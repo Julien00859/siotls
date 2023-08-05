@@ -40,6 +40,9 @@ dev = [
 # Bug Tracker =
 # Funding =
 
+[project.scripts]
+siotls = "siotls.__main__:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

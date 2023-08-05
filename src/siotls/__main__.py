@@ -3,23 +3,78 @@ import getpass
 import importlib.resources
 import logging
 import mimetypes
-import pathlib
 import os
+import pathlib
 import sys
 import warnings
+from socket import socket
 
-import onioncorn
-import onioncorn.server
+import siotls
+
+def hexdump(bytes_):
+    """
+    Produce a pretty hexdump suitable for human reading
+
+    >>> hexdump(b'\x00\x17Hello world!\nSweat day.\x00')
+    '''\
+    0000: 00 17 48 65 6c 6c 6f 20  77 6f 72 6c 64 21 0a 53  ..Hello  world!.S
+    0010: 77 65 61 74 20 64 61 79  2e 00                    weat day ..'''
+    """
+    it = iter(bytes_)
+    xd = bytearray()
+    hex_ = bytearray()
+    d = math.ceil(math.ceil(len(bytes_).bit_length() / 4) / 4) * 4
+    i = 0
+    while line := bytes(itertools.islice(it, 16)):
+        hex_.clear()
+        hex_.extend(binascii.hexlify(line[:8], ' '))
+        hex_.extend(b'  ')
+        hex_.extend(binascii.hexlify(line[8:], ' '))
+        hex_.extend(b'  ')
+        hex_.extend(b' ' * (50 - len(hex_)))  # 3 * 16 + 2
+        xd.extend(f'{i:0{d}x}: '.encode())
+        xd.extend(hex_)
+        xd.extend([byte if 32 <= byte <= 126 else 46 for byte in line[:8]])
+        xd.extend(b' ')
+        xd.extend([byte if 32 <= byte <= 126 else 46 for byte in line[8:]])
+        xd.extend(b'\n')
+        i += 16
+    if bytes_:
+        xd.pop()  # ditch last \n
+    return xd.decode()
 
 
-logger = logging.getLogger(__name__)
+def serve(port, tlscert, tlskey):
+    logger = logging.getLogger(f'{__package__}.serve')
+
+    server = socket()
+    server.bind(('localhost', port))
+    server.listen(1)
+    logger.info("listening on %s", port)
+
+    try:
+        while True:
+            client = None
+            client, client_info = server.accept()
+            logger.info("new connection from %s", client_info[1])
+
+            while message := client.recv(1024):
+                logger.info("%s bytes from %s:\n%s", len(message), client_info[1], hexdump(message))
+            logger.info("end of connection with %s", client_info[1])
+    except KeyboardInterrupt:
+        logger.info("closing server")
+    finally:
+        if client:
+            client.close()
+        server.close()
+
 
 
 def main():
     mimetypes.init()
     parser = argparse.ArgumentParser(prog=__package__)
     parser.add_argument('-V', '--version', action='version',
-        version=f'%(prog)s {onioncorn.__version__}')
+        version=f'%(prog)s {siotls.__version__}')
     parser.add_argument('-v', '--verbose', action='count', default=0,
         help="Increase logging verbosity (repeatable)")
     parser.add_argument('-s', '--silent', action='count', default=0,
@@ -27,10 +82,10 @@ def main():
     parser.add_argument('port', action='store', type=int,
         help="TCP port number on which the server will listen")
     parser.add_argument('--tlscert', '--sslcert', action='store', type=pathlib.Path,
-        default=importlib.resources.path('onioncorn.data', 'self-signed-cert.pem'),
+        default=importlib.resources.path('siotls.data', 'self-signed-cert.pem'),
         help="Path to the SSL/TLS certificate file")
     parser.add_argument('--tlskey', '--sslkey', action='store', type=pathlib.Path,
-        default=importlib.resources.path('onioncorn.data', 'self-signed-key.pem'),
+        default=importlib.resources.path('siotls.data', 'self-signed-key.pem'),
         help="Path to the SSL/TLS private key file")
 
     try:
@@ -49,27 +104,10 @@ def main():
     if not os.access(options.tlskey, os.R_OK):
         logging.critical("Cannot access TLS private key file at %s", options.tlscert)
         return 1
-    if any(
-        self_signed_hint in file.name.replace('-', '').replace('_', '')
-        for file in [options.tlskey, options.tlscert]
-        for self_signed_hint in ['snakeoil', 'selfsigned']
-    ):
-        logger.warning("Looks like your TLS key/cert is self-signed, unwise for production.")
-    elif options.tlskey.stat().st_mode & 0o66:
-        logging.critical(
-            "The TLS private key file at %s has too broad permissions, it should only be "
-            "readable by the current user %r. In case you are using a self-signed certificate "
-            "for development, please rename it as %r or leave out the option to use the "
-            "self-signed certificate/private key bundled with onioncorn.",
-            options.tlskey,
-            getpass.getuser(),
-            options.tlskey.with_stem(f"{options.tlskey.stem}-self-signed").name
-        )
-        return 1
 
     # Run server
     try:
-        onioncorn.server.serve(options.port, os.fspath(options.tlscert), os.fspath(options.tlskey))
+        serve(options.port, os.fspath(options.tlscert), os.fspath(options.tlskey))
     except Exception as exc:
         logger.critical("Fatal exception while running the server", exc_info=exc)
         return 1
