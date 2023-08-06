@@ -1,18 +1,24 @@
 import enum
 import math
 
-class HexEnum(enum.IntEnum):
+class Hex1Enum(enum.IntEnum):
+    """ An integer on 1 byte with hexadecimal representation """
     def __repr__(self):
-        digits = math.ceil(self.value.bit_length() / 8) * 2
-        return f'<{type(self).__name__}.{self.name}: {self.value} (0x{self.value:0{digits}x})>'
+        return f'<{type(self).__name__}.{self.name}: {self.value} ({self.value:02x})>'
 
 
-class AlertLevel(HexEnum):
+class Hex2Enum(enum.IntEnum):
+    """ An integer on 2 bytes with hexadecimal representation """
+    def __repr__(self):
+        return f'<{type(self).__name__}.{self.name}: {self.value} ({self.value:04x})>'
+
+
+class AlertLevel(Hex1Enum):
     WARNING = 1
     FATAL = 2
 
 
-class AlertDescription(HexEnum):
+class AlertDescription(Hex1Enum):
     CLOSE_NOTIFY = 0
     UNEXPECTED_MESSAGE = 10
     BAD_RECORD_MAC = 20
@@ -42,21 +48,18 @@ class AlertDescription(HexEnum):
     NO_APPLICATION_PROTOCOL = 120
 
 
-class CipherSuites(enum.Enum):
-    TLS_EMPTY_RENEGOTIATION_INFO_SCSV = (0x00, 0xff)
-    TLS_AES_128_GCM_SHA256 = (0x13, 0x01)
-    TLS_AES_256_GCM_SHA384 = (0x13, 0x02)
-    TLS_CHACHA20_POLY1305_SHA256 = (0x13, 0x03)
-    TLS_AES_128_CCM_SHA256 = (0x13, 0x04)
-    TLS_AES_128_CCM_8_SHA256 = (0x13, 0x05)
-
-    def __repr__(self):
-        return (f'<{type(self).__name__}.{self.name}: '
-                f'{self.value} (0x{self.value[0]:02x}{self.value[1]:02x})>')
+class CipherSuites(Hex2Enum):
+    # The actual type in uint8_t[2] and not uint16_t but we want to use
+    # an IntEnum in Python to ease serialization
+    TLS_EMPTY_RENEGOTIATION_INFO_SCSV = 0x00ff
+    TLS_AES_128_GCM_SHA256 = 0x1301
+    TLS_AES_256_GCM_SHA384 = 0x1302
+    TLS_CHACHA20_POLY1305_SHA256 = 0x1303
+    TLS_AES_128_CCM_SHA256 = 0x1304
+    TLS_AES_128_CCM_8_SHA256 = 0x1305
 
 
-
-class ContentType(HexEnum):
+class ContentType(Hex1Enum):
     INVALID = 0
     CHANGE_CIPHER_SPEC = 20
     ALERT = 21
@@ -64,7 +67,25 @@ class ContentType(HexEnum):
     APPLICATION_DATA = 23
 
 
-class ExtensionType(HexEnum):
+class HandshakeType(Hex1Enum):
+    CLIENT_HELLO = 1
+    SERVER_HELLO = 2
+    NEW_SESSION_TICKET = 4
+    END_OF_EARLY_DATA = 5
+    ENCRYPTED_EXTENSIONS = 8
+    CERTIFICATE = 11
+    CERTIFICATE_REQUEST = 13
+    CERTIFICATE_VERIFY = 15
+    FINISHED = 20
+    KEY_UPDATE = 24
+    MESSAGE_HASH = 254
+
+
+#-----------------------------------------------------------------------
+# Extension related types
+#-----------------------------------------------------------------------
+
+class ExtensionType(Hex2Enum):
     SERVER_NAME = 0
     MAX_FRAGMENT_LENGTH = 1
     STATUS_REQUEST = 5
@@ -89,36 +110,27 @@ class ExtensionType(HexEnum):
     KEY_SHARE = 51
 
 
-class HandshakeType(HexEnum):
-    CLIENT_HELLO = 1
-    SERVER_HELLO = 2
-    NEW_SESSION_TICKET = 4
-    END_OF_EARLY_DATA = 5
-    ENCRYPTED_EXTENSIONS = 8
-    CERTIFICATE = 11
-    CERTIFICATE_REQUEST = 13
-    CERTIFICATE_VERIFY = 15
-    FINISHED = 20
-    KEY_UPDATE = 24
-    MESSAGE_HASH = 254
-
-
-
-# Not IANA
-class TLSVersion(HexEnum):
-    TLS_1_0 = 0x0301
-    TLS_1_2 = 0x0303
-    TLS_1_3 = 0x0304
-
-#
-#  Extensions
-#
-
-class NameType(HexEnum):
+class NameType(Hex1Enum):
     HOST_NAME = 0
 
-class MaxFragmentLength(HexEnum):
+
+class MaxFragmentLength(Hex1Enum):
     LIMIT_512 = 1
     LIMIT_1024 = 2
     LIMIT_2048 = 3
     LIMIT_4096 = 4
+
+
+class CertificateStatusType(Hex1Enum):
+    OCSP = 1
+
+
+#-----------------------------------------------------------------------
+# Extra non-IANA types registered here for simplicity
+#-----------------------------------------------------------------------
+
+class TLSVersion(Hex2Enum):
+    TLS_1_0 = 0x0301
+    TLS_1_1 = 0x0302
+    TLS_1_2 = 0x0303
+    TLS_1_3 = 0x0304

@@ -13,8 +13,24 @@ import siotls.examples.simple
 logger = logging.getLogger(__name__)
 
 
+# Color the LEVEL part of messages, need new terminal on Windows
+class ColoredFormatter(logging.Formatter):
+    colors = {
+        logging.DEBUG: (34, 49),  # blue
+        logging.INFO: (32, 49),  # green
+        logging.WARNING: (33, 49),  # yellow
+        logging.ERROR: (31, 49),  # red
+        logging.CRITICAL: (37, 41),  # white on red
+    }
+    def format(self, record):
+        fg, bg = type(self).colors.get(record.levelno, (32, 49))
+        record.levelname = f'\033[1;{fg}m\033[1;{bg}m{record.levelname}\033[0m'
+        return super().format(record)
+
+
 def main():
-    mimetypes.init()
+    logging.basicConfig()
+
     parser = argparse.ArgumentParser(prog=__package__)
     parser.add_argument('-V', '--version', action='version',
         version=f'%(prog)s {siotls.__version__}')
@@ -34,11 +50,17 @@ def main():
     try:
         options = parser.parse_args()
     except Exception as exc:
-        logging.basicConfig(level=logging.CRITICAL)
         logging.critical("Couldn't parse command line", exc_info=exc)
         return 1
 
-    setup_logging(logging.INFO - options.verbose * 10 + options.silent * 10)
+    # Configure logging
+    if hasattr(sys.stderr, 'fileno') and os.isatty(sys.stderr.fileno()):
+        logging.getLogger().formatter = ColoredFormatter(logging.BASIC_FORMAT)
+    verbosity = logging.INFO - options.verbose * 10 + options.silent * 10
+    logging.getLogger().setLevel(max(verbosity, logging.DEBUG))
+    if verbosity < logging.DEBUG:
+        logging.captureWarnings(True)
+        warnings.filterwarnings("default")
 
     # Check TLS cert/key
     if not os.access(options.tlscert, os.R_OK):
@@ -61,36 +83,6 @@ def main():
 
     return 0
 
-
-# Color the [LEVEL] part of messages, need new terminal on Windows
-# https://github.com/odoo/odoo/blob/13.0/odoo/netsvc.py#L57-L100
-class ColoredFormatter(logging.Formatter):
-    colors = {
-        logging.DEBUG: (34, 49),  # blue
-        logging.INFO: (32, 49),  # green
-        logging.WARNING: (33, 49),  # yellow
-        logging.ERROR: (31, 49),  # red
-        logging.CRITICAL: (37, 41),  # white fg, red bg
-    }
-    def format(self, record):
-        fg, bg = type(self).colors.get(record.levelno, (32, 49))
-        record.levelname = f'\033[1;{fg}m\033[1;{bg}m{record.levelname}\033[0m'
-        return super().format(record)
-
-
-def setup_logging(verbosity):
-    stderr = logging.StreamHandler()
-    stderr.formatter = (
-        ColoredFormatter('[%(levelname)s] %(message)s')
-        if hasattr(sys.stderr, 'fileno') and os.isatty(sys.stderr.fileno()) else
-        logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-    )
-    root_logger = logging.getLogger('' if __name__ == '__main__' else __package__)
-    root_logger.handlers = [stderr]
-    root_logger.setLevel(max(verbosity, logging.DEBUG))
-    if verbosity < logging.DEBUG:
-        logging.captureWarnings(capture=True)
-        warnings.filterwarnings("default")
 
 if __name__ == '__main__':
     sys.exit(main())

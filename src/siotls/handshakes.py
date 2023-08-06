@@ -2,12 +2,15 @@ import enum
 import struct
 from contextlib import suppress
 from .iana import ContentType, HandshakeType
-from .serializable import Serializable, ProtocolIO
+from .content import Content
+from .serial import Serializable, SerialIO
 
-handshakemap = {}
+handshake_registry = {}
 
 
-class Handshake(Serializable):
+class Handshake(Content, Serializable):
+    content_type = ContentType.HANDSHAKE
+
     # struct {
     #     HandshakeType msg_type;    /* handshake type */
     #     uint24 length;             /* remaining bytes in message */
@@ -26,9 +29,20 @@ class Handshake(Serializable):
     # } Handshake;
     msg_type: HandshakeType
 
-    def __init_subclass__(cls, *, **kwargs):
+    def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        handshakemap[cls.msg_type] = cls
+        handshake_registry[cls.msg_type] = cls
+
+    @classmethod
+    def parse(cls, data):
+        stream = SerialIO(data)
+
+        msg_type = stream.read_int(1)
+        try:
+            cls = handshake_registry[HandshakeType(name_type)]
+        except ValueError:
+            raise alerts.UnrecognizedName() from exc
+        return cls.parse(stream.read())
 
 
 class ClientHello(Handshake):
@@ -53,7 +67,6 @@ class ClientHello(Handshake):
     cipher_suites: list
     legacy_compression_methods = b'\x00'  # "null" compression method
     extensions: list['siotls.extensions.Extension']
-    ...
 
     def __init__(self, random_, cipher_suites, extensions):
         self.random = random_
@@ -62,11 +75,12 @@ class ClientHello(Handshake):
 
     @classmethod
     def parse(cls, data):
-        stream = ProtocolIO(data)
+        stream = SerialIO(data)
 
         legacy_version = stream.read_int(2)
-        with suppress(ValueError):
-            legacy_version = TLSVersion(legacy_version)
+        if legacy_version != TLSVersion.TLS_1_2:
+            raise alerts.ProtocolVersion()
+        legacy_version = TLSVersion(legacy_version)
 
         random_ = stream.read_exactly(32)
         legacy_session_id = stream.read_var(1)
@@ -74,32 +88,29 @@ class ClientHello(Handshake):
         cipher_suites = []
         it = iter(stream.read_var(2))
         for pair in zip(it, it):
-            # geometrie variable, pas bien !
+            cipher = (pair[0] << 8) + pair[1]
             try:
-                cipher_suites.append(CipherSuites(pair))
+                cipher_suites.append(CipherSuites(cipher))
             except ValueError:
-                cipher_suites.append(pair)
+                cipher_suites.append(cipher)
 
         legacy_compression_methods = stream.read_var(1)
         if legacy_compression_methods != '\x00':  # "null" compression method
             raise alerts.IllegalParameter()
 
         extensions = []
-        extensions_length = stream.read_int(2)
-        while extensions_length:
-            extension_type = stream.read_int(2)
-            extension_data = stream.read_var(2)
-            extensions_length -= 4 + len(extension_data)
-            if extension_cls := extensionmap.get(extension_type):
-                if msg_type not in extension_cls.handshake_types:
-                    raise ...
-                extension = extension_cls.parse(extension_data)
-            else:
-                extension = UnknownExtension(extension_type, extension_data)
-            extensions.append(extension)
+        remaining = stream.read_int(2)
+        while remaining > 0:
+            with stream.peek():
+                stream.read_exactly(2, limit=remaining)  # extension_type
+                extensions_length = stream.read_int(2, limit=remaining - 2)
+            extensions.append(
+                Extension.parse(stream.read_exactly(4 + extensions_length), limit=remaining)
+            )
+            remaining -= length
 
-        if remaining_data := len(data) - stream.tell():
-            raise ValueError(f"Expected end of stream but {remaining_data} bytes remain.")
+        if remaining := len(data) - stream.tell():
+            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
 
         self = cls(random_, cipher_suites, extensions)
         self.legacy_version = legacy_version
@@ -108,7 +119,6 @@ class ClientHello(Handshake):
         return self
 
     def serialize(self):
-        ...
 
 
 
