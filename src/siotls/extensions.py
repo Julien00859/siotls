@@ -20,6 +20,26 @@ class Extension(Serializable):
         super().__init_subclass__(**kwargs)
         extensionmap[cls.extension_type] = cls
 
+class UnknownExtension(Extension):
+    handshake_types = set(HandshakeType.__members__.keys())
+    extension_data: bytes
+
+    def __init__(self, extension_type, extension_data):
+        self.extension_type = extension_type
+        self.extension_data = extension_data
+
+    @classmethod
+    def parse(cls, data):
+        raise NotImplementedError("Cannot parse an unknown extension.")
+
+    @classmethod
+    def serialize(self):
+        return b''.join([
+            self.extension_type.to_bytes(2, 'big'),
+            len(self.extension_data).to_bytes(2, 'big'),
+            self.extension_data,
+        ])
+
 class ServerName(Extension):
     extension_type = ExtensionType.SERVER_NAME
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
@@ -67,8 +87,10 @@ class ServerName(Extension):
                 case _:
                     raise RuntimeError("unreachable")
 
-        if remaining_data := stream.tell() < len(data):
+        if remaining_data := len(data) - stream.tell():
             raise ValueError(f"Expected end of stream but {remaining_data} bytes remain.")
+
+        return cls(server_name_list)
 
     def serialize(self):
         stream = ProtocolIO()

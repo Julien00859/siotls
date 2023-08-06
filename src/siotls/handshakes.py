@@ -47,51 +47,68 @@ class ClientHello(Handshake):
     #     opaque legacy_compression_methods<1..2^8-1>;
     #     Extension extensions<8..2^16-1>;
     # } ClientHello;
-    legacy_version = 0x0303
+    legacy_version = TLSVersion.TLS_1_2
     random: bytes
-    legacy_session_id: bytes
+    legacy_session_id = b''
     cipher_suites: list
-    legacy_compression_methods: bytes
+    legacy_compression_methods = b'\x00'  # "null" compression method
     extensions: list['siotls.extensions.Extension']
     ...
+
+    def __init__(self, random_, cipher_suites, extensions):
+        self.random = random_
+        self.cipher_suites = cipher_suites
+        self.extensions = extensions
 
     @classmethod
     def parse(cls, data):
         stream = ProtocolIO(data)
-
-        msg_type = HandshakeType(stream.read_int(1))
-        length = stream.read_int(3)
-        if len(data) < length:
-            raise ...  # missing data, bail
-        if len(data) > length:
-            raise ...  # protocol error
 
         legacy_version = stream.read_int(2)
         with suppress(ValueError):
             legacy_version = TLSVersion(legacy_version)
 
         random_ = stream.read_exactly(32)
-        session_id = stream.read_var(1)
-        cipher_suites = list(map(CipherSuites, zip(it:=iter(stream.read_var(2)), it)))
-        compression_methods = stream.read_var(1)
-        extensions = []
+        legacy_session_id = stream.read_var(1)
 
+        cipher_suites = []
+        it = iter(stream.read_var(2))
+        for pair in zip(it, it):
+            # geometrie variable, pas bien !
+            try:
+                cipher_suites.append(CipherSuites(pair))
+            except ValueError:
+                cipher_suites.append(pair)
+
+        legacy_compression_methods = stream.read_var(1)
+        if legacy_compression_methods != '\x00':  # "null" compression method
+            raise alerts.IllegalParameter()
+
+        extensions = []
         extensions_length = stream.read_int(2)
         while extensions_length:
             extension_type = stream.read_int(2)
-            Extension[extension_type]
+            extension_data = stream.read_var(2)
+            extensions_length -= 4 + len(extension_data)
+            if extension_cls := extensionmap.get(extension_type):
+                if msg_type not in extension_cls.handshake_types:
+                    raise ...
+                extension = extension_cls.parse(extension_data)
+            else:
+                extension = UnknownExtension(extension_type, extension_data)
+            extensions.append(extension)
 
-            try:
-                extension.type = ExtensionType(extension.type)
-            except ValueError:
-                pass
-            length = int.from_bytes(read(2), 'big')
-            extension.data = stream.read(length)
-            handshake.extensions.append(vars(extension))
-            extensions_length -= length + 4
+        if remaining_data := len(data) - stream.tell():
+            raise ValueError(f"Expected end of stream but {remaining_data} bytes remain.")
 
-        pp(vars(record))
-        pp(vars(handshake))
+        self = cls(random_, cipher_suites, extensions)
+        self.legacy_version = legacy_version
+        self.legacy_session_id = legacy_session_id
+        self.legacy_compression_methods = legacy_compression_methods
+        return self
+
+    def serialize(self):
+        ...
 
 
 
