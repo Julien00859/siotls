@@ -1,6 +1,7 @@
 import enum
 from .iana import AlertLevel, AlertDescription
 from .utils import RegistryMixin
+from .serial import SerialIO
 
 alert_registry = {}
 
@@ -50,7 +51,8 @@ class Alert(Exception, Content, Serializable):
     level: AlertLevel
     description: AlertDescription
 
-    def __init__(self, level, description):
+    def __init__(self, message, level, description):
+        super().__init__(message, level, description)
         self.level = level
         self.description = description
 
@@ -60,7 +62,12 @@ class Alert(Exception, Content, Serializable):
 
     @classmethod
     def parse(cls, data):
-        return cls(*struct.unpack('!BB'), data)
+        stream = SerialIO(data)
+        level = stream.read_int(1)
+        description = stream.read_int(1)
+        if remaining := len(data) - stream.tell():
+            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+        return cls('', stream, level)
 
     def serialize(self):
         return struct.pack('!BB', self.level, self.description)

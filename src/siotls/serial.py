@@ -1,7 +1,10 @@
 import abc
 import contextlib
 import io
-import struct
+
+
+class MissingData(ValueError):
+    pass
 
 
 class Serializable(metaclass=abc.ABCMeta):
@@ -12,10 +15,6 @@ class Serializable(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def serialize(self):
         raise NotImplementedError("abstract method")
-
-
-class MissingData(ValueError):
-    pass
 
 
 class SerialIO(io.BytesIO):

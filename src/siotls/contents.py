@@ -5,7 +5,8 @@ class Content:
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        content_registry[cls.content_type] = cls
+        if Content in cls.__bases__:
+            content_registry[cls.content_type] = cls
 
 
 class ApplicationData(Content, Serializable):
