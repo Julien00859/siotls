@@ -1,7 +1,6 @@
-import enum
-from .iana import AlertLevel, AlertDescription
-from .utils import RegistryMixin
-from .serial import SerialIO
+from .iana import AlertLevel, AlertDescription, ContentType
+from .serial import SerialIO, Serializable
+from .contents import Content
 
 alert_registry = {}
 
@@ -51,10 +50,10 @@ class Alert(Exception, Content, Serializable):
     level: AlertLevel
     description: AlertDescription
 
-    def __init__(self, message, level, description):
+    def __init__(self, message='', level=None, description=None):
         super().__init__(message, level, description)
-        self.level = level
-        self.description = description
+        self.level = level or type(self).level
+        self.description = description or type(self).description
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -67,10 +66,10 @@ class Alert(Exception, Content, Serializable):
         description = stream.read_int(1)
         if remaining := len(data) - stream.tell():
             raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
-        return cls('', stream, level)
+        return cls('', level, description)
 
     def serialize(self):
-        return struct.pack('!BB', self.level, self.description)
+        return ((self.level << 8) + self.description).to_bytes('big')
 
 
 class CloseNotify(Alert):

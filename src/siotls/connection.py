@@ -1,3 +1,14 @@
+import logging
+
+from .serial import SerialIO, MissingData
+from .iana import ContentType
+from . import alerts
+from .contents import content_registry
+
+
+logger = logging.getLogger(__name__)
+
+
 class TLSConfiguration:
     def __init__(self, side):
         assert side in ('server', 'client')
@@ -10,8 +21,8 @@ class TLSConnection:
         self.negociated_config = ...
         self._input_data = b''
         self._output_data = b''
-
-        self.state = (... if self.config.side == 'server' else ...)(self)
+        #self.state = (... if self.config.side == 'server' else ...)(self)
+        self.encrypted = False
 
     def receive_data(self, data):
         if not data:
@@ -23,11 +34,9 @@ class TLSConnection:
         stream = SerialIO(self._input_data)
         contents = self._process_stream(stream)
         self._input_data = self._input_data[stream.tell()]
-        events = self._process_contents(contents)
+        return self._process_contents(contents)
 
-        return self.process(contents)
-
-    def _process_stream(self):
+    def _process_stream(self, stream):
         contents = []
         while record := self._get_next_record(stream):
             content_type, fragment = record
@@ -36,10 +45,9 @@ class TLSConnection:
             elif len(fragment) < 4:
                 raise alerts.DecodeError()
             else:
-                handshake_type = int.from_bytes(fragment[0], 'big')
                 handshake_length = int.from_bytes(fragment[1:3], 'big')
-                data = bytearray(fragment[4:])
-                while len(data) < handshake_length:
+                data = bytearray(fragment)
+                while len(data) < handshake_length + 6:
                     record = self._get_next_record(stream)
                     if not record:
                         raise MissingData()
@@ -58,7 +66,7 @@ class TLSConnection:
 
 
     def _get_next_record(self, stream):
-        pos = stream.pos()
+        pos = stream.tell()
         try:
             content_type = stream.read_int(1)
             legacy_version = stream.read_int(2)
@@ -82,4 +90,5 @@ class TLSConnection:
         return innertext[i], innertext[:i-1]
 
     def _process_contents(contents):
-        return []
+        return contents
+        #return []

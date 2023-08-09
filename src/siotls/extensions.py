@@ -1,14 +1,11 @@
-import enum
-import struct
-from typing import Literal, Any
 from . import alerts
-from .iana import ExtensionType, HandshakeType as HT
+from .iana import ExtensionType, HandshakeType as HT, NameType, MaxFragmentLength, CertificateStatusType
 from .serial import Serializable, SerialIO
 
 
 extension_registry = {}
 
-class Extension(Se):
+class Extension(Serializable):
     # struct {
     #     ExtensionType extension_type;
     #     opaque extension_data<0..2^16-1>;
@@ -78,7 +75,7 @@ class ServerNameList(Extension):
     # struct {
     #     ServerName server_name_list<1..2^16-1>
     # } ServerNameList;
-    server_name_list: list[ServerName]
+    server_name_list: list['ServerName']
 
     def __init__(self, server_name_list):
         self.server_name_list = server_name_list
@@ -154,7 +151,7 @@ class ServerName(Serializable):
         name_type = stream.read_int(1)
         try:
             cls = server_name_registry[NameType(name_type)]
-        except ValueError:
+        except ValueError as exc:
             # unknown type, can choice to either crash or ignore
             # this extension, crash for now.
             # should be configurable (should it?)
@@ -172,6 +169,9 @@ class HostName(ServerName):
     name_type = NameType.HOST_NAME
     # opaque HostName<1..2^16-1>;
     host_name: bytes
+
+    def __init__(self, host_name):
+        self.host_name = host_name
 
     @classmethod
     def parse(cls, data):
@@ -260,7 +260,7 @@ class StatusRequest(Extension):
     def serialize(self):
         return b''.join([
             self.status_type.to_bytes(1, 'big'),
-            status_request_registry[status_type].serial(),
+            status_request_registry[self.status_type].serial(),
         ])
 
 
@@ -283,6 +283,7 @@ class OCSPStatusRequest(StatusRequest):
 
     @classmethod
     def parse(cls, data):
+        stream = SerialIO(data)
         responder_id_list = []
         remaining = stream.read_int(2)
         while remaining > 0:

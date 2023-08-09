@@ -1,9 +1,8 @@
-import enum
-import struct
-from contextlib import suppress
-from .iana import ContentType, HandshakeType
-from .content import Content
+from .iana import CipherSuites, ContentType, HandshakeType, TLSVersion
+from .contents import Content
+from .extensions import Extension
 from .serial import Serializable, SerialIO
+from . import alerts
 
 handshake_registry = {}
 
@@ -38,11 +37,15 @@ class Handshake(Content, Serializable):
         stream = SerialIO(data)
 
         msg_type = stream.read_int(1)
+        length = stream.read_int(3)
         try:
-            cls = handshake_registry[HandshakeType(name_type)]
-        except ValueError:
+            cls = handshake_registry[HandshakeType(msg_type)]
+        except ValueError as exc:
             raise alerts.UnrecognizedName() from exc
-        return cls.parse(stream.read())
+        self = cls.parse(stream.read_exactly(length))
+        if remaining := len(data) - stream.tell():
+            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+        return self
 
 
 class ClientHello(Handshake):
@@ -66,7 +69,7 @@ class ClientHello(Handshake):
     legacy_session_id = b''
     cipher_suites: list
     legacy_compression_methods = b'\x00'  # "null" compression method
-    extensions: list['siotls.extensions.Extension']
+    extensions: list[Extension]
 
     def __init__(self, random_, cipher_suites, extensions):
         self.random = random_
@@ -95,19 +98,19 @@ class ClientHello(Handshake):
                 cipher_suites.append(cipher)
 
         legacy_compression_methods = stream.read_var(1)
-        if legacy_compression_methods != '\x00':  # "null" compression method
+        if legacy_compression_methods != b'\x00':  # "null" compression method
             raise alerts.IllegalParameter()
 
         extensions = []
         remaining = stream.read_int(2)
         while remaining > 0:
-            with stream.peek():
+            with stream.lookahead():
                 stream.read_exactly(2, limit=remaining)  # extension_type
                 extensions_length = stream.read_int(2, limit=remaining - 2)
             extensions.append(
-                Extension.parse(stream.read_exactly(4 + extensions_length), limit=remaining)
+                Extension.parse(stream.read_exactly(4 + extensions_length, limit=remaining))
             )
-            remaining -= length
+            remaining -= extensions_length
 
         if remaining := len(data) - stream.tell():
             raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
@@ -119,7 +122,7 @@ class ClientHello(Handshake):
         return self
 
     def serialize(self):
-
+        raise NotImplementedError()
 
 
 class ServerHello(Handshake):

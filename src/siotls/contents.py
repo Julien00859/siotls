@@ -1,3 +1,6 @@
+from .serial import Serializable
+from .iana import ContentType
+
 content_registry = {}
 
 class Content:
