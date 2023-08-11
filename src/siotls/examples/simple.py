@@ -25,8 +25,12 @@ def serve(port, tlscert, tlskey):
             client = None
             client, client_info = server.accept()
             logger.info("new connection from %s", client_info[1])
-            handle_one(client, client_info)
+            try:
+                handle_one(client, client_info)
+            except Exception:
+                logger.exception("while parsing data from %s", client_info[1])
             logger.info("end of connection with %s", client_info[1])
+            client.close()
     except KeyboardInterrupt:
         logger.info("closing server")
     finally:
