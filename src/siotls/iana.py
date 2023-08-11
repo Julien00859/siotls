@@ -1,16 +1,15 @@
 import enum
-import math
 
 class Hex1Enum(enum.IntEnum):
     """ An integer on 1 byte with hexadecimal representation """
     def __repr__(self):
-        return f'<{type(self).__name__}.{self.name}: {self.value} ({self.value:02x})>'
+        return f'<{type(self).__name__}.{self.name}: {self.value} (0x{self.value:02x})>'
 
 
 class Hex2Enum(enum.IntEnum):
     """ An integer on 2 bytes with hexadecimal representation """
     def __repr__(self):
-        return f'<{type(self).__name__}.{self.name}: {self.value} ({self.value:04x})>'
+        return f'<{type(self).__name__}.{self.name}: {self.value} (0x{self.value:04x})>'
 
 
 class AlertLevel(Hex1Enum):
