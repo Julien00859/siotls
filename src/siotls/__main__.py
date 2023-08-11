@@ -1,7 +1,6 @@
 import argparse
 import importlib.resources
 import logging
-import mimetypes
 import os
 import pathlib
 import sys
@@ -25,6 +24,7 @@ class ColoredFormatter(logging.Formatter):
     def format(self, record):
         fg, bg = type(self).colors.get(record.levelno, (32, 49))
         record.levelname = f'\033[1;{fg}m\033[1;{bg}m{record.levelname}\033[0m'
+        record.name = f'\033[1;29m\033[1;49m{record.name}\033[0m'
         return super().format(record)
 
 
@@ -55,7 +55,7 @@ def main():
 
     # Configure logging
     if hasattr(sys.stderr, 'fileno') and os.isatty(sys.stderr.fileno()):
-        logging.getLogger().formatter = ColoredFormatter(logging.BASIC_FORMAT)
+        logging.getLogger().handlers[0].formatter = ColoredFormatter(logging.BASIC_FORMAT)
     verbosity = logging.INFO - options.verbose * 10 + options.silent * 10
     logging.getLogger().setLevel(max(verbosity, logging.DEBUG))
     if verbosity < logging.DEBUG:
