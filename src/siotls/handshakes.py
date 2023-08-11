@@ -1,7 +1,7 @@
 from .iana import CipherSuites, ContentType, HandshakeType, TLSVersion
 from .contents import Content
 from .extensions import Extension
-from .serial import Serializable, SerialIO
+from .serial import Serializable, SerializableBody, SerialIO
 from . import alerts
 
 handshake_registry = {}
@@ -42,13 +42,16 @@ class Handshake(Content, Serializable):
             cls = handshake_registry[HandshakeType(msg_type)]
         except ValueError as exc:
             raise alerts.UnrecognizedName() from exc
-        self = cls.parse(stream.read_exactly(length))
+        self = cls.parse_body(stream.read_exactly(length))
         if remaining := len(data) - stream.tell():
             raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
         return self
 
+    def serialize(self):
+        raise NotImplementedError("todo")
 
-class ClientHello(Handshake):
+
+class ClientHello(Handshake, SerializableBody):
     msg_type = HandshakeType.CLIENT_HELLO
 
     # uint16 ProtocolVersion;
@@ -77,7 +80,7 @@ class ClientHello(Handshake):
         self.extensions = extensions
 
     @classmethod
-    def parse(cls, data):
+    def parse_body(cls, data):
         stream = SerialIO(data)
 
         legacy_version = stream.read_int(2)
@@ -121,11 +124,11 @@ class ClientHello(Handshake):
         self.legacy_compression_methods = legacy_compression_methods
         return self
 
-    def serialize(self):
-        raise NotImplementedError()
+    def serialize_body(self):
+        raise NotImplementedError("todo")
 
 
-class ServerHello(Handshake):
+class ServerHello(Handshake, SerializableBody):
     msg_type = HandshakeType.SERVER_HELLO
 
     # struct {
@@ -139,42 +142,41 @@ class ServerHello(Handshake):
     ...
 
 
-class EndOfEarlyData(Handshake):
+class EndOfEarlyData(Handshake, SerializableBody):
     msg_type = HandshakeType.END_OF_EARLY_DATA
     ...
 
 
-class EncryptedExtensions(Handshake):
+class EncryptedExtensions(Handshake, SerializableBody):
     msg_type = HandshakeType.ENCRYPTED_EXTENSIONS
     ...
 
 
-class CertificateRequest(Handshake):
+class CertificateRequest(Handshake, SerializableBody):
     msg_type = HandshakeType.CERTIFICATE_REQUEST
     ...
 
 
-class Certificate(Handshake):
+class Certificate(Handshake, SerializableBody):
     msg_type = HandshakeType.CERTIFICATE
     ...
 
 
-class CertificateVerify(Handshake):
+class CertificateVerify(Handshake, SerializableBody):
     msg_type = HandshakeType.CERTIFICATE_VERIFY
     ...
 
 
-class Finished(Handshake):
+class Finished(Handshake, SerializableBody):
     msg_type = HandshakeType.FINISHED
     ...
 
 
-class NewSessionTicket(Handshake):
+class NewSessionTicket(Handshake, SerializableBody):
     msg_type = HandshakeType.NEW_SESSION_TICKET
     ...
 
 
-class KeyUpdate(Handshake):
+class KeyUpdate(Handshake, SerializableBody):
     msg_type = HandshakeType.KEY_UPDATE
     ...
-

@@ -11,26 +11,28 @@ class MissingData(ValueError):
     pass
 
 
-def serial_verbose(func):
+def parse_verbose(func):
     def wrapped(data):
-        try:
-            return func(data)
-        except Exception as exc:
-            if hasattr(exc, 'serializable_verbose_logged'):
-                raise
-            exc.serializable_verbose_logged = True
-            logger.debug(
-                "While parsing data for %s:\n%s",
-                func.__self__.__name__,
-                hexdump(data),
-                exc_info=True
-            )
-            raise
+        logger.debug(
+            "Parsing %s\nStruct:\n%s\nData:\n%s\n",
+            func.__self__.__name__,
+            '',  # todo struct
+            hexdump(data),
+        )
+        return func(data)
     return wrapped
 
 
-def raise_not_implemented_error(*args):
-    raise NotImplementedError()
+def serialize_verbose(func):
+    def wrapped():
+        logger.debug(
+            "Serializing %s\nStruct:\n%s\nSelf:\n%s\n",
+            func.__self__.__name__,
+            '',  # todo struct
+            func.__self__,  # todo repr
+        )
+        return func()
+    return wrapped
 
 
 class Serializable(metaclass=abc.ABCMeta):
@@ -44,11 +46,31 @@ class Serializable(metaclass=abc.ABCMeta):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        if 'parse' in cls.__dict__:
-            cls.parse = serial_verbose(cls.parse)
-        else:
-            logger.warning("%s is missing a parse method", cls)
-            cls.parse = raise_not_implemented_error
+        if logger.isEnabledFor(logging.DEBUG):
+            if 'parse' in cls.__dict__:
+                cls.parse = parse_verbose(cls.parse)
+            if 'serialize' in cls.__dict__:
+                cls.serialize = serialize_verbose(cls.serialize)
+
+
+class SerializableBody(metaclass=abc.ABCMeta):
+    _struct: str
+
+    @abc.abstractclassmethod
+    def parse_body(cls, data):
+        raise NotImplementedError("abstract method")
+
+    @abc.abstractmethod
+    def serialize_body(self):
+        raise NotImplementedError("abstract method")
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if logger.isEnabledFor(logging.DEBUG):
+            if 'parse_body' in cls.__dict__:
+                cls.parse_body = parse_verbose(cls.parse_body)
+            if 'serialize_body' in cls.__dict__:
+                cls.serialize_body = serialize_verbose(cls.serialize_body)
 
 
 class SerialIO(io.BytesIO):

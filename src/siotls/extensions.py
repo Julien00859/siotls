@@ -1,6 +1,6 @@
 from . import alerts
 from .iana import ExtensionType, HandshakeType as HT, NameType, MaxFragmentLength, CertificateStatusType
-from .serial import Serializable, SerialIO
+from .serial import Serializable, SerializableBody, SerialIO
 
 
 extension_registry = {}
@@ -26,7 +26,7 @@ class Extension(Serializable):
             cls = extension_registry[ExtensionType(extension_type)]
         except ValueError:
             return UnknownExtension(extension_type, stream.read())
-        self = cls.parse(stream.read_var(2))
+        self = cls.parse_body(stream.read_var(2))
 
         if remaining := len(data) - stream.tell():
             raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
@@ -34,7 +34,7 @@ class Extension(Serializable):
         return self
 
     def serialize(self):
-        extension_data = extension_registry[self.extension_type].serial()
+        extension_data = self.serialize_body()
         return b''.join([
             self.extension_type.to_bytes(2, 'big'),
             len(extension_data).to_bytes(2, 'big'),
@@ -68,7 +68,7 @@ class UnknownExtension(Serializable):
 #-----------------------------------------------------------------------
 server_name_registry = {}
 
-class ServerNameList(Extension):
+class ServerNameList(Extension, SerializableBody):
     extension_type = ExtensionType.SERVER_NAME
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
@@ -81,7 +81,7 @@ class ServerNameList(Extension):
         self.server_name_list = server_name_list
 
     @classmethod
-    def parse(cls, data):
+    def parse_body(cls, data):
         stream = SerialIO(data)
 
         server_name_list = []
@@ -154,16 +154,16 @@ class ServerName(Serializable):
             # this extension, crash for now.
             # should be configurable (should it?)
             raise alerts.UnrecognizedName() from exc
-        return cls.parse(stream.read())
+        return cls.parse_body(stream.read())
 
     def serialize(self):
         return b''.join([
             self.name_type.to_bytes(1, 'big'),
-            server_name_registry[self.name_type].serial(),
+            self.serialize_body(),
         ])
 
 
-class HostName(ServerName):
+class HostName(ServerName, SerializableBody):
     name_type = NameType.HOST_NAME
     # opaque HostName<1..2^16-1>;
     host_name: bytes
@@ -172,14 +172,14 @@ class HostName(ServerName):
         self.host_name = host_name
 
     @classmethod
-    def parse(cls, data):
+    def parse_body(cls, data):
         stream = SerialIO(data)
         host_name = stream.read_var(2)
         if remaining := len(data) - stream.tell():
             raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
         return cls(host_name)
 
-    def serialize(self):
+    def serialize_body(self):
         return b''.join([
             len(self.host_name).to_bytes(2, 'big'),
             self.host_name,
@@ -190,7 +190,7 @@ class HostName(ServerName):
 # Max Fragment Length
 #-----------------------------------------------------------------------
 
-class MaxFragmentLength(Extension):
+class MaxFragmentLength(Extension, SerializableBody):
     extension_type = ExtensionType.MAX_FRAGMENT_LENGTH
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
@@ -203,7 +203,7 @@ class MaxFragmentLength(Extension):
         self.max_fragment_length = max_fragment_length
 
     @classmethod
-    def parse(cls, data):
+    def parse_body(cls, data):
         if len(data) != 1:
             raise ValueError(f"Expected exactly 1 byte but found {len(data)}")
         max_fragment_length = int.from_bytes(data[0], 'big')
@@ -213,7 +213,7 @@ class MaxFragmentLength(Extension):
             raise alerts.IllegalParameter() from exc
         return cls(max_fragment_length)
 
-    def serialize(self):
+    def serialize_body(self):
         return self.max_fragment_length.to_bytes(1, 'big')
 
 
@@ -222,7 +222,7 @@ class MaxFragmentLength(Extension):
 #-----------------------------------------------------------------------
 status_request_registry = {}
 
-class StatusRequest(Extension):
+class StatusRequest(Extension, SerializableBody):
     extension_type = ExtensionType.STATUS_REQUEST
     handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
 
@@ -242,7 +242,7 @@ class StatusRequest(Extension):
             status_request_registry[cls.extension_type] = cls
 
     @classmethod
-    def parse(abc, data):
+    def parse_body(abc, data):
         stream = SerialIO(data)
 
         status_type = stream.read_int(1)
@@ -255,14 +255,14 @@ class StatusRequest(Extension):
 
         return status_request_registry[status_type].parse(stream.read())
 
-    def serialize(self):
+    def serialize_body(self):
         return b''.join([
             self.status_type.to_bytes(1, 'big'),
             status_request_registry[self.status_type].serial(),
         ])
 
 
-class OCSPStatusRequest(StatusRequest):
+class OCSPStatusRequest(StatusRequest, Serializable):
     status_type = CertificateStatusType.OCSP
 
     # struct {
@@ -314,97 +314,97 @@ class OCSPStatusRequest(StatusRequest):
 
 
 
-class SupportedGroups(Extension):
+class SupportedGroups(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_GROUPS
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
-class SignatureAlgorithms(Extension):
+class SignatureAlgorithms(Extension, SerializableBody):
     extension_type = ExtensionType.SIGNATURE_ALGORITHMS
     handshake_types = {HT.CLIENT_HELLO}
 
 
-class UseSRTP(Extension):
+class UseSRTP(Extension, SerializableBody):
     extension_type = ExtensionType.USE_SRTP
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
-class Heartbeat(Extension):
+class Heartbeat(Extension, SerializableBody):
     extension_type = ExtensionType.HEARTBEAT
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
-class ApplicationLayerProtocolNegotiation(Extension):
+class ApplicationLayerProtocolNegotiation(Extension, SerializableBody):
     extension_type = ExtensionType.APPLICATION_LAYER_PROTOCOL_NEGOTIATION
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
-class SignedCertificateTimestamp(Extension):
+class SignedCertificateTimestamp(Extension, SerializableBody):
     extension_type = ExtensionType.SIGNED_CERTIFICATE_TIMESTAMP
     handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
 
 
-class ClientCertificateType(Extension):
+class ClientCertificateType(Extension, SerializableBody):
     extension_type = ExtensionType.CLIENT_CERTIFICATE_TYPE
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
-class ServerCertificateType(Extension):
+class ServerCertificateType(Extension, SerializableBody):
     extension_type = ExtensionType.SERVER_CERTIFICATE_TYPE
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
-class Padding(Extension):
+class Padding(Extension, SerializableBody):
     extension_type = ExtensionType.PADDING
     handshake_types = {HT.CLIENT_HELLO}
 
 
-class PreSharedKey(Extension):
+class PreSharedKey(Extension, SerializableBody):
     extension_type = ExtensionType.PRE_SHARED_KEY
     handshake_types = {HT.CLIENT_HELLO, HT.SERVER_HELLO}
 
 
-class EarlyData(Extension):
+class EarlyData(Extension, SerializableBody):
     extension_type = ExtensionType.EARLY_DATA
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS, HT.NEW_SESSION_TICKET}
 
 
-class SupportedVersions(Extension):
+class SupportedVersions(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_VERSIONS
     handshake_types = {HT.CLIENT_HELLO, HT.SERVER_HELLO}
 
 
-class Cookie(Extension):
+class Cookie(Extension, SerializableBody):
     extension_type = ExtensionType.COOKIE
     handshake_types = {HT.CLIENT_HELLO}
 
 
-class PskKeyExchangeModes(Extension):
+class PskKeyExchangeModes(Extension, SerializableBody):
     extension_type = ExtensionType.PSK_KEY_EXCHANGE_MODES
     handshake_types = {HT.CLIENT_HELLO}
 
 
-class CertificateAuthorities(Extension):
+class CertificateAuthorities(Extension, SerializableBody):
     extension_type = ExtensionType.CERTIFICATE_AUTHORITIES
     handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
 
 
-class OidFilters(Extension):
+class OidFilters(Extension, SerializableBody):
     extension_type = ExtensionType.OID_FILTERS
     handshake_types = {HT.CERTIFICATE_REQUEST}
 
 
-class PostHandshakeAuth(Extension):
+class PostHandshakeAuth(Extension, SerializableBody):
     extension_type = ExtensionType.POST_HANDSHAKE_AUTH
     handshake_types = {HT.CLIENT_HELLO}
 
 
-class SignatureAlgorithmsCert(Extension):
+class SignatureAlgorithmsCert(Extension, SerializableBody):
     extension_type = ExtensionType.SIGNATURE_ALGORITHMS_CERT
     handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
 
 
-class KeyShare(Extension):
+class KeyShare(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
     handshake_types = {HT.CLIENT_HELLO, HT.SERVER_HELLO}
 
