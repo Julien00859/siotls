@@ -111,19 +111,17 @@ class ServerNameList(Extension):
 
         return cls(server_name_list)
 
-    def serialize(self):
-        stream = SerialIO()
+    def serialize_body(self):
+        server_name_list = b''.join([
+            server_name.serialize()
+            for server_name
+            in self.server_name_list
+        ])
 
-        for name_type, *opaque in self.server_name_list:
-            stream.write_int(1, name_type)
-            match name_type:
-                case NameType.HOST_NAME:
-                    host_name, = opaque
-                    stream.write_var(2, host_name)
-                case _:
-                    raise KeyError(f"missing parser for {name_type}")
-
-        return stream.getvalue()
+        return b''.join([
+            len(server_name_list).to_bytes(2, 'big'),
+            server_name_list
+        ])
 
 
 class ServerName(Serializable):
