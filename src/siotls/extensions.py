@@ -3,7 +3,7 @@ from .iana import ExtensionType, HandshakeType as HT, NameType, MaxFragmentLengt
 from .serial import Serializable, SerializableBody, SerialIO
 
 
-extension_registry = {}
+_extension_registry = {}
 
 class Extension(Serializable):
     # struct {
@@ -13,17 +13,17 @@ class Extension(Serializable):
     extension_type: ExtensionType
     handshake_types: set
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if Extension in cls.__bases__:
-            extension_registry[cls.extension_type] = cls
+        if register and Extension in cls.__bases__:
+            _extension_registry[cls.extension_type] = cls
 
     @classmethod
     def parse(abc, data):
         stream = SerialIO(data)
         extension_type = stream.read_int(2)
         try:
-            cls = extension_registry[ExtensionType(extension_type)]
+            cls = _extension_registry[ExtensionType(extension_type)]
         except ValueError:
             return UnknownExtension(extension_type, stream.read())
         self = cls.parse_body(stream.read_var(2))
@@ -137,9 +137,9 @@ class ServerName(Serializable):
     # } NameType;
     name_type: NameType
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if ServerName in cls.__bases__:
+        if register and ServerName in cls.__bases__:
             server_name_registry[cls.name_type] = cls
 
     @classmethod
@@ -236,9 +236,9 @@ class StatusRequest(Extension, SerializableBody):
     # enum { ocsp(1), (255) } CertificateStatusType;
     status_type: CertificateStatusType
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if StatusRequest in cls.__bases__:
+        if register and CertificateStatusRequest in cls.__bases__:
             status_request_registry[cls.extension_type] = cls
 
     @classmethod

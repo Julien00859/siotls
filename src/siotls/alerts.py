@@ -2,8 +2,8 @@ from .iana import AlertLevel, AlertDescription, ContentType
 from .serial import SerialIO, Serializable
 from .contents import Content
 
-alert_registry = {}
 
+_alert_registry = {}
 
 class Alert(Exception, Content, Serializable):
     content_type = ContentType.ALERT
@@ -55,9 +55,10 @@ class Alert(Exception, Content, Serializable):
         self.level = level or type(self).level
         self.description = description or type(self).description
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        alert_registry[cls.description] = cls
+        if register and Alert in cls.__bases__:
+            _alert_registry[cls.description] = cls
 
     @classmethod
     def parse(cls, data):

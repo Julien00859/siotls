@@ -4,8 +4,8 @@ from .extensions import Extension
 from .serial import Serializable, SerializableBody, SerialIO
 from . import alerts
 
-handshake_registry = {}
 
+_handshake_registry = {}
 
 class Handshake(Content, Serializable):
     content_type = ContentType.HANDSHAKE
@@ -28,9 +28,10 @@ class Handshake(Content, Serializable):
     # } Handshake;
     msg_type: HandshakeType
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        handshake_registry[cls.msg_type] = cls
+        if register and Handshake in cls.__bases__:
+            _handshake_registry[cls.msg_type] = cls
 
     @classmethod
     def parse(cls, data):
@@ -39,7 +40,7 @@ class Handshake(Content, Serializable):
         msg_type = stream.read_int(1)
         length = stream.read_int(3)
         try:
-            cls = handshake_registry[HandshakeType(msg_type)]
+            cls = _handshake_registry[HandshakeType(msg_type)]
         except ValueError as exc:
             raise alerts.UnrecognizedName() from exc
         self = cls.parse_body(stream.read_exactly(length))

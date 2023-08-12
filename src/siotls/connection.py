@@ -3,7 +3,7 @@ import logging
 from .serial import SerialIO, MissingData
 from .iana import ContentType
 from . import alerts
-from .contents import content_registry
+from .contents import Content
 
 
 logger = logging.getLogger(__name__)
