@@ -14,6 +14,7 @@ from .serial import Serializable, SerializableBody, SerialIO
 _extension_registry = {}
 
 class Extension(Serializable):
+    _handshake_types: collections.abc.Container
     _struct = textwrap.dedent("""
         struct {
             ExtensionType extension_type;
@@ -45,7 +46,6 @@ class Extension(Serializable):
             }
         } Extension;
     """).strip('\n')
-    handshake_types: set
     extension_type: ExtensionType | int
 
     def __init_subclass__(cls, register=True, **kwargs):
@@ -235,7 +235,7 @@ class ServerNameList(Extension, SerializableBody):
 
 class MaxFragmentLength(Extension, SerializableBody):
     extension_type = ExtensionType.MAX_FRAGMENT_LENGTH
-    handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
     _struct = textwrap.dedent("""
         enum {
@@ -363,95 +363,95 @@ class OCSPStatusRequest(CertificateStatusRequest, Serializable):
 
 class SupportedGroups(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_GROUPS
-    handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
 class SignatureAlgorithms(Extension, SerializableBody):
     extension_type = ExtensionType.SIGNATURE_ALGORITHMS
-    handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = {HT.CLIENT_HELLO}
 
 
 class UseSRTP(Extension, SerializableBody):
     extension_type = ExtensionType.USE_SRTP
-    handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
 class Heartbeat(Extension, SerializableBody):
     extension_type = ExtensionType.HEARTBEAT
-    handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
 class ApplicationLayerProtocolNegotiation(Extension, SerializableBody):
     extension_type = ExtensionType.APPLICATION_LAYER_PROTOCOL_NEGOTIATION
-    handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
 class SignedCertificateTimestamp(Extension, SerializableBody):
     extension_type = ExtensionType.SIGNED_CERTIFICATE_TIMESTAMP
-    handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
+    _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
 
 
 class ClientCertificateType(Extension, SerializableBody):
     extension_type = ExtensionType.CLIENT_CERTIFICATE_TYPE
-    handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
 class ServerCertificateType(Extension, SerializableBody):
     extension_type = ExtensionType.SERVER_CERTIFICATE_TYPE
-    handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
 
 class Padding(Extension, SerializableBody):
     extension_type = ExtensionType.PADDING
-    handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = {HT.CLIENT_HELLO}
 
 
 class PreSharedKey(Extension, SerializableBody):
     extension_type = ExtensionType.PRE_SHARED_KEY
-    handshake_types = {HT.CLIENT_HELLO, HT.SERVER_HELLO}
+    _handshake_types = {HT.CLIENT_HELLO, HT.SERVER_HELLO}
 
 
 class EarlyData(Extension, SerializableBody):
     extension_type = ExtensionType.EARLY_DATA
-    handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS, HT.NEW_SESSION_TICKET}
+    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS, HT.NEW_SESSION_TICKET}
 
 
 class SupportedVersions(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_VERSIONS
-    handshake_types = {HT.CLIENT_HELLO, HT.SERVER_HELLO}
+    _handshake_types = {HT.CLIENT_HELLO, HT.SERVER_HELLO}
 
 
 class Cookie(Extension, SerializableBody):
     extension_type = ExtensionType.COOKIE
-    handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = {HT.CLIENT_HELLO}
 
 
 class PskKeyExchangeModes(Extension, SerializableBody):
     extension_type = ExtensionType.PSK_KEY_EXCHANGE_MODES
-    handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = {HT.CLIENT_HELLO}
 
 
 class CertificateAuthorities(Extension, SerializableBody):
     extension_type = ExtensionType.CERTIFICATE_AUTHORITIES
-    handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
+    _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
 
 
 class OidFilters(Extension, SerializableBody):
     extension_type = ExtensionType.OID_FILTERS
-    handshake_types = {HT.CERTIFICATE_REQUEST}
+    _handshake_types = {HT.CERTIFICATE_REQUEST}
 
 
 class PostHandshakeAuth(Extension, SerializableBody):
     extension_type = ExtensionType.POST_HANDSHAKE_AUTH
-    handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = {HT.CLIENT_HELLO}
 
 
 class SignatureAlgorithmsCert(Extension, SerializableBody):
     extension_type = ExtensionType.SIGNATURE_ALGORITHMS_CERT
-    handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
+    _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
 
 
 class KeyShare(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
-    handshake_types = {HT.CLIENT_HELLO, HT.SERVER_HELLO}
+    _handshake_types = {HT.CLIENT_HELLO, HT.SERVER_HELLO}
 
