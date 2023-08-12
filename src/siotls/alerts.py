@@ -46,12 +46,11 @@ class Alert(Exception, Content, Serializable):
         } Alert;
     """).strip('\n')
     level: AlertLevel
-    description: AlertDescription
+    description: AlertDescription | int
 
-    def __init__(self, message='', level=None, description=None):
-        super().__init__(message, level, description)
+    def __init__(self, message='', level=None):
+        super().__init__(message)
         self.level = level or type(self).level
-        self.description = description or type(self).description
 
     def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -59,16 +58,30 @@ class Alert(Exception, Content, Serializable):
             _alert_registry[cls.description] = cls
 
     @classmethod
-    def parse(cls, data):
+    def parse(abc, data):
         stream = SerialIO(data)
         level = stream.read_int(1)
         description = stream.read_int(1)
+
+        try:
+            cls = _alert_registry[AlertDescription(description)]
+        except ValueError:
+            cls = type('UnknownAlert', (UnknownAlert,), {
+                'description': description,
+                '_struct': UnknownAlert._struct,
+            })
+
         if remaining := len(data) - stream.tell():
             raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
-        return cls('', level, description)
+
+        return cls('', level)
 
     def serialize(self):
         return ((self.level << 8) + self.description).to_bytes('big')
+
+
+class UnknownAlert(Alert, register=False):
+    _struct = ""
 
 
 class CloseNotify(Alert):

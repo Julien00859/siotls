@@ -45,9 +45,8 @@ class Extension(Serializable):
             }
         } Extension;
     """).strip('\n')
-
-    extension_type: ExtensionType
     handshake_types: set
+    extension_type: ExtensionType | int
 
     def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -61,7 +60,10 @@ class Extension(Serializable):
         try:
             cls = _extension_registry[ExtensionType(extension_type)]
         except ValueError:
-            return UnknownExtension(extension_type, stream.read())
+            cls = type('UnknownExtension', (UnknownExtension,), {
+                '_struct': UnknownExtension._struct,
+                'extension_type': extension_type,
+            })
         self = cls.parse_body(stream.read_var(2))
 
         if remaining := len(data) - stream.tell():
@@ -78,25 +80,26 @@ class Extension(Serializable):
         ])
 
 
-class UnknownExtension(Serializable):
-    extension_type: int
+class UnknownExtension(Extension, SerializableBody, register=False):
+    _handshake_types = type("Everything", (), {'__contains__': lambda self, item: True})()
+
+    _struct = textwrap.dedent("""
+        struct {
+            opaque extension_data[Extension.extension_length];
+        } UnknownExtension;
+    """).strip('\n')
     extension_data: bytes
 
-    def __init__(self, extension_type, extension_data):
-        self.extension_type = extension_type
+    def __init__(self, extension_data):
         self.extension_data = extension_data
 
     @classmethod
-    def parse(cls, data):
-        raise NotImplementedError("Cannot parse an unknown extension.")
+    def parse_body(cls, data):
+        return cls(data)
 
     @classmethod
-    def serialize(self):
-        return b''.join([
-            self.extension_type.to_bytes(2, 'big'),
-            len(self.extension_data).to_bytes(2, 'big'),
-            self.extension_data,
-        ])
+    def serialize_body(self):
+        return self.extension_data
 
 
 #-----------------------------------------------------------------------
@@ -264,7 +267,7 @@ class MaxFragmentLength(Extension, SerializableBody):
 #-----------------------------------------------------------------------
 status_request_registry = {}
 
-class StatusRequest(Extension, SerializableBody):
+class CertificateStatusRequest(Extension, SerializableBody):
     extension_type = ExtensionType.STATUS_REQUEST
     _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
 
