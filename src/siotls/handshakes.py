@@ -120,11 +120,13 @@ class ClientHello(Handshake, SerializableBody):
         while remaining > 0:
             with stream.lookahead():
                 stream.read_exactly(2, limit=remaining)  # extension_type
-                extensions_length = stream.read_int(2, limit=remaining - 2)
-            extensions.append(
-                Extension.parse(stream.read_exactly(4 + extensions_length, limit=remaining))
-            )
-            remaining -= extensions_length
+                extension_length = stream.read_int(2, limit=remaining - 2)
+            item_data = stream.read_exactly(4 + extension_length, limit=remaining)
+            extension = Extension.parse(item_data)
+            if cls.msg_type not in extension._handshake_types:
+                raise NotImplementedError("todo")
+            extensions.append(extension)
+            remaining -= extension_length
 
         if remaining := len(data) - stream.tell():
             raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
