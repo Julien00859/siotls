@@ -25,3 +25,6 @@ class ApplicationData(Content, Serializable):
 
     def serialize(self):
         return self.data
+
+from . import alerts  # noqa: F401, E402
+from . import handshakes  # noqa: F401, E402

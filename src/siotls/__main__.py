@@ -5,9 +5,7 @@ import os
 import pathlib
 import sys
 import warnings
-
 import siotls
-import siotls.examples.simple
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +70,8 @@ def main():
 
     # Run server
     try:
-        siotls.examples.simple.serve(
+        from siotls.examples.simple import serve
+        serve(
             options.port,
             os.fspath(options.tlscert),
             os.fspath(options.tlskey),
