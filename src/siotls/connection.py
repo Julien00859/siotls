@@ -1,6 +1,7 @@
 import logging
+import struct
 
-from .serial import SerialIO, MissingData
+from .serial import TooMuchData
 from .iana import ContentType
 from . import alerts
 from .contents import Content
@@ -20,6 +21,7 @@ class TLSConnection:
         self.config = config
         self.negociated_config = ...
         self._input_data = b''
+        self._input_handshake = b''
         self._output_data = b''
         #self.state = (... if self.config.side == 'server' else ...)(self)
         self.encrypted = False
@@ -28,55 +30,26 @@ class TLSConnection:
         if not data:
             return
         self._input_data += data
+
+        contents = [
+            Content.get_parser(content_type).parse(content_data)
+            for content_type, content_data
+            in iter(self._read_next_content, None)
+        ]
+        return contents
+
+    def _read_next_record(self):
         if len(self._input_data) < 5:
             return
 
-        stream = SerialIO(self._input_data)
-        contents = self._process_stream(stream)
-        self._input_data = self._input_data[stream.tell()]
-        return self._process_contents(contents)
+        content_type, _legacy_version, content_length = \
+            struct.unpack('!BHH', self._input_data[:5])
 
-    def _process_stream(self, stream):
-        contents = []
-        while record := self._get_next_record(stream):
-            content_type, fragment = record
-            if content_type != ContentType.HANDSHAKE:
-                data = fragment
-            elif len(fragment) < 4:
-                raise alerts.DecodeError()
-            else:
-                handshake_length = int.from_bytes(fragment[1:3], 'big')
-                data = bytearray(fragment)
-                while len(data) < handshake_length + 6:
-                    record = self._get_next_record(stream)
-                    if not record:
-                        raise MissingData()
-
-                    fragment_type, fragment = record
-                    if fragment_type != ContentType.HANDSHAKE:
-                        raise alerts.UnexpectedMessage()
-                    if not fragment:
-                        logger.warning("Empty continuation handshake, close")
-                        raise alerts.UnexpectedMessage()
-                    data += fragment
-
-            contents.append(content_registry[content_type].parse(data))
-
-        return contents
-
-
-    def _get_next_record(self, stream):
-        pos = stream.tell()
-        try:
-            content_type = stream.read_int(1)
-            legacy_version = stream.read_int(2)
-            content_length = stream.read_int(2)
-            if content_length > 2 ** 14:  # TODO: MaxFragmentLength
-                raise alerts.RecordOverflow()
-            fragment = stream.read_exactly(content_length)
-        except MissingData:
-            stream.seek(pos)
+        if len(self._input_data) - 5 < content_length:
             return
+
+        fragment = self._input_data[5:content_length + 5]
+        self._input_data = self._input_data[content_length + 5:]
 
         if not self.encrypted:
             return content_type, fragment
@@ -86,8 +59,55 @@ class TLSConnection:
             if innertext[i]:
                 break
         else:
-            raise ...
+            return  # only padding
         return innertext[i], innertext[:i-1]
+
+    def _read_next_content(self):
+        # handshakes can be fragmented over multiple following records,
+        # other content types are not subject to fragmentation
+
+        record = self._read_next_record()
+        if not record:
+            return
+
+        content_type, fragment = record
+        if not self._input_handshake:
+            if content_type != ContentType.HANDSHAKE:
+                return content_type, fragment
+            else:
+                self._input_handshake = fragment
+        elif content_type != ContentType.HANDSHAKE:
+            msg = (
+                f"Expected {ContentType.HANDSHAKE} continuation "
+                f"record but {content_type} found."
+            )
+            raise alerts.UnexpectedMessage(msg)
+        else:
+            self._input_handshake += fragment
+
+        if len(self._input_handshake) < 4:
+            return
+        handshake_length = int.from_bytes(self._input_handshake[1:4], 'big')
+        while len(self._input_handshake) - 4 < handshake_length:
+            record = self._read_next_record()
+            if not record:
+                return
+            content_type, fragment = record
+            if content_type != ContentType.HANDSHAKE:
+                msg = (
+                    f"Expected {ContentType.HANDSHAKE} continuation "
+                    f"record but {content_type} found."
+                )
+                raise alerts.UnexpectedMessage(msg)
+            self._input_handshake += fragment
+        if len(self._input_handshake) - 4 > handshake_length:
+            msg = f"Expected {handshake_length} bytes but {len(self._input_handshake)} read."
+            raise TooMuchData(msg)
+
+        content_data = self._input_handshake
+        self._input_handshake = b''
+        return content_type, content_data
+
 
     def _process_contents(contents):
         return contents
