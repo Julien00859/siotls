@@ -1,3 +1,4 @@
+import textwrap
 from .iana import CipherSuites, ContentType, HandshakeType, TLSVersion
 from .contents import Content
 from .extensions import Extension
@@ -9,23 +10,25 @@ _handshake_registry = {}
 
 class Handshake(Content, Serializable):
     content_type = ContentType.HANDSHAKE
+    _struct = textwrap.dedent("""
+        struct {
+            HandshakeType msg_type;    /* handshake type */
+            uint24 length;             /* remaining bytes in message */
+            select (Handshake.msg_type) {
+                case 0x01: ClientHello;
+                case 0x02: ServerHello;
+                case 0x04: EndOfEarlyData;
+                case 0x05: EncryptedExtensions;
+                case 0x08: CertificateRequest;
+                case 0x0b: Certificate;
+                case 0x0d: CertificateVerify;
+                case 0x0f: Finished;
+                case 0x14: NewSessionTicket;
+                case 0x18: KeyUpdate;
+            };
+        } Handshake;
+    """).strip('\n')
 
-    # struct {
-    #     HandshakeType msg_type;    /* handshake type */
-    #     uint24 length;             /* remaining bytes in message */
-    #     select (Handshake.msg_type) {
-    #         case client_hello:          ClientHello;
-    #         case server_hello:          ServerHello;
-    #         case end_of_early_data:     EndOfEarlyData;
-    #         case encrypted_extensions:  EncryptedExtensions;
-    #         case certificate_request:   CertificateRequest;
-    #         case certificate:           Certificate;
-    #         case certificate_verify:    CertificateVerify;
-    #         case finished:              Finished;
-    #         case new_session_ticket:    NewSessionTicket;
-    #         case key_update:            KeyUpdate;
-    #     };
-    # } Handshake;
     msg_type: HandshakeType
 
     def __init_subclass__(cls, register=True, **kwargs):
@@ -49,30 +52,37 @@ class Handshake(Content, Serializable):
         return self
 
     def serialize(self):
-        raise NotImplementedError("todo")
+        msg_data = self.serialize_body()
+        return b''.join([
+            self.msg_type.to_bytes(1, 'big'),
+            len(msg_data).to_bytes(3, 'big'),
+            msg_data,
+        ])
 
 
 class ClientHello(Handshake, SerializableBody):
     msg_type = HandshakeType.CLIENT_HELLO
+    _struct = textwrap.dedent("""
+        uint16 ProtocolVersion;
+        opaque Random[32];
 
-    # uint16 ProtocolVersion;
-    # opaque Random[32];
-    #
-    # uint8 CipherSuite[2];    /* Cryptographic suite selector */
-    #
-    # struct {
-    #     ProtocolVersion legacy_version = 0x0303;    /* TLS v1.2 */
-    #     Random random;
-    #     opaque legacy_session_id<0..32>;
-    #     CipherSuite cipher_suites<2..2^16-2>;
-    #     opaque legacy_compression_methods<1..2^8-1>;
-    #     Extension extensions<8..2^16-1>;
-    # } ClientHello;
-    legacy_version = TLSVersion.TLS_1_2
+        uint8 CipherSuite[2];    /* Cryptographic suite selector */
+
+        struct {
+            ProtocolVersion legacy_version = 0x0303;    /* TLS v1.2 */
+            Random random;
+            opaque legacy_session_id<0..32>;
+            CipherSuite cipher_suites<2..2^16-2>;
+            opaque legacy_compression_methods<1..2^8-1>;
+            Extension extensions<8..2^16-1>;
+        } ClientHello;
+    """).strip('\n')
+
+    legacy_version: int = TLSVersion.TLS_1_2
     random: bytes
-    legacy_session_id = b''
+    legacy_session_id: bytes = b''
     cipher_suites: list
-    legacy_compression_methods = b'\x00'  # "null" compression method
+    legacy_compression_methods: bytes = b'\x00'  # "null" compression method
     extensions: list[Extension]
 
     def __init__(self, random_, cipher_suites, extensions):
@@ -132,14 +142,21 @@ class ClientHello(Handshake, SerializableBody):
 class ServerHello(Handshake, SerializableBody):
     msg_type = HandshakeType.SERVER_HELLO
 
-    # struct {
-    #     ProtocolVersion legacy_version = 0x0303;    /* TLS v1.2 */
-    #     Random random;
-    #     opaque legacy_session_id_echo<0..32>;
-    #     CipherSuite cipher_suite;
-    #     uint8 legacy_compression_method = 0;
-    #     Extension extensions<6..2^16-1>;
-    # } ServerHello;
+    _struct = textwrap.dedent("""
+        uint16 ProtocolVersion;
+        opaque Random[32];
+
+        uint8 CipherSuite[2];    /* Cryptographic suite selector */
+
+        struct {
+            ProtocolVersion legacy_version = 0x0303;    /* TLS v1.2 */
+            Random random;
+            opaque legacy_session_id_echo<0..32>;
+            CipherSuite cipher_suite;
+            uint8 legacy_compression_method = 0;
+            Extension extensions<6..2^16-1>;
+        } ServerHello;
+    """).strip('\n')
     ...
 
 

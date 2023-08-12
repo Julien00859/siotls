@@ -1,3 +1,4 @@
+import textwrap
 from .iana import AlertLevel, AlertDescription, ContentType
 from .serial import SerialIO, Serializable
 from .contents import Content
@@ -8,45 +9,42 @@ _alert_registry = {}
 class Alert(Exception, Content, Serializable):
     content_type = ContentType.ALERT
 
-    # enum { warning(1), fatal(2), (255) } AlertLevel;
-    #
-    # enum {
-    #     close_notify(0),
-    #     unexpected_message(10),
-    #     bad_record_mac(20),
-    #     record_overflow(22),
-    #     handshake_failure(40),
-    #     bad_certificate(42),
-    #     unsupported_certificate(43),
-    #     certificate_revoked(44),
-    #     certificate_expired(45),
-    #     certificate_unknown(46),
-    #     illegal_parameter(47),
-    #     unknown_ca(48),
-    #     access_denied(49),
-    #     decode_error(50),
-    #     decrypt_error(51),
-    #     protocol_version(70),
-    #     insufficient_security(71),
-    #     internal_error(80),
-    #     inappropriate_fallback(86),
-    #     user_canceled(90),
-    #     missing_extension(109),
-    #     unsupported_extension(110),
-    #     unrecognized_name(112),
-    #     bad_certificate_status_response(113),
-    #     unknown_psk_identity(115),
-    #     certificate_required(116),
-    #     no_application_protocol(120),
-    #     (255)
-    # } AlertDescription;
-    #
-    # struct {
-    #     AlertLevel level;
-    #     AlertDescription description;
-    # } Alert;
-
-
+    _struct = textwrap.dedent("""
+        struct {
+            AlertLevel level;
+            AlertDescription description;
+            select (Alert.level) {
+                case 0x00: CloseNotify;
+                case 0x0a: UnexpectedMessage;
+                case 0x14: BadRecordMac;
+                case 0x16: RecordOverflow;
+                case 0x28: HandshakeFailure;
+                case 0x2a: BadCertificate;
+                case 0x2b: UnsupportedCertificate;
+                case 0x2c: CertificateRevoked;
+                case 0x2d: CertificateExpired;
+                case 0x2e: CertificateUnknown;
+                case 0x2f: IllegalParameter;
+                case 0x30: UnknownCa;
+                case 0x31: AccessDenied;
+                case 0x32: DecodeError;
+                case 0x33: DecryptError;
+                case 0x46: ProtocolVersion;
+                case 0x47: InsufficientSecurity;
+                case 0x50: InternalError;
+                case 0x56: InappropriateFallback;
+                case 0x5a: UserCanceled;
+                case 0x6d: MissingExtension;
+                case 0x6e: UnsupportedExtension;
+                case 0x70: UnrecognizedName;
+                case 0x71: BadCertificateStatusResponse;
+                case 0x73: UnknownPskIdentity;
+                case 0x74: CertificateRequired;
+                case 0x78: NoApplicationProtocol;
+                case    _: UnknownAlert;
+            };
+        } Alert;
+    """).strip('\n')
     level: AlertLevel
     description: AlertDescription
 
@@ -81,6 +79,7 @@ class CloseNotify(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.CLOSE_NOTIFY
+    _struct = ""
 
 
 class UnexpectedMessage(Alert):
@@ -91,6 +90,7 @@ class UnexpectedMessage(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.UNEXPECTED_MESSAGE
+    _struct = ""
 
 
 class BadRecordMac(Alert):
@@ -104,6 +104,7 @@ class BadRecordMac(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.BAD_RECORD_MAC
+    _struct = ""
 
 
 class RecordOverflow(Alert):
@@ -116,6 +117,7 @@ class RecordOverflow(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.RECORD_OVERFLOW
+    _struct = ""
 
 
 class HandshakeFailure(Alert):
@@ -126,6 +128,7 @@ class HandshakeFailure(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.HANDSHAKE_FAILURE
+    _struct = ""
 
 
 class BadCertificate(Alert):
@@ -135,24 +138,28 @@ class BadCertificate(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.BAD_CERTIFICATE
+    _struct = ""
 
 
 class UnsupportedCertificate(Alert):
     """ A certificate was of an unsupported type. """
     level = AlertLevel.FATAL
     description = AlertDescription.UNSUPPORTED_CERTIFICATE
+    _struct = ""
 
 
 class CertificateRevoked(Alert):
     """ A certificate was revoked by its signer. """
     level = AlertLevel.FATAL
     description = AlertDescription.CERTIFICATE_REVOKED
+    _struct = ""
 
 
 class CertificateExpired(Alert):
     """ A certificate has expired or is not currently valid. """
     level = AlertLevel.FATAL
     description = AlertDescription.CERTIFICATE_EXPIRED
+    _struct = ""
 
 
 class CertificateUnknown(Alert):
@@ -162,6 +169,7 @@ class CertificateUnknown(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.CERTIFICATE_UNKNOWN
+    _struct = ""
 
 
 class IllegalParameter(Alert):
@@ -172,6 +180,7 @@ class IllegalParameter(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.ILLEGAL_PARAMETER
+    _struct = ""
 
 
 class UnknownCa(Alert):
@@ -182,6 +191,7 @@ class UnknownCa(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.UNKNOWN_CA
+    _struct = ""
 
 
 class AccessDenied(Alert):
@@ -191,6 +201,7 @@ class AccessDenied(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.ACCESS_DENIED
+    _struct = ""
 
 
 class DecodeError(Alert):
@@ -204,6 +215,7 @@ class DecodeError(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.DECODE_ERROR
+    _struct = ""
 
 
 class DecryptError(Alert):
@@ -214,6 +226,7 @@ class DecryptError(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.DECRYPT_ERROR
+    _struct = ""
 
 
 class ProtocolVersion(Alert):
@@ -223,6 +236,7 @@ class ProtocolVersion(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.PROTOCOL_VERSION
+    _struct = ""
 
 
 class InsufficientSecurity(Alert):
@@ -233,6 +247,7 @@ class InsufficientSecurity(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.INSUFFICIENT_SECURITY
+    _struct = ""
 
 
 class InternalError(Alert):
@@ -243,6 +258,7 @@ class InternalError(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.INTERNAL_ERROR
+    _struct = ""
 
 
 class InappropriateFallback(Alert):
@@ -252,6 +268,7 @@ class InappropriateFallback(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.INAPPROPRIATE_FALLBACK
+    _struct = ""
 
 
 class UserCanceled(Alert):
@@ -265,6 +282,7 @@ class UserCanceled(Alert):
     """
     level = AlertLevel.WARNING
     description = AlertDescription.USER_CANCELED
+    _struct = ""
 
 
 class MissingExtension(Alert):
@@ -275,6 +293,7 @@ class MissingExtension(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.MISSING_EXTENSION
+    _struct = ""
 
 
 class UnsupportedExtension(Alert):
@@ -287,6 +306,7 @@ class UnsupportedExtension(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.UNSUPPORTED_EXTENSION
+    _struct = ""
 
 
 class UnrecognizedName(Alert):
@@ -297,6 +317,7 @@ class UnrecognizedName(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.UNRECOGNIZED_NAME
+    _struct = ""
 
 
 class BadCertificateStatusResponse(Alert):
@@ -307,6 +328,7 @@ class BadCertificateStatusResponse(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.BAD_CERTIFICATE_STATUS_RESPONSE
+    _struct = ""
 
 
 class UnknownPskIdentity(Alert):
@@ -318,6 +340,7 @@ class UnknownPskIdentity(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.UNKNOWN_PSK_IDENTITY
+    _struct = ""
 
 
 class CertificateRequired(Alert):
@@ -327,6 +350,7 @@ class CertificateRequired(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.CERTIFICATE_REQUIRED
+    _struct = ""
 
 
 class NoApplicationProtocol(Alert):
@@ -337,3 +361,4 @@ class NoApplicationProtocol(Alert):
     """
     level = AlertLevel.FATAL
     description = AlertDescription.NO_APPLICATION_PROTOCOL
+    _struct = ""

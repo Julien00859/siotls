@@ -1,15 +1,51 @@
+import collections.abc
+import textwrap
 from . import alerts
-from .iana import ExtensionType, HandshakeType as HT, NameType, MaxFragmentLength, CertificateStatusType
+from .iana import (
+    CertificateStatusType,
+    ExtensionType,
+    HandshakeType as HT,
+    MaxFragmentLength,
+    NameType,
+)
 from .serial import Serializable, SerializableBody, SerialIO
 
 
 _extension_registry = {}
 
 class Extension(Serializable):
-    # struct {
-    #     ExtensionType extension_type;
-    #     opaque extension_data<0..2^16-1>;
-    # } Extension;
+    _struct = textwrap.dedent("""
+        struct {
+            ExtensionType extension_type;
+            uint16 extension_length;
+            select (Extension.extension_type) {
+                case 0x0000: ServerNameList;
+                case 0x0001: MaxFragmentLength;
+                case 0x0005: CertificateStatusRequest;
+                case 0x000a: SupportedGroups;
+                case 0x000d: SignatureAlgorithms;
+                case 0x000e: UseSrtp;
+                case 0x000f: Heartbeat;
+                case 0x0010: ApplicationLayerProtocolNegotiation;
+                case 0x0012: SignedCertificateTimestamp;
+                case 0x0013: ClientCertificateType;
+                case 0x0014: ServerCertificateType;
+                case 0x0015: Padding;
+                case 0x0029: PreSharedKey;
+                case 0x002a: EarlyData;
+                case 0x002b: SupportedVersions;
+                case 0x002c: Cookie;
+                case 0x002d: PskKeyExchangeModes;
+                case 0x002f: CertificateAuthorities;
+                case 0x0030: OidFilters;
+                case 0x0031: PostHandshakeAuth;
+                case 0x0032: SignatureAlgorithmsCert;
+                case 0x0033: KeyShare;
+                case      _: UnknownExtension;
+            }
+        } Extension;
+    """).strip('\n')
+
     extension_type: ExtensionType
     handshake_types: set
 
@@ -68,73 +104,19 @@ class UnknownExtension(Serializable):
 #-----------------------------------------------------------------------
 server_name_registry = {}
 
-class ServerNameList(Extension, SerializableBody):
-    extension_type = ExtensionType.SERVER_NAME
-    handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
-
-    # struct {
-    #     ServerName server_name_list<1..2^16-1>
-    # } ServerNameList;
-    server_name_list: list['ServerName']
-
-    def __init__(self, server_name_list):
-        self.server_name_list = server_name_list
-
-    @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
-        server_name_list = []
-        remaining = stream.read_int(2)
-        while remaining > 0:
-            with stream.lookahead():
-                # we don't know the length of each individual element
-                # before parsing them, introspect the data to determine
-                # it
-                name_type = stream.read_int(1, limit=remaining)
-                server_name_length = 1  # name_type
-                match name_type:
-                    case NameType.HOST_NAME:
-                        server_name_length += 2 + stream.read_int(2, limit=remaining - 1)
-                    case _:
-                        # unknown type, must assume it is the last element
-                        server_name_length = remaining
-            server_name_list.append(
-                ServerName.parse(stream.read_exactly(server_name_length, limit=remaining))
-            )
-            remaining -= server_name_length
-        if remaining < 0:
-            raise RuntimeError(f"buffer overflow while parsing {data}")
-
-        if remaining := len(data) - stream.tell():
-            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
-
-        return cls(server_name_list)
-
-    def serialize_body(self):
-        server_name_list = b''.join([
-            server_name.serialize()
-            for server_name
-            in self.server_name_list
-        ])
-
-        return b''.join([
-            len(server_name_list).to_bytes(2, 'big'),
-            server_name_list
-        ])
-
-
 class ServerName(Serializable):
-    # struct {
-    #     NameType name_type;
-    #     select (name_type) {
-    #         case host_name: HostName;
-    #     } name;
-    # } ServerName;
-    #
-    # enum {
-    #     host_name(0), (255)
-    # } NameType;
+    _struct = textwrap.dedent("""
+        struct {
+            NameType name_type;
+            select (name_type) {
+                case host_name: HostName;
+            } name;
+        } ServerName;
+
+        enum {
+            host_name(0x00), (0xff)
+        } NameType;
+    """).strip('\n')
     name_type: NameType
 
     def __init_subclass__(cls, register=True, **kwargs):
@@ -162,10 +144,12 @@ class ServerName(Serializable):
             self.serialize_body(),
         ])
 
-
 class HostName(ServerName, SerializableBody):
     name_type = NameType.HOST_NAME
-    # opaque HostName<1..2^16-1>;
+
+    _struct = textwrap.dedent("""
+        opaque HostName<1..2^16-1>;
+    """).strip('\n')
     host_name: bytes
 
     def __init__(self, host_name):
@@ -185,6 +169,62 @@ class HostName(ServerName, SerializableBody):
             self.host_name,
         ])
 
+class ServerNameList(Extension, SerializableBody):
+    extension_type = ExtensionType.SERVER_NAME
+    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _struct = textwrap.dedent("""
+        struct {
+            ServerName server_name_list<1..2^16-1>
+        } ServerNameList;
+    """).strip('\n')
+
+    server_name_list: list[ServerName]
+
+    def __init__(self, server_name_list):
+        self.server_name_list = server_name_list
+
+    @classmethod
+    def parse_body(cls, data):
+        stream = SerialIO(data)
+
+        server_name_list = []
+        remaining = stream.read_int(2)
+        while remaining > 0:
+            with stream.lookahead():
+                # we don't know the length of each individual element
+                # before parsing them, inspect the data to determine it
+                name_type = stream.read_int(1, limit=remaining)
+                server_name_length = 1  # name_type
+                match name_type:
+                    case NameType.HOST_NAME:
+                        server_name_length += 2 + stream.read_int(2, limit=remaining - 1)
+                    case _:
+                        # unknown type, must assume it is the last element
+                        server_name_length = remaining
+
+            item_data = stream.read_exactly(server_name_length, limit=remaining)
+            remaining -= server_name_length
+            server_name_list.append(ServerName.parse(item_data))
+        if remaining < 0:
+            raise RuntimeError(f"buffer overflow while parsing {data}")
+
+        if remaining := len(data) - stream.tell():
+            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+
+        return cls(server_name_list)
+
+    def serialize_body(self):
+        server_name_list = b''.join([
+            server_name.serialize()
+            for server_name
+            in self.server_name_list
+        ])
+
+        return b''.join([
+            len(server_name_list).to_bytes(2, 'big'),
+            server_name_list
+        ])
+
 
 #-----------------------------------------------------------------------
 # Max Fragment Length
@@ -194,9 +234,11 @@ class MaxFragmentLength(Extension, SerializableBody):
     extension_type = ExtensionType.MAX_FRAGMENT_LENGTH
     handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
-    # enum{
-    #     2^9(1), 2^10(2), 2^11(3), 2^12(4), (255)
-    # } MaxFragmentLength;
+    _struct = textwrap.dedent("""
+        enum {
+            2^9(0x01), 2^10(0x02), 2^11(0x03), 2^12(0x04), (0xff)
+        } MaxFragmentLength;
+    """).strip('\n')
     max_fragment_length: MaxFragmentLength
 
     def __init__(self, max_fragment_length):
@@ -224,16 +266,16 @@ status_request_registry = {}
 
 class StatusRequest(Extension, SerializableBody):
     extension_type = ExtensionType.STATUS_REQUEST
-    handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
+    _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
 
-    # struct {
-    #     CertificateStatusType status_type;
-    #     select (status_type) {
-    #         case ocsp: OCSPStatusRequest;
-    #     } request;
-    # } CertificateStatusRequest;
-    #
-    # enum { ocsp(1), (255) } CertificateStatusType;
+    _struct = textwrap.dedent("""
+        struct {
+            CertificateStatusType status_type;
+            select (status_type) {
+                case 0x01: OCSPStatusRequest;
+            } request;
+        } CertificateStatusRequest;
+    """).strip('\n')
     status_type: CertificateStatusType
 
     def __init_subclass__(cls, register=True, **kwargs):
@@ -262,16 +304,18 @@ class StatusRequest(Extension, SerializableBody):
         ])
 
 
-class OCSPStatusRequest(StatusRequest, Serializable):
+class OCSPStatusRequest(CertificateStatusRequest, Serializable):
     status_type = CertificateStatusType.OCSP
 
-    # struct {
-    #     ResponderID responder_id_list<0..2^16-1>;
-    #     Extensions  request_extensions;
-    # } OCSPStatusRequest;
-    #
-    # opaque ResponderID<1..2^16-1>;
-    # opaque Extensions<0..2^16-1>;
+    _struct = textwrap.dedent("""
+        struct {
+            ResponderID responder_id_list<0..2^16-1>;
+            Extensions  request_extensions;
+        } OCSPStatusRequest;
+
+        opaque ResponderID<1..2^16-1>;
+        opaque Extensions<0..2^16-1>;
+    """).strip('\n')
     responder_id_list: list[bytes]
     request_extensions: bytes
 

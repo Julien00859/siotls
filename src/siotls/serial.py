@@ -16,7 +16,7 @@ def parse_verbose(func):
         logger.debug(
             "Parsing %s\nStruct:\n%s\nData:\n%s\n",
             func.__self__.__name__,
-            '',  # todo struct
+            func.__self__._struct,
             hexdump(data),
         )
         return func(data)
@@ -28,14 +28,16 @@ def serialize_verbose(func):
         logger.debug(
             "Serializing %s\nStruct:\n%s\nSelf:\n%s\n",
             func.__self__.__name__,
-            '',  # todo struct
-            func.__self__,  # todo repr
+            func.__self__._struct,
+            func.__self__,
         )
         return func()
     return wrapped
 
 
 class Serializable(metaclass=abc.ABCMeta):
+    _struct: str
+
     @abc.abstractclassmethod
     def parse(cls, data):
         raise NotImplementedError("abstract method")
@@ -51,6 +53,27 @@ class Serializable(metaclass=abc.ABCMeta):
                 cls.parse = parse_verbose(cls.parse)
             if 'serialize' in cls.__dict__:
                 cls.serialize = serialize_verbose(cls.serialize)
+            if '_struct' not in cls.__dict__:
+                logger.warning("%s is missing a _struct declaration", cls)
+                cls._struct = ''
+
+    def __repr__(self):
+        output = [type(self).__name__, '(']
+
+        for key, value in vars(self).items():
+            if key.startswith('_'):
+                continue
+            if isinstance(key, (Serializable, SerializableBody)):
+                output.append(type(value).__name__)
+                output.append('()')
+            else:
+                output.append(str(value))
+            output.append(',')
+
+        if output[-1] == ',':
+            output.pop()
+        output.append(')')
+        return ''.join(output)
 
 
 class SerializableBody(metaclass=abc.ABCMeta):
@@ -71,6 +94,11 @@ class SerializableBody(metaclass=abc.ABCMeta):
                 cls.parse_body = parse_verbose(cls.parse_body)
             if 'serialize_body' in cls.__dict__:
                 cls.serialize_body = serialize_verbose(cls.serialize_body)
+            if '_struct' not in cls.__dict__:
+                logger.warning("%s is missing a _struct declaration", cls)
+                cls._struct = ''
+
+    __repr__ = Serializable.__repr__
 
 
 class SerialIO(io.BytesIO):

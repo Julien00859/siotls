@@ -1,3 +1,4 @@
+import textwrap
 from .serial import Serializable
 from .iana import ContentType
 
@@ -19,10 +20,14 @@ class Content:
 
 class ApplicationData(Content, Serializable):
     content_type = ContentType.APPLICATION_DATA
-    data: bytes
+
+    _struct = textwrap.dedent("""
+        opaque content_data[TLSPlaintext.length];
+    """).strip('\n')
+    content_data: bytes
 
     def __init__(self, data):
-        self.data = data
+        self.content_data = data
 
     @classmethod
     def parse(cls, data):
