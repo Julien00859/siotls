@@ -1,5 +1,4 @@
 import binascii
-import io
 import itertools
 import math
 
@@ -27,9 +26,15 @@ def hexdump(bytes_):
         hex_.extend(b' ' * (50 - len(hex_)))  # 3 * 16 + 2
         xd.extend(f'{i:0{d}x}: '.encode())
         xd.extend(hex_)
-        xd.extend([byte if 32 <= byte <= 126 else 46 for byte in line[:8]])
+        xd.extend([byte + 48 if 0 <= byte <= 9
+            else byte + 87 if 10 <= byte <= 15
+            else byte if 32 <= byte <= 126
+            else 46 for byte in line[:8]])
         xd.extend(b' ')
-        xd.extend([byte if 32 <= byte <= 126 else 46 for byte in line[8:]])
+        xd.extend([byte + 48 if 0 <= byte <= 9
+            else byte + 87 if 10 <= byte <= 15
+            else byte if 32 <= byte <= 126
+            else 46 for byte in line[8:]])
         xd.extend(b'\n')
         i += 16
     if bytes_:
