@@ -37,7 +37,7 @@ class Handshake(Content, Serializable):
             _handshake_registry[cls.msg_type] = cls
 
     @classmethod
-    def parse(cls, data):
+    def parse(abc, data):
         stream = SerialIO(data)
 
         msg_type = stream.read_int(1)
