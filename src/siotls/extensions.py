@@ -66,8 +66,7 @@ class Extension(Serializable):
             })
         self = cls.parse_body(stream.read_var(2))
 
-        if remaining := len(data) - stream.tell():
-            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+        stream.assert_eof()
 
         return self
 
@@ -162,8 +161,7 @@ class HostName(ServerName, SerializableBody):
     def parse_body(cls, data):
         stream = SerialIO(data)
         host_name = stream.read_var(2)
-        if remaining := len(data) - stream.tell():
-            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+        stream.assert_eof()
         return cls(host_name)
 
     def serialize_body(self):
@@ -211,8 +209,7 @@ class ServerNameList(Extension, SerializableBody):
         if remaining < 0:
             raise RuntimeError(f"buffer overflow while parsing {data}")
 
-        if remaining := len(data) - stream.tell():
-            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+        stream.assert_eof()
 
         return cls(server_name_list)
 
@@ -340,8 +337,7 @@ class OCSPStatusRequest(CertificateStatusRequest, Serializable):
 
         request_extension = stream.read_var(2)
 
-        if remaining := len(data) - stream.tell():
-            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+        stream.assert_eof()
 
         return cls(responder_id_list, request_extension)
 

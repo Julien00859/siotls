@@ -47,8 +47,7 @@ class Handshake(Content, Serializable):
         except ValueError as exc:
             raise alerts.UnrecognizedName() from exc
         self = cls.parse_body(stream.read_exactly(length))
-        if remaining := len(data) - stream.tell():
-            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+        stream.assert_eof()
         return self
 
     def serialize(self):
@@ -128,8 +127,7 @@ class ClientHello(Handshake, SerializableBody):
             extensions.append(extension)
             remaining -= extension_length
 
-        if remaining := len(data) - stream.tell():
-            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+        stream.assert_eof()
 
         self = cls(random_, cipher_suites, extensions)
         self.legacy_version = legacy_version

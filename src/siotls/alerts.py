@@ -71,8 +71,7 @@ class Alert(Exception, Content, Serializable):
                 '_struct': UnknownAlert._struct,
             })
 
-        if remaining := len(data) - stream.tell():
-            raise ValueError(f"Expected end of stream but {remaining} bytes remain.")
+        stream.assert_eof()
 
         return cls('', level)
 

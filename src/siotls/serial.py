@@ -11,6 +11,10 @@ class MissingData(ValueError):
     pass
 
 
+class TooMuchData(ValueError):
+    pass
+
+
 def parse_verbose(func):
     def wrapped(data):
         logger.debug(
@@ -102,12 +106,15 @@ class SerializableBody(metaclass=abc.ABCMeta):
 
 
 class SerialIO(io.BytesIO):
+    def read(self, n=None, limit=float('+inf')):
+        if n is not None and n > limit:
+            raise TooMuchData(f"Expected {n} bytes but can only read {limit}.")
+        return super().read(n)
+
     def read_exactly(self, n, limit=float('+inf')):
-        if n > limit:
-            raise ValueError(f"Expected {n} bytes but can only read {limit}.")
         data = b''
         while len(data) != n:
-            read = self.read(n - len(data))
+            read = self.read(n - len(data), limit=limit - len(data))
             if not read:
                 raise MissingData(f"Expected {n} bytes but could only read {len(data)}.")
             data += read
@@ -134,3 +141,10 @@ class SerialIO(io.BytesIO):
             yield
         finally:
             self.seek(pos)
+
+    def assert_eof(self):
+        current_pos = self.tell()
+        eof_pos = self.seek(0, 2)
+        if remaining := eof_pos - current_pos:
+            self.seek(current_pos, 0)
+            raise TooMuchData(f"Expected end of stream but {remaining} bytes remain.")
