@@ -36,7 +36,7 @@ def main():
         help="Increase logging verbosity (repeatable)")
     parser.add_argument('-s', '--silent', action='count', default=0,
         help="Decrease logging verbosity (repeatable)")
-    parser.add_argument('port', action='store', type=int,
+    parser.add_argument('--port', action='store', type=int, default=8446,
         help="TCP port number on which the server will listen")
     parser.add_argument('--tlscert', '--sslcert', action='store', type=pathlib.Path,
         default=importlib.resources.path('siotls.data', 'self-signed-cert.pem'),
