@@ -1,10 +1,9 @@
 import logging
 import struct
 
-from .serial import TooMuchData
-from .iana import ContentType
-from . import alerts
-from .contents import Content
+from siotls.iana import ContentType
+from siotls.serial import TooMuchData
+from .contents import Content, alerts
 
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ class TLSConnection:
         fragment = self._input_data[5:content_length + 5]
         self._input_data = self._input_data[content_length + 5:]
 
-        if not self.encrypted:
+        if not self.encrypted or content_type == ContentType.CHANGE_CIPHER_SPEC:
             return content_type, fragment
 
         innertext = self.decrypt(fragment)
@@ -60,7 +59,14 @@ class TLSConnection:
                 break
         else:
             return  # only padding
-        return innertext[i], innertext[:i-1]
+
+        content_type = innertext[i]
+        fragment = innertext[:i-1]
+        if content_type == ContentType.CHANGE_CIPHER_SPEC:
+            msg = f"cannot receive encrypted {ContentType.CHANGE_CIPHER_SPEC}"
+            raise alerts.UnexpectedMessage(msg)
+
+        return content_type, fragment
 
     def _read_next_content(self):
         # handshakes can be fragmented over multiple following records,

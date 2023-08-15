@@ -1,7 +1,7 @@
 import textwrap
-from .iana import AlertLevel, AlertDescription, ContentType
-from .serial import SerialIO, Serializable
-from .contents import Content
+from siotls.iana import AlertLevel, AlertDescription, ContentType
+from siotls.serial import SerialIO, Serializable
+from . import Content
 
 
 _alert_registry = {}
