@@ -99,7 +99,7 @@ from .server_name import ServerName, HostName, ServerNameList
 from .max_fragment_length import MaxFragmentLength
 from .status_request import CertificateStatusRequest, OCSPStatusRequest
 from .supported_groups import SupportedGroups
-from .signature_algorithms import SignatureAlgorithms
+from .signature_algorithms import SignatureAlgorithms, SignatureAlgorithmsCert
 from .use_srtp import UseSRTP
 from .heartbeat import Heartbeat
 from .application_layer_protocol_negotiation import ApplicationLayerProtocolNegotiation
@@ -115,5 +115,4 @@ from .psk_key_exchange_modes import PskKeyExchangeModes
 from .certificate_authorities import CertificateAuthorities
 from .oid_filters import OidFilters
 from .post_handshake_auth import PostHandshakeAuth
-from .signature_algorithms_cert import SignatureAlgorithmsCert
 from .key_share import KeyShare
