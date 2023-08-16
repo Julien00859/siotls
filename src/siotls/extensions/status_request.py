@@ -7,7 +7,7 @@ from ..contents import alerts
 
 _status_request_registry = {}
 
-class CertificateStatusRequest(Extension, SerializableBody):
+class CertificateStatusRequest(Extension, Serializable):
     extension_type = ExtensionType.STATUS_REQUEST
     _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
 
@@ -27,7 +27,7 @@ class CertificateStatusRequest(Extension, SerializableBody):
             _status_request_registry[cls.extension_type] = cls
 
     @classmethod
-    def parse_body(abc, data):
+    def parse(abc, data):
         stream = SerialIO(data)
 
         status_type = stream.read_int(1)
@@ -40,14 +40,14 @@ class CertificateStatusRequest(Extension, SerializableBody):
 
         return _status_request_registry[status_type].parse(stream.read())
 
-    def serialize_body(self):
+    def serialize(self):
         return b''.join([
             self.status_type.to_bytes(1, 'big'),
             _status_request_registry[self.status_type].serial(),
         ])
 
 
-class OCSPStatusRequest(CertificateStatusRequest, Serializable):
+class OCSPStatusRequest(CertificateStatusRequest, SerializableBody):
     status_type = CertificateStatusType.OCSP
 
     _struct = textwrap.dedent("""
@@ -67,7 +67,7 @@ class OCSPStatusRequest(CertificateStatusRequest, Serializable):
         self.request_extensions = request_extensions
 
     @classmethod
-    def parse(cls, data):
+    def parse_body(cls, data):
         stream = SerialIO(data)
         responder_id_list = []
         remaining = stream.read_int(2)
@@ -84,7 +84,7 @@ class OCSPStatusRequest(CertificateStatusRequest, Serializable):
 
         return cls(responder_id_list, request_extension)
 
-    def serialize(self):
+    def serialize_body(self):
         serialized_responder_id_list = b''.join([
             b''.join([len(responder_id).to_bytes(2, 'big'), responder_id])
             for responder_id in self.responder_id_list
