@@ -65,6 +65,8 @@ class ContentType(Hex1Enum):
     HANDSHAKE = 22
     APPLICATION_DATA = 23
 
+    HEARTBEAT = 24
+
 
 class HandshakeType(Hex1Enum):
     CLIENT_HELLO = 1
@@ -78,6 +80,11 @@ class HandshakeType(Hex1Enum):
     FINISHED = 20
     KEY_UPDATE = 24
     MESSAGE_HASH = 254
+
+
+class HeartbeatMessageType(Hex1Enum):
+    heartbeat_request = 1
+    heartbeat_response = 2
 
 
 #-----------------------------------------------------------------------
@@ -168,6 +175,11 @@ class SignatureScheme(Hex2Enum):
     # Legacy algorithms
     rsa_pkcs1_sha1 = 0x0201
     ecdsa_sha1 = 0x0203
+
+
+class HeartbeatMode(Hex1Enum):
+    peer_allowed_to_send = 1
+    peer_not_allowed_to_send = 2
 
 #-----------------------------------------------------------------------
 # Extra non-IANA types registered here for simplicity

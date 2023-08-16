@@ -44,6 +44,12 @@ class TLSConnection:
         content_type, _legacy_version, content_length = \
             struct.unpack('!BHH', self._input_data[:5])
 
+        max_fragment_length = 2 ** 14 + (256 if self.encrypted else 0)
+        if content_length > max_fragment_length:
+            msg = (f'The record is longer ({content_length} bytes) than '
+                   f'the allowed maximum ({max_fragment_length} bytes).')
+            raise alerts.RecordOverFlow(msg)
+
         if len(self._input_data) - 5 < content_length:
             return
 
