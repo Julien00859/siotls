@@ -13,7 +13,7 @@ class Heartbeat(Extension, SerializableBody):
         struct {
             HeartbeatMode mode;
         } HeartbeatExtension;
-    """.strip())
+    """).strip()
     mode: HeartbeatMode
 
     def __init__(self, mode):

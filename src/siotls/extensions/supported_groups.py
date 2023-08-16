@@ -12,7 +12,7 @@ class SupportedGroups(Extension, SerializableBody):
         struct {
             NamedGroup named_group_list<2..2^16-1>;
         } NamedGroupList;
-    """.strip())
+    """).strip()
 
     named_group_list: list[NamedGroup | int]
 

@@ -18,7 +18,7 @@ class UseSRTP(Extension, SerializableBody):
         } UseSRTPData;
 
         SRTPProtectionProfile SRTPProtectionProfiles<2..2^16-1>;
-    """.strip())
+    """).strip()
     protection_profiles: list[int]
     mki: bytes
 

@@ -9,7 +9,7 @@ class _SignAlgoMixin(SerializableBody):
         struct {
             SignatureScheme supported_signature_algorithms<2..2^16-2>;
         } SignatureSchemeList;
-    """.strip())
+    """).strip()
     supported_signature_algorithms: list[SignatureScheme | int]
 
     def __init__(self, supported_signature_algorithms):
