@@ -51,12 +51,13 @@ class Extension(Serializable):
         stream = SerialIO(data)
         extension_type = stream.read_int(2)
         try:
-            cls = _extension_registry[ExtensionType(extension_type)]
-        except ValueError:
-            cls = type('UnknownExtension', (UnknownExtension,), {
-                '_struct': UnknownExtension._struct,
-                'extension_type': extension_type,
-            })
+            cls = _extension_registry[extension_type]
+        except KeyError:
+            cls = type(
+                f'UnkonwnExtension{extension_type}',
+                (UnknownExtension, Extension),
+                {'extension_type': extension_type},
+            )
         self = cls.parse_body(stream.read_var(2))
 
         stream.assert_eof()
@@ -72,7 +73,7 @@ class Extension(Serializable):
         ])
 
 
-class UnknownExtension(Extension, SerializableBody, register=False):
+class UnknownExtension(SerializableBody):
     _handshake_types = type("Everything", (), {'__contains__': lambda self, item: True})()
 
     _struct = textwrap.dedent("""

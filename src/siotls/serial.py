@@ -15,15 +15,17 @@ class TooMuchData(ValueError):
     pass
 
 
-def parse_verbose(func):
+def parse_verbose(meth):
     def wrapped(data):
         logger.debug(
             "Parsing %s\nStruct:\n%s\nData:\n%s\n",
-            func.__self__.__name__,
-            func.__self__._struct,
+            meth.__self__.__name__,
+            meth.__self__._struct,
             hexdump(data),
         )
-        return func(data)
+        return wrapped.meth.__func__(wrapped.cls, data)
+    wrapped.meth = meth
+    wrapped.cls = None  # set by caller
     return wrapped
 
 
@@ -53,13 +55,22 @@ class Serializable(metaclass=abc.ABCMeta):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if logger.isEnabledFor(logging.DEBUG):
-            if 'parse' in cls.__dict__:
+
+            if getattr(cls.parse, '__isabstractmethod__', False):
+                pass
+            elif 'parse' in cls.__dict__:
+                if '_struct' not in cls.__dict__:
+                    logger.warning("%s is missing a _struct declaration", cls)
+                    cls._struct = ''
                 cls.parse = parse_verbose(cls.parse)
+                cls.parse.cls = cls
+            else:
+                cls.parse = parse_verbose(cls.parse.meth)
+                cls.parse.cls = cls
+
+
             if 'serialize' in cls.__dict__:
                 cls.serialize = serialize_verbose(cls.serialize)
-            if '_struct' not in cls.__dict__:
-                logger.warning("%s is missing a _struct declaration", cls)
-                cls._struct = ''
 
     def __repr__(self):
         output = [type(self).__name__, '(']
@@ -67,11 +78,7 @@ class Serializable(metaclass=abc.ABCMeta):
         for key, value in vars(self).items():
             if key.startswith('_'):
                 continue
-            if isinstance(key, (Serializable, SerializableBody)):
-                output.append(type(value).__name__)
-                output.append('()')
-            else:
-                output.append(str(value))
+            output.append(str(value))
             output.append(',')
 
         if output[-1] == ',':
@@ -94,15 +101,21 @@ class SerializableBody(metaclass=abc.ABCMeta):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if logger.isEnabledFor(logging.DEBUG):
-            if 'parse_body' in cls.__dict__:
+
+            if getattr(cls.parse_body, '__isabstractmethod__', False):
+                pass
+            elif 'parse_body' in cls.__dict__:
+                if '_struct' not in cls.__dict__:
+                    logger.warning("%s is missing a _struct declaration", cls)
+                    cls._struct = ''
                 cls.parse_body = parse_verbose(cls.parse_body)
+                cls.parse_body.cls = cls
+            else:
+                cls.parse_body = parse_verbose(cls.parse_body.meth)
+                cls.parse_body.cls = cls
+
             if 'serialize_body' in cls.__dict__:
                 cls.serialize_body = serialize_verbose(cls.serialize_body)
-            if '_struct' not in cls.__dict__:
-                logger.warning("%s is missing a _struct declaration", cls)
-                cls._struct = ''
-
-    __repr__ = Serializable.__repr__
 
 
 class SerialIO(io.BytesIO):

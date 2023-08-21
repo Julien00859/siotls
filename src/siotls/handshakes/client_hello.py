@@ -1,9 +1,12 @@
+import logging
 import textwrap
 from siotls.iana import CipherSuites, HandshakeType, TLSVersion
 from siotls.serial import SerializableBody, SerialIO
 from . import Handshake
 from ..contents import alerts
 from ..extensions import Extension
+
+logger = logging.getLogger(__name__)
 
 
 class ClientHello(Handshake, SerializableBody):
@@ -71,6 +74,7 @@ class ClientHello(Handshake, SerializableBody):
             extension = Extension.parse(item_data)
             if cls.msg_type not in extension._handshake_types:
                 raise NotImplementedError("todo")
+            logger.debug("Found extension %s", extension)
             extensions.append(extension)
             remaining -= extension_length
 

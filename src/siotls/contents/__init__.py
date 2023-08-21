@@ -6,9 +6,9 @@ _content_registry = {}
 class Content:
     content_type: ContentType
 
-    def __init_subclass__(cls, register=True, **kwargs):
+    def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        if register and Content in cls.__bases__:
+        if Content in cls.__bases__:
             _content_registry[cls.content_type] = cls
 
     @classmethod
