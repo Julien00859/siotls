@@ -16,14 +16,14 @@ class TooMuchData(ValueError):
 
 
 def parse_verbose(meth):
-    def wrapped(data):
+    def wrapped(data, **kwargs):
         logger.debug(
             "Parsing %s\nStruct:\n%s\nData:\n%s\n",
             meth.__self__.__name__,
             meth.__self__._struct,
             hexdump(data),
         )
-        return wrapped.meth.__func__(wrapped.cls, data)
+        return wrapped.meth.__func__(wrapped.cls, data, **kwargs)
     wrapped.meth = meth
     wrapped.cls = None  # set by caller
     return wrapped

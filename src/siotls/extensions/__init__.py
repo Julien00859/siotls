@@ -1,13 +1,14 @@
-import collections
 import textwrap
-from siotls.iana import ExtensionType
+from typing import Literal
+from siotls.iana import HandshakeType, ExtensionType
 from siotls.serial import Serializable, SerializableBody, SerialIO
 
 
+ANY_HANDSHAKE = -1
 _extension_registry = {}
 
 class Extension(Serializable):
-    _handshake_types: collections.abc.Container
+    _handshake_types: set[HandshakeType | Literal[ANY_HANDSHAKE]]
     _struct = textwrap.dedent("""
         struct {
             ExtensionType extension_type;
@@ -44,20 +45,27 @@ class Extension(Serializable):
     def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and Extension in cls.__bases__:
-            _extension_registry[cls.extension_type] = cls
+            for handshake_type in cls._handshake_types:
+                registry = _extension_registry.setdefault(cls.extension_type, {})
+                registry[handshake_type] = cls
 
     @classmethod
-    def parse(abc, data):
+    def parse(abc, data, *, handshake_type):
         stream = SerialIO(data)
         extension_type = stream.read_int(2)
-        try:
-            cls = _extension_registry[extension_type]
-        except KeyError:
+
+        if registry := _extension_registry.get(extension_type):
+            try:
+                cls = registry.get(ANY_HANDSHAKE) or registry[handshake_type]
+            except KeyError:
+                raise NotImplementedError("todo")
+        else:
             cls = type(
                 f'UnkonwnExtension{extension_type}',
                 (UnknownExtension, Extension),
                 {'extension_type': extension_type},
             )
+
         self = cls.parse_body(stream.read_var(2))
 
         stream.assert_eof()
@@ -74,7 +82,7 @@ class Extension(Serializable):
 
 
 class UnknownExtension(SerializableBody):
-    _handshake_types = type("Everything", (), {'__contains__': lambda self, item: True})()
+    _handshake_types = {ANY_HANDSHAKE}
 
     _struct = textwrap.dedent("""
         struct {

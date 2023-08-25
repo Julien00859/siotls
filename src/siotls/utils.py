@@ -40,3 +40,10 @@ def hexdump(bytes_):
     if bytes_:
         xd.pop()  # ditch last \n
     return xd.decode()
+
+
+def try_cast(type_, value, exceptions=ValueError):
+    try:
+        return type_(value)
+    except exceptions:
+        return value

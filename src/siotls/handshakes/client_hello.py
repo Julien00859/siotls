@@ -71,9 +71,7 @@ class ClientHello(Handshake, SerializableBody):
                 stream.read_exactly(2, limit=remaining)  # extension_type
                 extension_length = stream.read_int(2, limit=remaining - 2)
             item_data = stream.read_exactly(4 + extension_length, limit=remaining)
-            extension = Extension.parse(item_data)
-            if cls.msg_type not in extension._handshake_types:
-                raise NotImplementedError("todo")
+            extension = Extension.parse(item_data, handshake_type=cls.msg_type)
             logger.debug("Found extension %s", extension)
             extensions.append(extension)
             remaining -= extension_length

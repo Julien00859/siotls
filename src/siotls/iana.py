@@ -181,6 +181,13 @@ class HeartbeatMode(Hex1Enum):
     peer_allowed_to_send = 1
     peer_not_allowed_to_send = 2
 
+
+class CertificateType(Hex1Enum):
+    X509 = 0
+    OPENPGP = 1
+    RAW_PUBLIC_KEY = 2
+    CT_1609DOT2 = 3
+
 #-----------------------------------------------------------------------
 # Extra non-IANA types registered here for simplicity
 #-----------------------------------------------------------------------
