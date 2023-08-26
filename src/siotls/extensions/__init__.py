@@ -116,7 +116,7 @@ from .signed_certificate_timestamp import SignedCertificateTimestamp
 from .client_certificate_type import ClientCertificateType
 from .server_certificate_type import ServerCertificateType
 from .padding import Padding
-from .pre_shared_key import PreSharedKey
+from .pre_shared_key import PreSharedKeyRequest, PreSharedKeyResponse, PskIdentity
 from .early_data import EarlyData
 from .supported_versions import SupportedVersions
 from .cookie import Cookie

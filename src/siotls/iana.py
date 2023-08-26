@@ -188,6 +188,11 @@ class CertificateType(Hex1Enum):
     RAW_PUBLIC_KEY = 2
     CT_1609DOT2 = 3
 
+
+class PskKeyExchangeMode(Hex1Enum):
+    PSK_KE = 0
+    PSK_DHE_KE = 1
+
 #-----------------------------------------------------------------------
 # Extra non-IANA types registered here for simplicity
 #-----------------------------------------------------------------------
