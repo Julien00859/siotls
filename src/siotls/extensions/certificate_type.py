@@ -1,3 +1,4 @@
+import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, CertificateType
 from siotls.serial import SerializableBody, SerialIO
 from siotls.utils import try_cast
@@ -45,12 +46,32 @@ class _CertificateTypeResponse(SerializableBody):
 
 class ClientCertificateTypeRequest(Extension, _CertificateTypeRequest):
     extension_type = ExtensionType.CLIENT_CERTIFICATE_TYPE
+    _struct = textwrap.dedent("""\
+        struct {
+            CertificateType client_certificate_types<1..2^8-1>;
+        } ClientCertTypeExtension;
+    """).strip()
 
 class ClientCertificateTypeResponse(Extension, _CertificateTypeResponse):
     extension_type = ExtensionType.CLIENT_CERTIFICATE_TYPE
+    _struct = textwrap.dedent("""\
+        struct {
+            CertificateType client_certificate_type;
+        } ClientCertTypeExtension;
+    """).strip()
 
 class ServerCertificateTypeRequest(Extension, _CertificateTypeRequest):
     extension_type = ExtensionType.SERVER_CERTIFICATE_TYPE
+    _struct = textwrap.dedent("""\
+        struct {
+            CertificateType server_certificate_types<1..2^8-1>;
+        } ServerCertTypeExtension;
+    """).strip()
 
 class ServerCertificateTypeResponse(Extension, _CertificateTypeResponse):
     extension_type = ExtensionType.SERVER_CERTIFICATE_TYPE
+    _struct = textwrap.dedent("""\
+        struct {
+            CertificateType server_certificate_type;
+        } ServerCertTypeExtension;
+    """).strip()
