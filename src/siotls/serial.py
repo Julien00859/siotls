@@ -147,6 +147,24 @@ class SerialIO(io.BytesIO):
         self.write_int(n, len(b))
         self.write(b)
 
+    def read_varint(self, n, sizeof, limit=float('+inf')):
+        length = self.read_int(n, limit)
+        if length % sizeof != 0:
+            msg = (f"Cannot read {length // sizeof + 1} "
+                   f"uint{sizeof * 8}_t out of {length} bytes.")
+            raise ValueError(msg)
+
+        it = iter(self.read_exactly(length))
+        return [
+            int.from_bytes(bytes(group), 'big')
+            for group in zip(*([it] * sizeof))
+        ]
+
+    def write_varint(self, n, sizeof, b):
+        self.write_int(n, len(b) * sizeof)
+        for i in b:
+            self.write_int(sizeof, i)
+
     @contextlib.contextmanager
     def lookahead(self):
         pos = self.tell()

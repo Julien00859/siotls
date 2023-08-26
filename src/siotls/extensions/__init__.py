@@ -118,7 +118,7 @@ from .server_certificate_type import ServerCertificateType
 from .padding import Padding
 from .pre_shared_key import PreSharedKeyRequest, PreSharedKeyResponse, PskIdentity
 from .early_data import EarlyData
-from .supported_versions import SupportedVersions
+from .supported_versions import SupportedVersionsRequest, SupportedVersionsResponse
 from .cookie import Cookie
 from .psk_key_exchange_modes import PskKeyExchangeModes
 from .certificate_authorities import CertificateAuthorities
