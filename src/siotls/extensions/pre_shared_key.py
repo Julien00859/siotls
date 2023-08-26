@@ -42,7 +42,7 @@ class PreSharedKeyRequest(Extension, SerializableBody):
         list_length = stream.read_int(2)
         while list_length > 0:
             identify = stream.read_var(2, limit=list_length)
-            list_length -= 2 - len(identify)
+            list_length -= 2 + len(identify)
             obfuscated_ticket_age = stream.read_int(4, limit=list_length)
             list_length -= 4
             identities.append(PskIdentity(identify, obfuscated_ticket_age))
