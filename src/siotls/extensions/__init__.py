@@ -124,4 +124,4 @@ from .psk_key_exchange_modes import PskKeyExchangeModes
 from .certificate_authorities import CertificateAuthorities
 from .oid_filters import OIDFilters, OIDFilter
 from .post_handshake_auth import PostHandshakeAuth
-from .key_share import KeyShare
+from .key_share import KeyShareRequest, KeyShareResponse, KeyShareEntry
