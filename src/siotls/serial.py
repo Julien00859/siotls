@@ -7,11 +7,15 @@ from .utils import hexdump
 logger = logging.getLogger(__name__)
 
 
-class MissingData(ValueError):
+class SerializationError(ValueError):
     pass
 
 
-class TooMuchData(ValueError):
+class MissingData(SerializationError):
+    pass
+
+
+class TooMuchData(SerializationError):
     pass
 
 

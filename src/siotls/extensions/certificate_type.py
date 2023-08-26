@@ -1,12 +1,14 @@
 import textwrap
+from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType as HT, CertificateType
-from siotls.serial import SerializableBody, SerialIO
+from siotls.serial import SerializableBody, SerialIO, SerializationError
 from siotls.utils import try_cast
 from . import Extension
 
 
 class _CertificateTypeRequest(SerializableBody):
     _handshake_types = {HT.CLIENT_HELLO}
+    certificate_types: list[CertificateType | int]
 
     def __init__(self, certificate_types):
         self.certificate_types = certificate_types
@@ -29,6 +31,7 @@ class _CertificateTypeRequest(SerializableBody):
 
 class _CertificateTypeResponse(SerializableBody):
     _handshake_types = {HT.ENCRYPTED_EXTENSIONS}
+    certificate_type: CertificateType
 
     def __init__(self, certificate_type):
         self.certificate_type = certificate_type
@@ -36,9 +39,14 @@ class _CertificateTypeResponse(SerializableBody):
     @classmethod
     def parse_body(cls, data):
         stream = SerialIO(data)
-        self = cls(stream.read_int(1))
+        try:
+            certificate_type = CertificateType(stream.read_int(1))
+        except SerializationError:
+            raise
+        except ValueError as exc:
+            raise alerts.IllegalParameter() from exc
         stream.assert_eof()
-        return self
+        return cls(certificate_type)
 
     @classmethod
     def serialize_body(self):
