@@ -65,16 +65,18 @@ class ClientHello(Handshake, SerializableBody):
             raise alerts.IllegalParameter()
 
         extensions = []
-        remaining = stream.read_int(2)
-        while remaining > 0:
+        list_length = stream.read_int(2)
+        while list_length > 0:
             with stream.lookahead():
-                stream.read_exactly(2, limit=remaining)  # extension_type
-                extension_length = stream.read_int(2, limit=remaining - 2)
-            item_data = stream.read_exactly(4 + extension_length, limit=remaining)
+                stream.read_exactly(2, limit=list_length)  # extension_type
+                extension_length = stream.read_int(2, limit=list_length - 2)
+            item_data = stream.read_exactly(4 + extension_length, limit=list_length)
             extension = Extension.parse(item_data, handshake_type=cls.msg_type)
             logger.debug("Found extension %s", extension)
             extensions.append(extension)
-            remaining -= extension_length
+            list_length -= 4 + extension_length
+        if list_length < 0:
+            raise RuntimeError(f"buffer overflow while parsing {data}")
 
         stream.assert_eof()
 
