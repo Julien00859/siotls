@@ -1,6 +1,7 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, NamedGroup
-from siotls.serial import SerializableBody, SerialIO
+from siotls.serial import SerializableBody
+from siotls.utils import try_cast
 from . import Extension
 
 
@@ -20,19 +21,11 @@ class SupportedGroups(Extension, SerializableBody):
         self.named_group_list = named_group_list
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
-        named_group_list = []
-        it = iter(stream.read_var(2))
-        for pair in zip(it, it):
-            named_group = (pair[0] << 8) + pair[1]
-            try:
-                named_group_list.append(NamedGroup(named_group))
-            except ValueError:
-                named_group_list.append(named_group)
-
-        stream.assert_eof()
+    def parse_body(cls, stream):
+        named_group_list = [
+            try_cast(NamedGroup, named_group)
+            for named_group in stream.read_listint(2, 2)
+        ]
         return cls(named_group_list)
 
     def serialize_body(self):

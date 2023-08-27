@@ -28,9 +28,7 @@ class ServerName(Serializable):
             _server_name_registry[cls.name_type] = cls
 
     @classmethod
-    def parse(abc, data):
-        stream = SerialIO(data)
-
+    def parse(abc, stream):
         name_type = stream.read_int(1)
         try:
             cls = _server_name_registry[NameType(name_type)]
@@ -39,7 +37,8 @@ class ServerName(Serializable):
             # this extension, crash for now.
             # should be configurable (should it?)
             raise alerts.UnrecognizedName() from exc
-        return cls.parse_body(stream.read())
+
+        return cls.parse_body(stream)
 
     def serialize(self):
         return b''.join([
@@ -59,10 +58,8 @@ class HostName(ServerName, SerializableBody):
         self.host_name = host_name
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
+    def parse_body(cls, stream):
         host_name = stream.read_var(2)
-        stream.assert_eof()
         return cls(host_name)
 
     def serialize_body(self):
@@ -86,32 +83,12 @@ class ServerNameList(Extension, SerializableBody):
         self.server_name_list = server_name_list
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
+    def parse_body(cls, stream):
         server_name_list = []
-        remaining = stream.read_int(2)
-        while remaining > 0:
-            with stream.lookahead():
-                # we don't know the length of each individual element
-                # before parsing them, inspect the data to determine it
-                name_type = stream.read_int(1, limit=remaining)
-                server_name_length = 1  # name_type
-                match name_type:
-                    case NameType.HOST_NAME:
-                        server_name_length += 2 + stream.read_int(2, limit=remaining - 1)
-                    case _:
-                        # unknown type, must assume it is the last element
-                        server_name_length = remaining
-
-            item_data = stream.read_exactly(server_name_length, limit=remaining)
-            remaining -= server_name_length
-            server_name_list.append(ServerName.parse(item_data))
-        if remaining < 0:
-            raise RuntimeError(f"buffer overflow while parsing {data}")
-
-        stream.assert_eof()
-
+        list_stream = SerialIO(stream.read_var(2))
+        while not list_stream.is_eof():
+            server_name = ServerName.parse(list_stream)
+            server_name_list.append(server_name)
         return cls(server_name_list)
 
     def serialize_body(self):

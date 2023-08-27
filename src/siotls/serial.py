@@ -20,14 +20,16 @@ class TooMuchData(SerializationError):
 
 
 def parse_verbose(meth):
-    def wrapped(data, **kwargs):
+    def wrapped(stream, **kwargs):
+        with stream.lookahead():
+            data = stream.read()
         logger.debug(
             "Parsing %s\nStruct:\n%s\nData:\n%s\n",
             meth.__self__.__name__,
             meth.__self__._struct,
             hexdump(data),
         )
-        return wrapped.meth.__func__(wrapped.cls, data, **kwargs)
+        return wrapped.meth.__func__(wrapped.cls, stream, **kwargs)
     wrapped.meth = meth
     wrapped.cls = None  # set by caller
     return wrapped
@@ -49,7 +51,7 @@ class Serializable(metaclass=abc.ABCMeta):
     _struct: str
 
     @abc.abstractclassmethod
-    def parse(cls, data):
+    def parse(cls, stream):
         raise NotImplementedError("abstract method")
 
     @abc.abstractmethod
@@ -82,10 +84,10 @@ class Serializable(metaclass=abc.ABCMeta):
         for key, value in vars(self).items():
             if key.startswith('_'):
                 continue
-            output.append(str(value))
-            output.append(',')
+            output.append(f'{key}={value}')
+            output.append(', ')
 
-        if output[-1] == ',':
+        if output[-1] == ', ':
             output.pop()
         output.append(')')
         return ''.join(output)
@@ -95,7 +97,7 @@ class SerializableBody(metaclass=abc.ABCMeta):
     _struct: str
 
     @abc.abstractclassmethod
-    def parse_body(cls, data):
+    def parse_body(cls, stream):
         raise NotImplementedError("abstract method")
 
     @abc.abstractmethod
@@ -123,51 +125,80 @@ class SerializableBody(metaclass=abc.ABCMeta):
 
 
 class SerialIO(io.BytesIO):
-    def read(self, n=None, limit=float('+inf')):
-        if n is not None and n > limit:
-            raise TooMuchData(f"Expected {n} bytes but can only read {limit}.")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._limits = [float('+inf')]
+
+    def read(self, n=None):
+        max_n = self._limits[-1] - self.tell()
+        if n is None:
+            if len(self._limits) > 1:
+                n = max_n
+        elif n > max_n:
+            msg = f"Expected {n} bytes but can only read {max_n}."
+            raise TooMuchData(msg)
         return super().read(n)
 
-    def read_exactly(self, n, limit=float('+inf')):
+    def read_exactly(self, n):
         data = b''
         while len(data) != n:
-            read = self.read(n - len(data), limit=limit - len(data))
+            read = self.read(n - len(data))
             if not read:
-                raise MissingData(f"Expected {n} bytes but could only read {len(data)}.")
+                msg = f"Expected {n} bytes but could only read {len(data)}."
+                raise MissingData(msg)
             data += read
         return data
 
-    def read_int(self, n, limit=float('+inf')):
-        return int.from_bytes(self.read_exactly(n, limit), 'big')
+    def read_int(self, n):
+        return int.from_bytes(self.read_exactly(n), 'big')
 
     def write_int(self, n, i):
         self.write(i.to_bytes(n, 'big'))
 
-    def read_var(self, n, limit=float('+inf')):
-        length = self.read_int(n, limit)
-        return self.read_exactly(length, limit - n)
+    def read_var(self, n):
+        length = self.read_int(n)
+        return self.read_exactly(length)
 
     def write_var(self, n, b):
         self.write_int(n, len(b))
         self.write(b)
 
-    def read_varint(self, n, sizeof, limit=float('+inf')):
-        length = self.read_int(n, limit)
-        if length % sizeof != 0:
-            msg = (f"Cannot read {length // sizeof + 1} "
-                   f"uint{sizeof * 8}_t out of {length} bytes.")
-            raise ValueError(msg)
+    def read_listint(self, nlist, nitem):
+        length = self.read_int(nlist)
+        if length % nitem != 0:
+            msg = (f"Cannot read {length // nitem + 1} "
+                   f"uint{nitem * 8}_t out of {length} bytes.")
+            raise SerializationError(msg)
 
         it = iter(self.read_exactly(length))
         return [
             int.from_bytes(bytes(group), 'big')
-            for group in zip(*([it] * sizeof))
+            for group in zip(*([it] * nitem))
         ]
 
-    def write_varint(self, n, sizeof, b):
-        self.write_int(n, len(b) * sizeof)
-        for i in b:
-            self.write_int(sizeof, i)
+    def write_listin(self, nlist, nitem, items):
+        self.write_int(nlist, len(items) * nitem)
+        for item in items:
+            self.write_int(nitem, item)
+
+    def read_listvar(self, nlist, nitem):
+        items = []
+        list_stream = type(self)(self.read_var(nlist))
+        while not list_stream.is_eof():
+            items.append(list_stream.read_var(nitem))
+        return items
+
+    def write_listvar(self, nlist, nitem, items):
+        prepos = self.tell()
+        self.write_int(nlist, 0)  # placeholder
+        for item in items:
+            self.write_var(nitem, item)
+        postpos = self.tell()
+        # write the effective size on the placeholder
+        self.seek(prepos, 0)
+        self.write_int(nlist, postpos - prepos - nlist)
+        self.seek(postpos, 0)
+
 
     @contextlib.contextmanager
     def lookahead(self):
@@ -177,9 +208,33 @@ class SerialIO(io.BytesIO):
         finally:
             self.seek(pos)
 
+    def is_eof(self):
+        current_pos = self.tell()
+        eof_pos = self.seek(0, 2)
+        self.seek(current_pos, 0)
+        return current_pos == eof_pos
+
     def assert_eof(self):
         current_pos = self.tell()
         eof_pos = self.seek(0, 2)
         if remaining := eof_pos - current_pos:
             self.seek(current_pos, 0)
-            raise TooMuchData(f"Expected end of stream but {remaining} bytes remain.")
+            msg = f"Expected end of stream but {remaining} bytes remain."
+            raise TooMuchData(msg)
+
+    @contextlib.contextmanager
+    def limit(self, length):
+        new_limit = self.tell() + length
+        if new_limit > self._limits[-1]:
+            msg = "An more restrictive limit is present already"
+            raise ValueError(msg)
+
+        self._limits.append(new_limit)
+        try:
+            yield
+        finally:
+            assert self._limits.pop() == new_limit, "another limit was pop"
+            assert self._limits, "+inf was pop"
+            if (remaining := new_limit - self.tell()):
+                msg = f"Expected end of chunk but {remaining} bytes remain."
+                raise TooMuchData(msg)

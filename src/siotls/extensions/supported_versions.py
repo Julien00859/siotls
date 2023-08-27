@@ -1,7 +1,7 @@
 import textwrap
 from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType as HT, TLSVersion
-from siotls.serial import SerializableBody, SerialIO, SerializationError
+from siotls.serial import SerializableBody, SerializationError
 from siotls.utils import try_cast
 from . import Extension
 
@@ -21,13 +21,11 @@ class SupportedVersionsRequest(Extension, SerializableBody):
         self.versions = versions
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
+    def parse_body(cls, stream):
         versions = [
-            try_cast(TLSVersion, i)
-            for i in stream.read_varint(1, sizeof=2)
+            try_cast(TLSVersion, version)
+            for version in stream.read_listint(1, 2)
         ]
-        stream.assert_eof()
         return cls(versions)
 
     def serialize_body(self):
@@ -56,15 +54,13 @@ class SupportedVersionsResponse(Extension, SerializableBody):
         self.selected_version = selected_version
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
+    def parse_body(cls, stream):
         try:
             selected_version = TLSVersion(stream.read_int(2, 'big'))
         except SerializationError:
             raise
         except ValueError as exc:
             raise alerts.IllegalParameter() from exc
-        stream.assert_eof()
         return cls(selected_version)
 
     def serialize_body(self):

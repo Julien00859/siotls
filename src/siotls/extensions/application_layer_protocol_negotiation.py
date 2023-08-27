@@ -1,6 +1,6 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT
-from siotls.serial import SerializableBody, SerialIO
+from siotls.serial import SerializableBody
 from . import Extension
 
 
@@ -20,16 +20,8 @@ class ApplicationLayerProtocolNegotiation(Extension, SerializableBody):
         self.protocol_name_list = protocol_name_list
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
-        protocol_name_list = []
-        list_length = stream.read_int(2)
-        while list_length > 0:
-            protocol_name_list.append(stream.read_var(1, limit=list_length))
-            list_length -= len(protocol_name_list[-1]) + 1
-
-        stream.assert_eof()
+    def parse_body(cls, stream):
+        protocol_name_list = stream.read_listvar(2, 1)
         return cls(protocol_name_list)
 
     def serialize_body(self):

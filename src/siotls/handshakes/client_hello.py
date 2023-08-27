@@ -35,14 +35,15 @@ class ClientHello(Handshake, SerializableBody):
     extensions: list[Extension]
 
     def __init__(self, random_, cipher_suites, extensions):
+        self.legacy_version = type(self).legacy_version
         self.random = random_
+        self.legacy_session_id = type(self).legacy_session_id
         self.cipher_suites = cipher_suites
+        self.legacy_compression_methods = type(self).legacy_compression_methods
         self.extensions = extensions
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
+    def parse_body(cls, stream):
         legacy_version = stream.read_int(2)
         if legacy_version != TLSVersion.TLS_1_2:
             raise alerts.ProtocolVersion()
@@ -65,20 +66,11 @@ class ClientHello(Handshake, SerializableBody):
             raise alerts.IllegalParameter()
 
         extensions = []
-        list_length = stream.read_int(2)
-        while list_length > 0:
-            with stream.lookahead():
-                stream.read_exactly(2, limit=list_length)  # extension_type
-                extension_length = stream.read_int(2, limit=list_length - 2)
-            item_data = stream.read_exactly(4 + extension_length, limit=list_length)
-            extension = Extension.parse(item_data, handshake_type=cls.msg_type)
+        list_stream = SerialIO(stream.read_var(2))
+        while not list_stream.is_eof():
+            extension = Extension.parse(list_stream, handshake_type=cls.msg_type)
             logger.debug("Found extension %s", extension)
             extensions.append(extension)
-            list_length -= 4 + extension_length
-        if list_length < 0:
-            raise RuntimeError(f"buffer overflow while parsing {data}")
-
-        stream.assert_eof()
 
         self = cls(random_, cipher_suites, extensions)
         self.legacy_version = legacy_version

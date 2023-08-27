@@ -1,6 +1,6 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, PskKeyExchangeMode
-from siotls.serial import SerializableBody, SerialIO
+from siotls.serial import SerializableBody
 from siotls.utils import try_cast
 from . import Extension
 
@@ -20,13 +20,11 @@ class PskKeyExchangeModes(Extension, SerializableBody):
         self.zeros = zeros
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
+    def parse_body(cls, stream):
         ke_modes = [
             try_cast(PskKeyExchangeMode, ke_mode)
-            for ke_mode in stream.read_var(1)
+            for ke_mode in stream.read_listint(1, 1)
         ]
-        stream.assert_eof()
         return cls(ke_modes)
 
     def serialize_body(self):

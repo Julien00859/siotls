@@ -30,21 +30,13 @@ class OIDFilters(Extension, SerializableBody):
         self.filters = filters
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
+    def parse_body(cls, stream):
         filters = []
-        list_length = stream.read_int(2)
-        while list_length > 0:
-            cert_ext_oid = stream.read_var(1)
-            list_length -= len(cert_ext_oid) - 1
-            cert_ext_values = stream.read_var(2)
-            list_length -= len(cert_ext_values) - 2
+        list_stream = SerialIO(stream.read_var(2))
+        while not list_stream.is_eof():
+            cert_ext_oid = list_stream.read_var(1)
+            cert_ext_values = list_stream.read_var(2)
             filters.append(OIDFilter(cert_ext_oid, cert_ext_values))
-        if list_length < 0:
-            raise RuntimeError(f"buffer overflow while parsing {data}")
-
-        stream.assert_eof()
         return cls(filters)
 
     def serialize_body(self):

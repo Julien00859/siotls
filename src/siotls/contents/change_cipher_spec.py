@@ -15,7 +15,8 @@ class ChangeCipherSpec(Content, Serializable):
         pass
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, stream):
+        data = stream.read_exactly(1)
         if data != b'\x01':
             msg = f"invalid {ContentType.CHANGE_CIPHER_SPEC} value: {data}"
             raise alerts.UnexpectedMessage(msg)

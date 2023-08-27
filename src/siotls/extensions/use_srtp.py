@@ -1,7 +1,7 @@
 import itertools
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT
-from siotls.serial import SerializableBody, SerialIO
+from siotls.serial import SerializableBody
 from . import Extension
 
 
@@ -27,14 +27,12 @@ class UseSRTP(Extension, SerializableBody):
         self.mki = mki
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
+    def parse_body(cls, stream):
+        # cannot use read_listint as the type in uint8[2], not uint16
         it = iter(stream.read_var(2))
         protection_profiles = list(zip(it, it))
         mki = stream.read_var(1)
 
-        stream.assert_eof()
         return cls(protection_profiles, mki)
 
     def serialize(self):

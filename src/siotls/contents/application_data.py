@@ -16,8 +16,8 @@ class ApplicationData(Content, Serializable):
         self.content_data = data
 
     @classmethod
-    def parse(cls, data):
-        return cls(data)
+    def parse(cls, stream):
+        return cls(stream.read())
 
     def serialize(self):
         return self.data

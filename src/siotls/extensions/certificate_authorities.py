@@ -1,6 +1,6 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT
-from siotls.serial import SerializableBody, SerialIO
+from siotls.serial import SerializableBody
 from . import Extension
 
 
@@ -21,19 +21,8 @@ class CertificateAuthorities(Extension, SerializableBody):
         self.autorities = autorities
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
-        autorities = []
-        list_length = stream.read_int(2)
-        while list_length > 0:
-            autority = stream.read_var(2, limit=list_length)
-            list_length -= len(autority) + 2
-            autorities.append(autority)
-        if list_length < 0:
-            raise RuntimeError(f"buffer overflow while parsing {data}")
-
-        stream.assert_eof()
+    def parse_body(cls, stream):
+        autorities = stream.read_listvar(2, 2)
         return cls(autorities)
 
     def serialize(self):

@@ -1,6 +1,6 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT
-from siotls.serial import SerializableBody, SerialIO
+from siotls.serial import SerializableBody
 from . import Extension
 
 
@@ -19,10 +19,8 @@ class Cookie(Extension, SerializableBody):
         self.cookie = cookie
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
+    def parse_body(cls, stream):
         cookie = stream.read_var(2)
-        stream.assert_eof()
         return cls(cookie)
 
     def serialize_body(self):
