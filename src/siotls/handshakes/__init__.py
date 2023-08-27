@@ -1,6 +1,6 @@
 import textwrap
 from siotls.iana import ContentType, HandshakeType
-from siotls.serial import Serializable, SerialIO
+from siotls.serial import Serializable
 from ..contents import Content, alerts
 
 
@@ -35,18 +35,15 @@ class Handshake(Content, Serializable):
             _handshake_registry[cls.msg_type] = cls
 
     @classmethod
-    def parse(abc, data):
-        stream = SerialIO(data)
-
+    def parse(abc, stream):
         msg_type = stream.read_int(1)
         length = stream.read_int(3)
         try:
             cls = _handshake_registry[HandshakeType(msg_type)]
         except ValueError as exc:
             raise alerts.UnrecognizedName() from exc
-        self = cls.parse_body(stream.read_exactly(length))
-        stream.assert_eof()
-        return self
+        with stream.limit(length):
+            return cls.parse_body(stream)
 
     def serialize(self):
         msg_data = self.serialize_body()

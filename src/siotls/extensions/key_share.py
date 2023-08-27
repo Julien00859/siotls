@@ -32,21 +32,13 @@ class KeyShareRequest(Extension, SerializableBody):
         self.client_shares = client_shares
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
+    def parse_body(cls, stream):
         client_shares = []
-        list_length = stream.read_int(2)
-        while list_length:
-            group = try_cast(NamedGroup, stream.read_int(2))
-            list_length -= 2
-            key_exchange = stream.read_var(2)
-            list_length -= 2 + len(key_exchange)
+        list_stream = SerialIO(stream.read_var(2))
+        while not list_stream.is_eof():
+            group = try_cast(NamedGroup, list_stream.read_int(2))
+            key_exchange = list_stream.read_var(2)
             client_shares.append(KeyShareEntry(group, key_exchange))
-        if list_length < 0:
-            raise RuntimeError(f"buffer overflow while parsing {data}")
-
-        stream.assert_eof()
         return cls(client_shares)
 
     def serialize_body(self):
@@ -78,13 +70,11 @@ class KeyShareResponse(Extension, SerializableBody):
         self.selected_group = selected_group
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
+    def parse_body(cls, stream):
         try:
             selected_group = NamedGroup(stream.read_int(2))
         except SerializationError:
             raise
         except ValueError as exc:
             raise alerts.IllegalParameter() from exc
-        stream.assert_eof()
         return cls(selected_group)

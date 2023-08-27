@@ -1,6 +1,6 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, MaxFragmentLength
-from siotls.serial import SerializableBody
+from siotls.serial import SerializableBody, SerializationError
 from . import Extension
 from ..contents import alerts
 
@@ -20,12 +20,11 @@ class MaxFragmentLength(Extension, SerializableBody):
         self.max_fragment_length = max_fragment_length
 
     @classmethod
-    def parse_body(cls, data):
-        if len(data) != 1:
-            raise ValueError(f"Expected exactly 1 byte but found {len(data)}")
-        max_fragment_length = int.from_bytes(data[0], 'big')
+    def parse_body(cls, stream):
         try:
-            max_fragment_length = MaxFragmentLength(max_fragment_length)
+            max_fragment_length = MaxFragmentLength(stream.read_int(1))
+        except SerializationError:
+            raise
         except ValueError as exc:
             raise alerts.IllegalParameter() from exc
         return cls(max_fragment_length)

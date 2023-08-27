@@ -1,6 +1,7 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, SignatureScheme
-from siotls.serial import SerializableBody, SerialIO
+from siotls.serial import SerializableBody
+from siotls.utils import try_cast
 from . import Extension
 
 
@@ -16,20 +17,12 @@ class _SignAlgoMixin(SerializableBody):
         self.supported_signature_algorithms = supported_signature_algorithms
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
-
-        supp_sign_algos = []
-        it = iter(stream.read_var(2))
-        for pair in zip(it, it):
-            named_group = (pair[0] << 8) + pair[1]
-            try:
-                supp_sign_algos.append(SignatureScheme(named_group))
-            except ValueError:
-                supp_sign_algos.append(named_group)
-
-        stream.assert_eof()
-        return cls(supp_sign_algos)
+    def parse_body(cls, stream):
+        supported_signature_algorithms = [
+            try_cast(SignatureScheme, signature_scheme)
+            for signature_scheme in stream.read_listint(2, 2)
+        ]
+        return cls(supported_signature_algorithms)
 
     def serialize_body(self):
         return b''.join([

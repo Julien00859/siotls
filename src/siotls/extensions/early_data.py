@@ -1,6 +1,6 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT
-from siotls.serial import SerializableBody, SerialIO
+from siotls.serial import SerializableBody
 from . import Extension
 
 
@@ -8,15 +8,15 @@ class EarlyData(Extension, SerializableBody):
     extension_type = ExtensionType.EARLY_DATA
     _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
 
-    _struct = ''
+    # The mere presence of the extension is enough
+    _struct = ""
 
     def __init__(self):
         pass
 
     @classmethod
-    def parse_body(cls, data):
-        SerialIO(data).ensure_eof()
-        return cls
+    def parse_body(cls, stream):
+        return cls()
 
     def serialize_body(self):
         return b''
@@ -37,10 +37,8 @@ class NewSessionEarlyData(Extension, SerializableBody):
         self.max_early_data_size = max_early_data_size
 
     @classmethod
-    def parse_body(cls, data):
-        stream = SerialIO(data)
+    def parse_body(cls, stream):
         max_early_data_size = stream.read_int(4)
-        stream.ensure_eof()
         return cls(max_early_data_size)
 
     def serialize_body(self):

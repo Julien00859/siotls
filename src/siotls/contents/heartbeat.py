@@ -32,8 +32,7 @@ class Heartbeat(Content, Serializable):
         self.padding = padding
 
     @classmethod
-    def parse(cls, data):
-        stream = SerialIO(data)
+    def parse(cls, stream):
         try:
             heartbeat_type = HeartbeatMessageType(stream.read_int(1))
         except ValueError as exc:

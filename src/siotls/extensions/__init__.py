@@ -1,7 +1,7 @@
 import textwrap
 from typing import Literal
 from siotls.iana import HandshakeType, ExtensionType
-from siotls.serial import Serializable, SerializableBody, SerialIO
+from siotls.serial import Serializable, SerializableBody
 
 
 ANY_HANDSHAKE = -1
@@ -50,8 +50,7 @@ class Extension(Serializable):
                 registry[handshake_type] = cls
 
     @classmethod
-    def parse(abc, data, *, handshake_type):
-        stream = SerialIO(data)
+    def parse(abc, stream, *, handshake_type):
         extension_type = stream.read_int(2)
 
         if registry := _extension_registry.get(extension_type):
@@ -66,11 +65,9 @@ class Extension(Serializable):
                 {'extension_type': extension_type},
             )
 
-        self = cls.parse_body(stream.read_var(2))
-
-        stream.assert_eof()
-
-        return self
+        extension_length = stream.read_int(2)
+        with stream.limit(extension_length):
+            return cls.parse_body(stream)
 
     def serialize(self):
         extension_data = self.serialize_body()
@@ -95,8 +92,8 @@ class UnknownExtension(SerializableBody):
         self.extension_data = extension_data
 
     @classmethod
-    def parse_body(cls, data):
-        return cls(data)
+    def parse_body(cls, stream):
+        return cls(stream.read())
 
     @classmethod
     def serialize_body(self):

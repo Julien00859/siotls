@@ -58,9 +58,11 @@ class Alert(Exception, Content, Serializable):
             _alert_registry[cls.description] = cls
 
     @classmethod
-    def parse(abc, data):
-        stream = SerialIO(data)
-        level = AlertLevel(stream.read_int(1))
+    def parse(abc, stream):
+        try:
+            level = AlertLevel(stream.read_int(1))
+        except ValueError as exc:
+            raise IllegalParameter() from exc
         description = stream.read_int(1)
 
         try:
@@ -71,8 +73,6 @@ class Alert(Exception, Content, Serializable):
                 'description': description,
                 '_struct': '',
             })
-
-        stream.assert_eof()
 
         return cls('', level)
 

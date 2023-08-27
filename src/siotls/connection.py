@@ -2,7 +2,7 @@ import logging
 import struct
 
 from siotls.iana import ContentType
-from siotls.serial import TooMuchData
+from siotls.serial import TooMuchData, SerialIO
 from .contents import Content, alerts
 
 
@@ -30,11 +30,13 @@ class TLSConnection:
             return
         self._input_data += data
 
-        contents = [
-            Content.get_parser(content_type).parse(content_data)
-            for content_type, content_data
-            in iter(self._read_next_content, None)
-        ]
+        contents = []
+        for content_type, content_data in iter(self._read_next_content, None):
+            stream = SerialIO(content_data)
+            content = Content.get_parser(content_type).parse(stream)
+            stream.assert_eof()
+            contents.append(content)
+
         return contents
 
     def _read_next_record(self):
@@ -106,14 +108,13 @@ class TLSConnection:
                 return
             content_type, fragment = record
             if content_type != ContentType.HANDSHAKE:
-                msg = (
-                    f"Expected {ContentType.HANDSHAKE} continuation "
-                    f"record but {content_type} found."
-                )
+                msg = (f"Expected {ContentType.HANDSHAKE} continuation "
+                       f"record but {content_type} found.")
                 raise alerts.UnexpectedMessage(msg)
             self._input_handshake += fragment
         if len(self._input_handshake) - 4 > handshake_length:
-            msg = f"Expected {handshake_length} bytes but {len(self._input_handshake)} read."
+            msg = (f"Expected {handshake_length + 4} bytes but "
+                   f"{len(self._input_handshake)} read.")
             raise TooMuchData(msg)
 
         content_data = self._input_handshake
