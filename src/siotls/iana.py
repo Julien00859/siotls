@@ -1,5 +1,6 @@
 import enum
 
+
 class Hex1Enum(enum.IntEnum):
     """ An integer on 1 byte with hexadecimal representation """
     def __repr__(self):
@@ -132,54 +133,54 @@ class CertificateStatusType(Hex1Enum):
 
 
 class NamedGroup(Hex2Enum):
-    # Elliptic Curve Groups (ECDHE)
-    secp256r1 = 0x0017
-    secp384r1 = 0x0018
-    secp521r1 = 0x0019
-    x25519 = 0x001D
-    x448 = 0x001E
+    # ELLIPTIC Curve Groups (ECDHE)
+    SECP256R1 = 0x0017
+    SECP384R1 = 0x0018
+    SECP521R1 = 0x0019
+    X25519 = 0x001D
+    X448 = 0x001E
 
     # Finite Field Groups (DHE)
-    ffdhe2048 = 0x0100
-    ffdhe3072 = 0x0101
-    ffdhe4096 = 0x0102
-    ffdhe6144 = 0x0103
-    ffdhe8192 = 0x0104
+    FFDHE2048 = 0x0100
+    FFDHE3072 = 0x0101
+    FFDHE4096 = 0x0102
+    FFDHE6144 = 0x0103
+    FFDHE8192 = 0x0104
 
 
 class SignatureScheme(Hex2Enum):
     # RSASSA-PKCS1-v1_5 algorithms
-    rsa_pkcs1_sha256 = 0x0401
-    rsa_pkcs1_sha384 = 0x0501
-    rsa_pkcs1_sha512 = 0x0601
+    RSA_PKCS1_SHA256 = 0x0401
+    RSA_PKCS1_SHA384 = 0x0501
+    RSA_PKCS1_SHA512 = 0x0601
 
     # ECDSA algorithms
-    ecdsa_secp256r1_sha256 = 0x0403
-    ecdsa_secp384r1_sha384 = 0x0503
-    ecdsa_secp521r1_sha512 = 0x0603
+    ECDSA_SECP256R1_SHA256 = 0x0403
+    ECDSA_SECP384R1_SHA384 = 0x0503
+    ECDSA_SECP521R1_SHA512 = 0x0603
 
     # RSASSA-PSS algorithms with public key OID rsaEncryption
-    rsa_pss_rsae_sha256 = 0x0804
-    rsa_pss_rsae_sha384 = 0x0805
-    rsa_pss_rsae_sha512 = 0x0806
+    RSA_PSS_RSAE_SHA256 = 0x0804
+    RSA_PSS_RSAE_SHA384 = 0x0805
+    RSA_PSS_RSAE_SHA512 = 0x0806
 
     # EdDSA algorithms
-    ed25519 = 0x0807
-    ed448 = 0x0808
+    ED25519 = 0x0807
+    ED448 = 0x0808
 
     # RSASSA-PSS algorithms with public key OID RSASSA-PSS
-    rsa_pss_pss_sha256 = 0x0809
-    rsa_pss_pss_sha384 = 0x080a
-    rsa_pss_pss_sha512 = 0x080b
+    RSA_PSS_PSS_SHA256 = 0x0809
+    RSA_PSS_PSS_SHA384 = 0x080a
+    RSA_PSS_PSS_SHA512 = 0x080b
 
     # Legacy algorithms
-    rsa_pkcs1_sha1 = 0x0201
-    ecdsa_sha1 = 0x0203
+    RSA_PKCS1_SHA1 = 0x0201
+    ECDSA_SHA1 = 0x0203
 
 
 class HeartbeatMode(Hex1Enum):
-    peer_allowed_to_send = 1
-    peer_not_allowed_to_send = 2
+    PEER_ALLOWED_TO_SEND = 1
+    PEER_NOT_ALLOWED_TO_SEND = 2
 
 
 class CertificateType(Hex1Enum):
@@ -192,6 +193,7 @@ class CertificateType(Hex1Enum):
 class PskKeyExchangeMode(Hex1Enum):
     PSK_KE = 0
     PSK_DHE_KE = 1
+
 
 #-----------------------------------------------------------------------
 # Extra non-IANA types registered here for simplicity
