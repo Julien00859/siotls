@@ -113,8 +113,12 @@ from .use_srtp import UseSRTP
 from .heartbeat import Heartbeat
 from .application_layer_protocol_negotiation import ApplicationLayerProtocolNegotiation
 from .signed_certificate_timestamp import SignedCertificateTimestamp
-from .client_certificate_type import ClientCertificateType
-from .server_certificate_type import ServerCertificateType
+from .certificate_type import (
+    ClientCertificateTypeRequest,
+    ClientCertificateTypeResponse,
+    ServerCertificateTypeRequest,
+    ServerCertificateTypeResponse,
+)
 from .padding import Padding
 from .pre_shared_key import PreSharedKeyRequest, PreSharedKeyResponse, PskIdentity
 from .early_data import EarlyData
