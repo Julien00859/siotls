@@ -16,8 +16,8 @@ class PskKeyExchangeModes(Extension, SerializableBody):
     """).strip()
     ke_modes: list[PskKeyExchangeMode | int]
 
-    def __init__(self, zeros):
-        self.zeros = zeros
+    def __init__(self, ke_modes):
+        self.ke_modes = ke_modes
 
     @classmethod
     def parse_body(cls, stream):

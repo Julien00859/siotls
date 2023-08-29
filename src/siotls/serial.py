@@ -92,6 +92,17 @@ class Serializable(metaclass=abc.ABCMeta):
         output.append(')')
         return ''.join(output)
 
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
+        notset = object()
+        for key, value in vars(self).items():
+            if key.startswith('_'):
+                continue
+            if value != getattr(other, key, notset):
+                return False
+        return True
+
 
 class SerializableBody(metaclass=abc.ABCMeta):
     _struct: str
