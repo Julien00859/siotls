@@ -95,7 +95,6 @@ class UnknownExtension(SerializableBody):
     def parse_body(cls, stream):
         return cls(stream.read())
 
-    @classmethod
     def serialize_body(self):
         return self.extension_data
 

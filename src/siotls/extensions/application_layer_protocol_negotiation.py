@@ -25,7 +25,12 @@ class ApplicationLayerProtocolNegotiation(Extension, SerializableBody):
         return cls(protocol_name_list)
 
     def serialize_body(self):
+        protocol_name_list = b''.join([
+            len(proto).to_bytes(1, 'big') + proto
+            for proto in self.protocol_name_list
+        ])
+
         return b''.join([
-            len(self.protocol_name_list).to_bytes(2, 'big'),
-            *self.protocol_name_list,
+            len(protocol_name_list).to_bytes(2, 'big'),
+            protocol_name_list,
         ])

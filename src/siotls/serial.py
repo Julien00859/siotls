@@ -36,14 +36,16 @@ def parse_verbose(meth):
 
 
 def serialize_verbose(func):
-    def wrapped():
+    def wrapped(self):
+        data = func(self)
         logger.debug(
-            "Serializing %s\nStruct:\n%s\nSelf:\n%s\n",
-            func.__self__.__name__,
-            func.__self__._struct,
-            func.__self__,
+            "Serializing %s\nStruct:\n%s\nSelf:\n%s\nData:\n%s\n",
+            type(self).__name__,
+            self._struct,
+            self,
+            hexdump(data),
         )
-        return func()
+        return data
     return wrapped
 
 

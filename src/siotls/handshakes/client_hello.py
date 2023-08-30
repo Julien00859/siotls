@@ -2,6 +2,7 @@ import logging
 import textwrap
 from siotls.iana import CipherSuites, HandshakeType, TLSVersion
 from siotls.serial import SerializableBody, SerialIO
+from siotls.utils import try_cast
 from . import Handshake
 from ..contents import alerts
 from ..extensions import Extension
@@ -52,14 +53,10 @@ class ClientHello(Handshake, SerializableBody):
         random_ = stream.read_exactly(32)
         legacy_session_id = stream.read_var(1)
 
-        cipher_suites = []
-        it = iter(stream.read_var(2))
-        for pair in zip(it, it):
-            cipher = (pair[0] << 8) + pair[1]
-            try:
-                cipher_suites.append(CipherSuites(cipher))
-            except ValueError:
-                cipher_suites.append(cipher)
+        cipher_suites = [
+            try_cast(CipherSuites, cipher_suite)
+            for cipher_suite in stream.read_listint(2, 2)
+        ]
 
         legacy_compression_methods = stream.read_var(1)
         if legacy_compression_methods != b'\x00':  # "null" compression method
@@ -73,10 +70,25 @@ class ClientHello(Handshake, SerializableBody):
             extensions.append(extension)
 
         self = cls(random_, cipher_suites, extensions)
-        self.legacy_version = legacy_version
         self.legacy_session_id = legacy_session_id
-        self.legacy_compression_methods = legacy_compression_methods
         return self
 
     def serialize_body(self):
-        raise NotImplementedError("todo")
+        extensions = b''.join((ext.serialize() for ext in self.extensions))
+
+        return b''.join([
+            self.legacy_version.to_bytes(2, 'big'),
+            self.random,
+
+            len(self.legacy_session_id).to_bytes(1, 'big'),
+            self.legacy_session_id,
+
+            (len(self.cipher_suites) * 2).to_bytes(2, 'big'),
+            *[cs.to_bytes(2, 'big') for cs in self.cipher_suites],
+
+            len(self.legacy_compression_methods).to_bytes(1, 'big'),
+            self.legacy_compression_methods,
+
+            len(extensions).to_bytes(2, 'big'),
+            extensions,
+        ])
