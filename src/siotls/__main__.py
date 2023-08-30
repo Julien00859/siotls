@@ -36,6 +36,8 @@ def main():
         help="Increase logging verbosity (repeatable)")
     parser.add_argument('-s', '--silent', action='count', default=0,
         help="Decrease logging verbosity (repeatable)")
+    parser.add_argument('--host', action='store', default='localhost',
+        help="IP address on which the server will listen")
     parser.add_argument('--port', action='store', type=int, default=8446,
         help="TCP port number on which the server will listen")
     parser.add_argument('--tlscert', '--sslcert', action='store', type=pathlib.Path,
@@ -72,6 +74,7 @@ def main():
     try:
         from siotls.examples.simple import serve
         serve(
+            options.host,
             options.port,
             os.fspath(options.tlscert),
             os.fspath(options.tlskey),

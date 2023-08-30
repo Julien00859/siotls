@@ -14,9 +14,9 @@ def handle_one(client, client_info):
         logger.info("%s bytes from %s:\n%s", len(message), client_info[1], hexdump(message))
         logger.info(conn.receive_data(message))
 
-def serve(port, tlscert, tlskey):
+def serve(host, port, tlscert, tlskey):
     server = socket()
-    server.bind(('localhost', port))
+    server.bind((host, port))
     server.listen(1)
     logger.info("listening on %s", port)
 
