@@ -26,6 +26,15 @@ class ColoredFormatter(logging.Formatter):
         return super().format(record)
 
 
+def setup_logging(verbosity):
+    if hasattr(sys.stderr, 'fileno') and os.isatty(sys.stderr.fileno()):
+        logging.getLogger().handlers[0].formatter = ColoredFormatter(logging.BASIC_FORMAT)
+    logging.getLogger().setLevel(max(verbosity, logging.DEBUG))
+    if verbosity < logging.DEBUG:
+        logging.captureWarnings(True)
+        warnings.filterwarnings("default")
+
+
 def main():
     logging.basicConfig()
 
@@ -54,13 +63,8 @@ def main():
         return 1
 
     # Configure logging
-    if hasattr(sys.stderr, 'fileno') and os.isatty(sys.stderr.fileno()):
-        logging.getLogger().handlers[0].formatter = ColoredFormatter(logging.BASIC_FORMAT)
     verbosity = logging.INFO - options.verbose * 10 + options.silent * 10
-    logging.getLogger().setLevel(max(verbosity, logging.DEBUG))
-    if verbosity < logging.DEBUG:
-        logging.captureWarnings(True)
-        warnings.filterwarnings("default")
+    setup_logging(verbosity)
 
     # Check TLS cert/key
     if not os.access(options.tlscert, os.R_OK):
