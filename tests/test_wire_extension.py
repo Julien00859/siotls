@@ -26,13 +26,12 @@ def parse_extension(stream):
 
 class TestWireExtension(unittest.TestCase):
 
-    @unittest.skip("hostname coding not implemented yet")
     def test_wire_extension_0000_server_name0(self):
         payload = "0000000e000c0000096c6f63616c686f7374"
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
         self.assertEqual(stream.read(), b'', "stream should be at end of file")
-        self.assertEqual(ext, ServerNameList([HostName(["localhost"])]))
+        self.assertEqual(ext, ServerNameList([HostName("localhost")]))
         self.assertEqual(ext.serialize().hex(), payload)
 
     def test_wire_extension_000a_supported_group0(self):
@@ -80,7 +79,6 @@ class TestWireExtension(unittest.TestCase):
         ]))
         self.assertEqual(ext.serialize().hex(), payload)
 
-    @unittest.skip("protocol coding not implemented yet")
     def test_wire_extension_0010_application_layer_protocol_negotiation0(self):
         payload = "0010000e000c02683208687474702f312e31"
         stream = SerialIO(bytes.fromhex(payload))

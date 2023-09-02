@@ -1,6 +1,7 @@
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT
+from siotls.iana import ExtensionType, HandshakeType as HT, ALPNProtocol
 from siotls.serial import SerializableBody
+from siotls.utils import try_cast, is_string
 from . import Extension
 
 
@@ -14,19 +15,23 @@ class ApplicationLayerProtocolNegotiation(Extension, SerializableBody):
             ProtocolName protocol_name_list<2..2^16-1>
         } ProtocolNameList;
     """).strip()
-    protocol_name_list: list[bytes]
+    protocol_name_list: list[ALPNProtocol | str]
 
     def __init__(self, protocol_name_list):
         self.protocol_name_list = protocol_name_list
 
     @classmethod
     def parse_body(cls, stream):
-        protocol_name_list = stream.read_listvar(2, 1)
+        protocol_name_list = [
+            try_cast(ALPNProtocol, protocol.decode())
+            for protocol in stream.read_listvar(2, 1)
+            if is_string(protocol)  # skip GREASE
+        ]
         return cls(protocol_name_list)
 
     def serialize_body(self):
         protocol_name_list = b''.join([
-            len(proto).to_bytes(1, 'big') + proto
+            len(proto).to_bytes(1, 'big') + proto.encode()
             for proto in self.protocol_name_list
         ])
 

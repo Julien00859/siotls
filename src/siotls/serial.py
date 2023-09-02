@@ -86,7 +86,7 @@ class Serializable(metaclass=abc.ABCMeta):
         for key, value in vars(self).items():
             if key.startswith('_'):
                 continue
-            output.append(f'{key}={value}')
+            output.append(f'{key}={value!r}')
             output.append(', ')
 
         if output[-1] == ', ':

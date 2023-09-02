@@ -25,6 +25,7 @@ classifiers = [
 ]
 
 dependencies = [
+  "idna"
 ]
 
 [project.optional-dependencies]

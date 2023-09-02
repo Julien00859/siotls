@@ -1,10 +1,14 @@
+import contextlib
+import logging
 import textwrap
+import idna
 from siotls.iana import ExtensionType, HandshakeType as HT, NameType
 from siotls.serial import Serializable, SerializableBody, SerialIO
 from . import Extension
 from ..contents import alerts
 
 
+logger = logging.getLogger(__name__)
 _server_name_registry = {}
 
 class ServerName(Serializable):
@@ -52,20 +56,24 @@ class HostName(ServerName, SerializableBody):
     _struct = textwrap.dedent("""
         opaque HostName<1..2^16-1>;
     """).strip('\n')
-    host_name: bytes
+    host_name: str
 
     def __init__(self, host_name):
         self.host_name = host_name
 
     @classmethod
     def parse_body(cls, stream):
-        host_name = stream.read_var(2)
-        return cls(host_name)
+        byte_host_name = stream.read_var(2)
+        try:
+            return cls(idna.decode(byte_host_name))
+        except idna.IDNAError as exc:
+            logger.warning("Skip invalid hostname %s: %s", byte_host_name, exc)
+            raise
 
     def serialize_body(self):
         return b''.join([
             len(self.host_name).to_bytes(2, 'big'),
-            self.host_name,
+            idna.encode(self.host_name, uts46=True),
         ])
 
 class ServerNameList(Extension, SerializableBody):
@@ -87,8 +95,9 @@ class ServerNameList(Extension, SerializableBody):
         server_name_list = []
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
-            server_name = ServerName.parse(list_stream)
-            server_name_list.append(server_name)
+            with contextlib.suppress(UnicodeError):
+                server_name = ServerName.parse(list_stream)
+                server_name_list.append(server_name)
         return cls(server_name_list)
 
     def serialize_body(self):

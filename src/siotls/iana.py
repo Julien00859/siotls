@@ -1,4 +1,8 @@
 import enum
+try:
+    from enum import StrEnum
+except ImportError:
+    StrEnum = str
 
 
 class Hex1Enum(enum.IntEnum):
@@ -181,6 +185,42 @@ class SignatureScheme(Hex2Enum):
 class HeartbeatMode(Hex1Enum):
     PEER_ALLOWED_TO_SEND = 1
     PEER_NOT_ALLOWED_TO_SEND = 2
+
+
+class ALPNProtocol(StrEnum):
+    HTTP_0_9 = "http/0.9"
+    HTTP_1_0 = "http/1.0"
+    HTTP_1_1 = "http/1.1"
+    SPDY_1 = "spdy/1"
+    SPDY_2 = "spdy/2"
+    SPDY_3 = "spdy/3"
+    TURN = "stun.turn"
+    STUN = "stun.nat-discovery"
+    HTTP_2 = "h2"
+    HTTP_2_TCP = "h2c"
+    WebRTC = "webrtc"
+    cWebRTC = "c-webrtc"
+    FTP = "ftp"
+    IMAP = "imap"
+    POP3 = "pop3"
+    ManageSieve = "managesieve"
+    CoAP = "coap"
+    XMPP_client = "xmpp-client"
+    XMPP_server = "xmpp-server"
+    acme_tls_1 = "acme-tls/1"
+    MQTT = "mqtt"
+    DNS_over_TLS = "dot"
+    NTSKE_1 = "ntske/1"
+    SunRPC = "sunrpc"
+    HTTP_3 = "h3"
+    SMB2 = "smb"
+    IRC = "irc"
+    NNTP_reading = "nntp"
+    NNTP_transit = "nnsp"
+    DoQ = "doq"
+    SIP = "sip/2"
+    TDS_8_0 = "tds/8.0"
+    DICOM = "dicom"
 
 
 class CertificateType(Hex1Enum):

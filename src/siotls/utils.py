@@ -47,3 +47,11 @@ def try_cast(type_, value, exceptions=ValueError):
         return type_(value)
     except exceptions:
         return value
+
+
+def is_string(proto):
+    try:
+        proto.decode()
+    except UnicodeDecodeError:
+        return False
+    return True
