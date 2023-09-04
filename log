@@ -1,0 +1,1408 @@
+DEBUG:siotls.serial:Parsing Handshake
+Struct:
+struct {
+    HandshakeType msg_type;    /* handshake type */
+    uint24 length;             /* remaining bytes in message */
+    select (Handshake.msg_type) {
+        case 0x01: ClientHello;
+        case 0x02: ServerHello;
+        case 0x04: EndOfEarlyData;
+        case 0x05: EncryptedExtensions;
+        case 0x08: CertificateRequest;
+        case 0x0b: Certificate;
+        case 0x0d: CertificateVerify;
+        case 0x0f: Finished;
+        case 0x14: NewSessionTicket;
+        case 0x18: KeyUpdate;
+    };
+} Handshake;
+Data:
+0000: 01 00 01 fc 03 03 30 19  52 0a 80 cf 1a 5b 03 8d  101.330. Ra...[3.
+0010: e9 c1 7e 6a 7f 37 64 25  19 4f 6c da f8 df 48 4f  ..~j.7d% .Ol...HO
+0020: 64 6d 93 0e e3 5f 20 7c  d2 03 64 a3 a6 73 1c 78  dm.e._ | .3d..s.x
+0030: 82 bc 43 3c c5 cb b1 f0  b0 91 e7 35 bf f0 0d 95  ..C<.... ...5..d.
+0040: 00 7e e5 34 8d 9f 74 00  08 13 02 13 03 13 01 00  0~.4..t0 8.2.3.10
+0050: ff 01 00 01 ab 00 00 00  0f 00 0d 00 00 0a 6c 6f  .101.000 f0d00alo
+0060: 63 61 6c 68 6f 73 74 32  00 0b 00 04 03 00 01 02  calhost2 0b043012
+0070: 00 0a 00 16 00 14 00 1d  00 17 00 1e 00 19 00 18  0a0.0.0. 0.0.0.0.
+0080: 01 00 01 01 01 02 01 03  01 04 33 74 00 00 00 10  10111213 143t000.
+0090: 00 0e 00 0c 02 68 32 08  68 74 74 70 2f 31 2e 31  0e0c2h28 http/1.1
+00a0: 00 16 00 00 00 17 00 00  00 31 00 00 00 0d 00 1e  0.000.00 01000d0.
+00b0: 00 1c 04 03 05 03 06 03  08 07 08 08 08 09 08 0a  0.435363 8788898a
+00c0: 08 0b 08 04 08 05 08 06  04 01 05 01 06 01 00 2b  8b848586 4151610+
+00d0: 00 03 02 03 04 00 2d 00  02 01 01 00 33 00 26 00  032340-0 211030&0
+00e0: 24 00 1d 00 20 a9 da 4a  99 be c4 36 0f 65 1b 5f  $0.0 ..J ...6fe._
+00f0: c3 cb 3f 88 ad 8c db 1b  b6 1b fe 32 7d 34 b7 15  ..?..... ...2}4..
+0100: ec 40 ca 27 77 00 15 00  f7 00 00 00 00 00 00 00  .@.'w0.0 .0000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0160: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0170: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0180: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0190: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+
+DEBUG:siotls.serial:Parsing ClientHello
+Struct:
+uint16 ProtocolVersion;
+opaque Random[32];
+
+uint8 CipherSuite[2];    /* Cryptographic suite selector */
+
+struct {
+    ProtocolVersion legacy_version = 0x0303;    /* TLS v1.2 */
+    Random random;
+    opaque legacy_session_id<0..32>;
+    CipherSuite cipher_suites<2..2^16-2>;
+    opaque legacy_compression_methods<1..2^8-1>;
+    Extension extensions<8..2^16-1>;
+} ClientHello;
+Data:
+0000: 03 03 30 19 52 0a 80 cf  1a 5b 03 8d e9 c1 7e 6a  330.Ra.. .[3...~j
+0010: 7f 37 64 25 19 4f 6c da  f8 df 48 4f 64 6d 93 0e  .7d%.Ol. ..HOdm.e
+0020: e3 5f 20 7c d2 03 64 a3  a6 73 1c 78 82 bc 43 3c  ._ |.3d. .s.x..C<
+0030: c5 cb b1 f0 b0 91 e7 35  bf f0 0d 95 00 7e e5 34  .......5 ..d.0~.4
+0040: 8d 9f 74 00 08 13 02 13  03 13 01 00 ff 01 00 01  ..t08.2. 3.10.101
+0050: ab 00 00 00 0f 00 0d 00  00 0a 6c 6f 63 61 6c 68  .000f0d0 0alocalh
+0060: 6f 73 74 32 00 0b 00 04  03 00 01 02 00 0a 00 16  ost20b04 30120a0.
+0070: 00 14 00 1d 00 17 00 1e  00 19 00 18 01 00 01 01  0.0.0.0. 0.0.1011
+0080: 01 02 01 03 01 04 33 74  00 00 00 10 00 0e 00 0c  1213143t 000.0e0c
+0090: 02 68 32 08 68 74 74 70  2f 31 2e 31 00 16 00 00  2h28http /1.10.00
+00a0: 00 17 00 00 00 31 00 00  00 0d 00 1e 00 1c 04 03  0.000100 0d0.0.43
+00b0: 05 03 06 03 08 07 08 08  08 09 08 0a 08 0b 08 04  53638788 898a8b84
+00c0: 08 05 08 06 04 01 05 01  06 01 00 2b 00 03 02 03  85864151 610+0323
+00d0: 04 00 2d 00 02 01 01 00  33 00 26 00 24 00 1d 00  40-02110 30&0$0.0
+00e0: 20 a9 da 4a 99 be c4 36  0f 65 1b 5f c3 cb 3f 88   ..J...6 fe._..?.
+00f0: ad 8c db 1b b6 1b fe 32  7d 34 b7 15 ec 40 ca 27  .......2 }4...@.'
+0100: 77 00 15 00 f7 00 00 00  00 00 00 00 00 00 00 00  w0.0.000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0160: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0170: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0180: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0190: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01f0: 00 00 00 00 00 00 00 00  00 00 00 00              00000000 0000
+
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 00 00 0f 00 0d 00 00  0a 6c 6f 63 61 6c 68 6f  000f0d00 alocalho
+0010: 73 74 32 00 0b 00 04 03  00 01 02 00 0a 00 16 00  st20b043 0120a0.0
+0020: 14 00 1d 00 17 00 1e 00  19 00 18 01 00 01 01 01  .0.0.0.0 .0.10111
+0030: 02 01 03 01 04 33 74 00  00 00 10 00 0e 00 0c 02  213143t0 00.0e0c2
+0040: 68 32 08 68 74 74 70 2f  31 2e 31 00 16 00 00 00  h28http/ 1.10.000
+0050: 17 00 00 00 31 00 00 00  0d 00 1e 00 1c 04 03 05  .0001000 d0.0.435
+0060: 03 06 03 08 07 08 08 08  09 08 0a 08 0b 08 04 08  36387888 98a8b848
+0070: 05 08 06 04 01 05 01 06  01 00 2b 00 03 02 03 04  58641516 10+03234
+0080: 00 2d 00 02 01 01 00 33  00 26 00 24 00 1d 00 20  0-021103 0&0$0.0 
+0090: a9 da 4a 99 be c4 36 0f  65 1b 5f c3 cb 3f 88 ad  ..J...6f e._..?..
+00a0: 8c db 1b b6 1b fe 32 7d  34 b7 15 ec 40 ca 27 77  ......2} 4...@.'w
+00b0: 00 15 00 f7 00 00 00 00  00 00 00 00 00 00 00 00  0.0.0000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0160: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0170: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0180: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0190: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+01a0: 00 00 00 00 00 00 00 00  00 00 00                 00000000 000
+
+DEBUG:siotls.serial:Parsing ServerNameList
+Struct:
+struct {
+    ServerName server_name_list<1..2^16-1>
+} ServerNameList;
+Data:
+0000: 00 0d 00 00 0a 6c 6f 63  61 6c 68 6f 73 74 32     0d00aloc alhost2
+
+DEBUG:siotls.serial:Parsing ServerName
+Struct:
+struct {
+    NameType name_type;
+    select (name_type) {
+        case host_name: HostName;
+    } name;
+} ServerName;
+
+enum {
+    host_name(0x00), (0xff)
+} NameType;
+Data:
+0000: 00 00 0a 6c 6f 63 61 6c  68 6f 73 74 32           00alocal host2
+
+DEBUG:siotls.serial:Parsing HostName
+Struct:
+opaque HostName<1..2^16-1>;
+Data:
+0000: 00 0a 6c 6f 63 61 6c 68  6f 73 74 32              0alocalh ost2
+
+DEBUG:siotls.handshakes.client_hello:Found extension ServerNameList(server_name_list=[HostName(host_name=b'localhost2')])
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 0b 00 04 03 00 01 02  00 0a 00 16 00 14 00 1d  0b043012 0a0.0.0.
+0010: 00 17 00 1e 00 19 00 18  01 00 01 01 01 02 01 03  0.0.0.0. 10111213
+0020: 01 04 33 74 00 00 00 10  00 0e 00 0c 02 68 32 08  143t000. 0e0c2h28
+0030: 68 74 74 70 2f 31 2e 31  00 16 00 00 00 17 00 00  http/1.1 0.000.00
+0040: 00 31 00 00 00 0d 00 1e  00 1c 04 03 05 03 06 03  01000d0. 0.435363
+0050: 08 07 08 08 08 09 08 0a  08 0b 08 04 08 05 08 06  8788898a 8b848586
+0060: 04 01 05 01 06 01 00 2b  00 03 02 03 04 00 2d 00  4151610+ 032340-0
+0070: 02 01 01 00 33 00 26 00  24 00 1d 00 20 a9 da 4a  211030&0 $0.0 ..J
+0080: 99 be c4 36 0f 65 1b 5f  c3 cb 3f 88 ad 8c db 1b  ...6fe._ ..?.....
+0090: b6 1b fe 32 7d 34 b7 15  ec 40 ca 27 77 00 15 00  ...2}4.. .@.'w0.0
+00a0: f7 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  .0000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0160: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0170: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0180: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0190: 00 00 00 00 00 00 00 00                           00000000 
+
+DEBUG:siotls.serial:Parsing UnknownExtension
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Data:
+0000: 03 00 01 02                                       3012 
+
+DEBUG:siotls.handshakes.client_hello:Found extension UnkonwnExtension11(extension_data=b'\x03\x00\x01\x02')
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 0a 00 16 00 14 00 1d  00 17 00 1e 00 19 00 18  0a0.0.0. 0.0.0.0.
+0010: 01 00 01 01 01 02 01 03  01 04 33 74 00 00 00 10  10111213 143t000.
+0020: 00 0e 00 0c 02 68 32 08  68 74 74 70 2f 31 2e 31  0e0c2h28 http/1.1
+0030: 00 16 00 00 00 17 00 00  00 31 00 00 00 0d 00 1e  0.000.00 01000d0.
+0040: 00 1c 04 03 05 03 06 03  08 07 08 08 08 09 08 0a  0.435363 8788898a
+0050: 08 0b 08 04 08 05 08 06  04 01 05 01 06 01 00 2b  8b848586 4151610+
+0060: 00 03 02 03 04 00 2d 00  02 01 01 00 33 00 26 00  032340-0 211030&0
+0070: 24 00 1d 00 20 a9 da 4a  99 be c4 36 0f 65 1b 5f  $0.0 ..J ...6fe._
+0080: c3 cb 3f 88 ad 8c db 1b  b6 1b fe 32 7d 34 b7 15  ..?..... ...2}4..
+0090: ec 40 ca 27 77 00 15 00  f7 00 00 00 00 00 00 00  .@.'w0.0 .0000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0160: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0170: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0180: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+
+DEBUG:siotls.serial:Parsing SupportedGroups
+Struct:
+struct {
+    NamedGroup named_group_list<2..2^16-1>;
+} NamedGroupList;
+Data:
+0000: 00 14 00 1d 00 17 00 1e  00 19 00 18 01 00 01 01  0.0.0.0. 0.0.1011
+0010: 01 02 01 03 01 04                                 121314 
+
+DEBUG:siotls.handshakes.client_hello:Found extension SupportedGroups(named_group_list=[<NamedGroup.x25519: 29 (0x001d)>, <NamedGroup.secp256r1: 23 (0x0017)>, <NamedGroup.x448: 30 (0x001e)>, <NamedGroup.secp521r1: 25 (0x0019)>, <NamedGroup.secp384r1: 24 (0x0018)>, <NamedGroup.ffdhe2048: 256 (0x0100)>, <NamedGroup.ffdhe3072: 257 (0x0101)>, <NamedGroup.ffdhe4096: 258 (0x0102)>, <NamedGroup.ffdhe6144: 259 (0x0103)>, <NamedGroup.ffdhe8192: 260 (0x0104)>])
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 33 74 00 00 00 10 00 0e  00 0c 02 68 32 08 68 74  3t000.0e 0c2h28ht
+0010: 74 70 2f 31 2e 31 00 16  00 00 00 17 00 00 00 31  tp/1.10. 000.0001
+0020: 00 00 00 0d 00 1e 00 1c  04 03 05 03 06 03 08 07  000d0.0. 43536387
+0030: 08 08 08 09 08 0a 08 0b  08 04 08 05 08 06 04 01  88898a8b 84858641
+0040: 05 01 06 01 00 2b 00 03  02 03 04 00 2d 00 02 01  51610+03 2340-021
+0050: 01 00 33 00 26 00 24 00  1d 00 20 a9 da 4a 99 be  1030&0$0 .0 ..J..
+0060: c4 36 0f 65 1b 5f c3 cb  3f 88 ad 8c db 1b b6 1b  .6fe._.. ?.......
+0070: fe 32 7d 34 b7 15 ec 40  ca 27 77 00 15 00 f7 00  .2}4...@ .'w0.0.0
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0160: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0170: 00 00 00 00 00 00                                 000000 
+
+DEBUG:siotls.serial:Parsing UnknownExtension
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Data:
+
+
+DEBUG:siotls.handshakes.client_hello:Found extension UnkonwnExtension13172(extension_data=b'')
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 10 00 0e 00 0c 02 68  32 08 68 74 74 70 2f 31  0.0e0c2h 28http/1
+0010: 2e 31 00 16 00 00 00 17  00 00 00 31 00 00 00 0d  .10.000. 0001000d
+0020: 00 1e 00 1c 04 03 05 03  06 03 08 07 08 08 08 09  0.0.4353 63878889
+0030: 08 0a 08 0b 08 04 08 05  08 06 04 01 05 01 06 01  8a8b8485 86415161
+0040: 00 2b 00 03 02 03 04 00  2d 00 02 01 01 00 33 00  0+032340 -0211030
+0050: 26 00 24 00 1d 00 20 a9  da 4a 99 be c4 36 0f 65  &0$0.0 . .J...6fe
+0060: 1b 5f c3 cb 3f 88 ad 8c  db 1b b6 1b fe 32 7d 34  ._..?... .....2}4
+0070: b7 15 ec 40 ca 27 77 00  15 00 f7 00 00 00 00 00  ...@.'w0 .0.00000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0160: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0170: 00 00                                             00 
+
+DEBUG:siotls.serial:Parsing ApplicationLayerProtocolNegotiation
+Struct:
+opaque ProtocolName<1..2^8-1>;
+struct {
+    ProtocolName protocol_name_list<2..2^16-1>
+} ProtocolNameList;
+Data:
+0000: 00 0c 02 68 32 08 68 74  74 70 2f 31 2e 31        0c2h28ht tp/1.1
+
+DEBUG:siotls.handshakes.client_hello:Found extension ApplicationLayerProtocolNegotiation(protocol_name_list=[b'h2', b'http/1.1'])
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 16 00 00 00 17 00 00  00 31 00 00 00 0d 00 1e  0.000.00 01000d0.
+0010: 00 1c 04 03 05 03 06 03  08 07 08 08 08 09 08 0a  0.435363 8788898a
+0020: 08 0b 08 04 08 05 08 06  04 01 05 01 06 01 00 2b  8b848586 4151610+
+0030: 00 03 02 03 04 00 2d 00  02 01 01 00 33 00 26 00  032340-0 211030&0
+0040: 24 00 1d 00 20 a9 da 4a  99 be c4 36 0f 65 1b 5f  $0.0 ..J ...6fe._
+0050: c3 cb 3f 88 ad 8c db 1b  b6 1b fe 32 7d 34 b7 15  ..?..... ...2}4..
+0060: ec 40 ca 27 77 00 15 00  f7 00 00 00 00 00 00 00  .@.'w0.0 .0000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+
+DEBUG:siotls.serial:Parsing UnknownExtension
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Data:
+
+
+DEBUG:siotls.handshakes.client_hello:Found extension UnkonwnExtension22(extension_data=b'')
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 17 00 00 00 31 00 00  00 0d 00 1e 00 1c 04 03  0.000100 0d0.0.43
+0010: 05 03 06 03 08 07 08 08  08 09 08 0a 08 0b 08 04  53638788 898a8b84
+0020: 08 05 08 06 04 01 05 01  06 01 00 2b 00 03 02 03  85864151 610+0323
+0030: 04 00 2d 00 02 01 01 00  33 00 26 00 24 00 1d 00  40-02110 30&0$0.0
+0040: 20 a9 da 4a 99 be c4 36  0f 65 1b 5f c3 cb 3f 88   ..J...6 fe._..?.
+0050: ad 8c db 1b b6 1b fe 32  7d 34 b7 15 ec 40 ca 27  .......2 }4...@.'
+0060: 77 00 15 00 f7 00 00 00  00 00 00 00 00 00 00 00  w0.0.000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00  00 00 00 00              00000000 0000
+
+DEBUG:siotls.serial:Parsing UnknownExtension
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Data:
+
+
+DEBUG:siotls.handshakes.client_hello:Found extension UnkonwnExtension23(extension_data=b'')
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 31 00 00 00 0d 00 1e  00 1c 04 03 05 03 06 03  01000d0. 0.435363
+0010: 08 07 08 08 08 09 08 0a  08 0b 08 04 08 05 08 06  8788898a 8b848586
+0020: 04 01 05 01 06 01 00 2b  00 03 02 03 04 00 2d 00  4151610+ 032340-0
+0030: 02 01 01 00 33 00 26 00  24 00 1d 00 20 a9 da 4a  211030&0 $0.0 ..J
+0040: 99 be c4 36 0f 65 1b 5f  c3 cb 3f 88 ad 8c db 1b  ...6fe._ ..?.....
+0050: b6 1b fe 32 7d 34 b7 15  ec 40 ca 27 77 00 15 00  ...2}4.. .@.'w0.0
+0060: f7 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  .0000000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00 00 00 00 00                           00000000 
+
+DEBUG:siotls.serial:Parsing PostHandshakeAuth
+Struct:
+
+Data:
+
+
+DEBUG:siotls.handshakes.client_hello:Found extension PostHandshakeAuth()
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 0d 00 1e 00 1c 04 03  05 03 06 03 08 07 08 08  0d0.0.43 53638788
+0010: 08 09 08 0a 08 0b 08 04  08 05 08 06 04 01 05 01  898a8b84 85864151
+0020: 06 01 00 2b 00 03 02 03  04 00 2d 00 02 01 01 00  610+0323 40-02110
+0030: 33 00 26 00 24 00 1d 00  20 a9 da 4a 99 be c4 36  30&0$0.0  ..J...6
+0040: 0f 65 1b 5f c3 cb 3f 88  ad 8c db 1b b6 1b fe 32  fe._..?. .......2
+0050: 7d 34 b7 15 ec 40 ca 27  77 00 15 00 f7 00 00 00  }4...@.' w0.0.000
+0060: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0140: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0150: 00 00 00 00                                       0000 
+
+DEBUG:siotls.serial:Parsing _SignAlgoMixin
+Struct:
+struct {
+    SignatureScheme supported_signature_algorithms<2..2^16-2>;
+} SignatureSchemeList;
+Data:
+0000: 00 1c 04 03 05 03 06 03  08 07 08 08 08 09 08 0a  0.435363 8788898a
+0010: 08 0b 08 04 08 05 08 06  04 01 05 01 06 01        8b848586 415161
+
+DEBUG:siotls.handshakes.client_hello:Found extension SignatureAlgorithms(supported_signature_algorithms=[<SignatureScheme.ecdsa_secp256r1_sha256: 1027 (0x0403)>, <SignatureScheme.ecdsa_secp384r1_sha384: 1283 (0x0503)>, <SignatureScheme.ecdsa_secp521r1_sha512: 1539 (0x0603)>, <SignatureScheme.ed25519: 2055 (0x0807)>, <SignatureScheme.ed448: 2056 (0x0808)>, <SignatureScheme.rsa_pss_pss_sha256: 2057 (0x0809)>, <SignatureScheme.rsa_pss_pss_sha384: 2058 (0x080a)>, <SignatureScheme.rsa_pss_pss_sha512: 2059 (0x080b)>, <SignatureScheme.rsa_pss_rsae_sha256: 2052 (0x0804)>, <SignatureScheme.rsa_pss_rsae_sha384: 2053 (0x0805)>, <SignatureScheme.rsa_pss_rsae_sha512: 2054 (0x0806)>, <SignatureScheme.rsa_pkcs1_sha256: 1025 (0x0401)>, <SignatureScheme.rsa_pkcs1_sha384: 1281 (0x0501)>, <SignatureScheme.rsa_pkcs1_sha512: 1537 (0x0601)>])
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 2b 00 03 02 03 04 00  2d 00 02 01 01 00 33 00  0+032340 -0211030
+0010: 26 00 24 00 1d 00 20 a9  da 4a 99 be c4 36 0f 65  &0$0.0 . .J...6fe
+0020: 1b 5f c3 cb 3f 88 ad 8c  db 1b b6 1b fe 32 7d 34  ._..?... .....2}4
+0030: b7 15 ec 40 ca 27 77 00  15 00 f7 00 00 00 00 00  ...@.'w0 .0.00000
+0040: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0050: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0060: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0130: 00 00                                             00 
+
+DEBUG:siotls.serial:Parsing SupportedVersionsRequest
+Struct:
+struct {
+    ProtocolVersion versions<2..254>;
+} SupportedVersions;
+Data:
+0000: 02 03 04                                          234 
+
+DEBUG:siotls.handshakes.client_hello:Found extension SupportedVersionsRequest(versions=[<TLSVersion.TLS_1_3: 772 (0x0304)>])
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 2d 00 02 01 01 00 33  00 26 00 24 00 1d 00 20  0-021103 0&0$0.0 
+0010: a9 da 4a 99 be c4 36 0f  65 1b 5f c3 cb 3f 88 ad  ..J...6f e._..?..
+0020: 8c db 1b b6 1b fe 32 7d  34 b7 15 ec 40 ca 27 77  ......2} 4...@.'w
+0030: 00 15 00 f7 00 00 00 00  00 00 00 00 00 00 00 00  0.0.0000 00000000
+0040: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0050: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0060: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00 00 00 00  00 00 00                 00000000 000
+
+DEBUG:siotls.serial:Parsing PskKeyExchangeModes
+Struct:
+struct {
+    PskKeyExchangeMode ke_modes<1..255>;
+} PskKeyExchangeModes;
+Data:
+0000: 01 01                                             11 
+
+DEBUG:siotls.handshakes.client_hello:Found extension PskKeyExchangeModes(ke_modes=[<PskKeyExchangeMode.PSK_DHE_KE: 1 (0x01)>])
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 33 00 26 00 24 00 1d  00 20 a9 da 4a 99 be c4  030&0$0. 0 ..J...
+0010: 36 0f 65 1b 5f c3 cb 3f  88 ad 8c db 1b b6 1b fe  6fe._..? ........
+0020: 32 7d 34 b7 15 ec 40 ca  27 77 00 15 00 f7 00 00  2}4...@. 'w0.0.00
+0030: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0040: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0050: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0060: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0100: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0110: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0120: 00 00 00 00 00                                    00000 
+
+DEBUG:siotls.serial:Parsing KeyShareRequest
+Struct:
+struct {
+    NamedGroup group;
+    opaque key_exchange<1..2^16-1>;
+} KeyShareEntry;
+
+struct {
+    KeyShareEntry client_shares<0..2^16-1>;
+} KeyShareClientHello;
+Data:
+0000: 00 24 00 1d 00 20 a9 da  4a 99 be c4 36 0f 65 1b  0$0.0 .. J...6fe.
+0010: 5f c3 cb 3f 88 ad 8c db  1b b6 1b fe 32 7d 34 b7  _..?.... ....2}4.
+0020: 15 ec 40 ca 27 77                                 ..@.'w 
+
+DEBUG:siotls.handshakes.client_hello:Found extension KeyShareRequest(client_shares=[KeyShareEntry(group=<NamedGroup.x25519: 29 (0x001d)>, key_exchange=b"\xa9\xdaJ\x99\xbe\xc46\x0fe\x1b_\xc3\xcb?\x88\xad\x8c\xdb\x1b\xb6\x1b\xfe2}4\xb7\x15\xec@\xca'w")])
+DEBUG:siotls.serial:Parsing Extension
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Data:
+0000: 00 15 00 f7 00 00 00 00  00 00 00 00 00 00 00 00  0.0.0000 00000000
+0010: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0020: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0030: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0040: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0050: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0060: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00                 00000000 000
+
+DEBUG:siotls.serial:Parsing Padding
+Struct:
+struct {
+    opaque zeros[Extension.extension_length];
+} PaddingExtension;
+Data:
+0000: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0010: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0020: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0030: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0040: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0050: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0060: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00                              0000000 
+
+DEBUG:siotls.handshakes.client_hello:Found extension Padding(zeros_count=247)
+DEBUG:siotls.serial:Serializing HostName
+Struct:
+opaque HostName<1..2^16-1>;
+Self:
+HostName(host_name=b'localhost2')
+Data:
+0000: 00 0a 6c 6f 63 61 6c 68  6f 73 74 32              0alocalh ost2
+
+DEBUG:siotls.serial:Serializing HostName
+Struct:
+opaque HostName<1..2^16-1>;
+Self:
+HostName(host_name=b'localhost2')
+Data:
+0000: 00 00 0a 6c 6f 63 61 6c  68 6f 73 74 32           00alocal host2
+
+DEBUG:siotls.serial:Serializing ServerNameList
+Struct:
+struct {
+    ServerName server_name_list<1..2^16-1>
+} ServerNameList;
+Self:
+ServerNameList(server_name_list=[HostName(host_name=b'localhost2')])
+Data:
+0000: 00 0d 00 00 0a 6c 6f 63  61 6c 68 6f 73 74 32     0d00aloc alhost2
+
+DEBUG:siotls.serial:Serializing ServerNameList
+Struct:
+struct {
+    ServerName server_name_list<1..2^16-1>
+} ServerNameList;
+Self:
+ServerNameList(server_name_list=[HostName(host_name=b'localhost2')])
+Data:
+0000: 00 00 00 0f 00 0d 00 00  0a 6c 6f 63 61 6c 68 6f  000f0d00 alocalho
+0010: 73 74 32                                          st2 
+
+DEBUG:siotls.serial:Serializing UnkonwnExtension11
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Self:
+UnkonwnExtension11(extension_data=b'\x03\x00\x01\x02')
+Data:
+0000: 03 00 01 02                                       3012 
+
+DEBUG:siotls.serial:Serializing UnkonwnExtension11
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Self:
+UnkonwnExtension11(extension_data=b'\x03\x00\x01\x02')
+Data:
+0000: 00 0b 00 04 03 00 01 02                           0b043012 
+
+DEBUG:siotls.serial:Serializing SupportedGroups
+Struct:
+struct {
+    NamedGroup named_group_list<2..2^16-1>;
+} NamedGroupList;
+Self:
+SupportedGroups(named_group_list=[<NamedGroup.x25519: 29 (0x001d)>, <NamedGroup.secp256r1: 23 (0x0017)>, <NamedGroup.x448: 30 (0x001e)>, <NamedGroup.secp521r1: 25 (0x0019)>, <NamedGroup.secp384r1: 24 (0x0018)>, <NamedGroup.ffdhe2048: 256 (0x0100)>, <NamedGroup.ffdhe3072: 257 (0x0101)>, <NamedGroup.ffdhe4096: 258 (0x0102)>, <NamedGroup.ffdhe6144: 259 (0x0103)>, <NamedGroup.ffdhe8192: 260 (0x0104)>])
+Data:
+0000: 00 14 00 1d 00 17 00 1e  00 19 00 18 01 00 01 01  0.0.0.0. 0.0.1011
+0010: 01 02 01 03 01 04                                 121314 
+
+DEBUG:siotls.serial:Serializing SupportedGroups
+Struct:
+struct {
+    NamedGroup named_group_list<2..2^16-1>;
+} NamedGroupList;
+Self:
+SupportedGroups(named_group_list=[<NamedGroup.x25519: 29 (0x001d)>, <NamedGroup.secp256r1: 23 (0x0017)>, <NamedGroup.x448: 30 (0x001e)>, <NamedGroup.secp521r1: 25 (0x0019)>, <NamedGroup.secp384r1: 24 (0x0018)>, <NamedGroup.ffdhe2048: 256 (0x0100)>, <NamedGroup.ffdhe3072: 257 (0x0101)>, <NamedGroup.ffdhe4096: 258 (0x0102)>, <NamedGroup.ffdhe6144: 259 (0x0103)>, <NamedGroup.ffdhe8192: 260 (0x0104)>])
+Data:
+0000: 00 0a 00 16 00 14 00 1d  00 17 00 1e 00 19 00 18  0a0.0.0. 0.0.0.0.
+0010: 01 00 01 01 01 02 01 03  01 04                    10111213 14
+
+DEBUG:siotls.serial:Serializing UnkonwnExtension13172
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Self:
+UnkonwnExtension13172(extension_data=b'')
+Data:
+
+
+DEBUG:siotls.serial:Serializing UnkonwnExtension13172
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Self:
+UnkonwnExtension13172(extension_data=b'')
+Data:
+0000: 33 74 00 00                                       3t00 
+
+DEBUG:siotls.serial:Serializing ApplicationLayerProtocolNegotiation
+Struct:
+opaque ProtocolName<1..2^8-1>;
+struct {
+    ProtocolName protocol_name_list<2..2^16-1>
+} ProtocolNameList;
+Self:
+ApplicationLayerProtocolNegotiation(protocol_name_list=[b'h2', b'http/1.1'])
+Data:
+0000: 00 02 68 32 68 74 74 70  2f 31 2e 31              02h2http /1.1
+
+DEBUG:siotls.serial:Serializing ApplicationLayerProtocolNegotiation
+Struct:
+opaque ProtocolName<1..2^8-1>;
+struct {
+    ProtocolName protocol_name_list<2..2^16-1>
+} ProtocolNameList;
+Self:
+ApplicationLayerProtocolNegotiation(protocol_name_list=[b'h2', b'http/1.1'])
+Data:
+0000: 00 10 00 0c 00 02 68 32  68 74 74 70 2f 31 2e 31  0.0c02h2 http/1.1
+
+DEBUG:siotls.serial:Serializing UnkonwnExtension22
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Self:
+UnkonwnExtension22(extension_data=b'')
+Data:
+
+
+DEBUG:siotls.serial:Serializing UnkonwnExtension22
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Self:
+UnkonwnExtension22(extension_data=b'')
+Data:
+0000: 00 16 00 00                                       0.00 
+
+DEBUG:siotls.serial:Serializing UnkonwnExtension23
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Self:
+UnkonwnExtension23(extension_data=b'')
+Data:
+
+
+DEBUG:siotls.serial:Serializing UnkonwnExtension23
+Struct:
+struct {
+    opaque extension_data[Extension.extension_length];
+} UnknownExtension;
+Self:
+UnkonwnExtension23(extension_data=b'')
+Data:
+0000: 00 17 00 00                                       0.00 
+
+DEBUG:siotls.serial:Serializing PostHandshakeAuth
+Struct:
+
+Self:
+PostHandshakeAuth()
+Data:
+
+
+DEBUG:siotls.serial:Serializing PostHandshakeAuth
+Struct:
+
+Self:
+PostHandshakeAuth()
+Data:
+0000: 00 31 00 00                                       0100 
+
+DEBUG:siotls.serial:Serializing SignatureAlgorithms
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Self:
+SignatureAlgorithms(supported_signature_algorithms=[<SignatureScheme.ecdsa_secp256r1_sha256: 1027 (0x0403)>, <SignatureScheme.ecdsa_secp384r1_sha384: 1283 (0x0503)>, <SignatureScheme.ecdsa_secp521r1_sha512: 1539 (0x0603)>, <SignatureScheme.ed25519: 2055 (0x0807)>, <SignatureScheme.ed448: 2056 (0x0808)>, <SignatureScheme.rsa_pss_pss_sha256: 2057 (0x0809)>, <SignatureScheme.rsa_pss_pss_sha384: 2058 (0x080a)>, <SignatureScheme.rsa_pss_pss_sha512: 2059 (0x080b)>, <SignatureScheme.rsa_pss_rsae_sha256: 2052 (0x0804)>, <SignatureScheme.rsa_pss_rsae_sha384: 2053 (0x0805)>, <SignatureScheme.rsa_pss_rsae_sha512: 2054 (0x0806)>, <SignatureScheme.rsa_pkcs1_sha256: 1025 (0x0401)>, <SignatureScheme.rsa_pkcs1_sha384: 1281 (0x0501)>, <SignatureScheme.rsa_pkcs1_sha512: 1537 (0x0601)>])
+Data:
+0000: 00 1c 04 03 05 03 06 03  08 07 08 08 08 09 08 0a  0.435363 8788898a
+0010: 08 0b 08 04 08 05 08 06  04 01 05 01 06 01        8b848586 415161
+
+DEBUG:siotls.serial:Serializing SignatureAlgorithms
+Struct:
+struct {
+    ExtensionType extension_type;
+    uint16 extension_length;
+    select (Extension.extension_type) {
+        case 0x0000: ServerNameList;
+        case 0x0001: MaxFragmentLength;
+        case 0x0005: CertificateStatusRequest;
+        case 0x000a: SupportedGroups;
+        case 0x000d: SignatureAlgorithms;
+        case 0x000e: UseSrtp;
+        case 0x000f: Heartbeat;
+        case 0x0010: ApplicationLayerProtocolNegotiation;
+        case 0x0012: SignedCertificateTimestamp;
+        case 0x0013: ClientCertificateType;
+        case 0x0014: ServerCertificateType;
+        case 0x0015: Padding;
+        case 0x0029: PreSharedKey;
+        case 0x002a: EarlyData;
+        case 0x002b: SupportedVersions;
+        case 0x002c: Cookie;
+        case 0x002d: PskKeyExchangeModes;
+        case 0x002f: CertificateAuthorities;
+        case 0x0030: OidFilters;
+        case 0x0031: PostHandshakeAuth;
+        case 0x0032: SignatureAlgorithmsCert;
+        case 0x0033: KeyShare;
+        case      _: UnknownExtension;
+    }
+} Extension;
+Self:
+SignatureAlgorithms(supported_signature_algorithms=[<SignatureScheme.ecdsa_secp256r1_sha256: 1027 (0x0403)>, <SignatureScheme.ecdsa_secp384r1_sha384: 1283 (0x0503)>, <SignatureScheme.ecdsa_secp521r1_sha512: 1539 (0x0603)>, <SignatureScheme.ed25519: 2055 (0x0807)>, <SignatureScheme.ed448: 2056 (0x0808)>, <SignatureScheme.rsa_pss_pss_sha256: 2057 (0x0809)>, <SignatureScheme.rsa_pss_pss_sha384: 2058 (0x080a)>, <SignatureScheme.rsa_pss_pss_sha512: 2059 (0x080b)>, <SignatureScheme.rsa_pss_rsae_sha256: 2052 (0x0804)>, <SignatureScheme.rsa_pss_rsae_sha384: 2053 (0x0805)>, <SignatureScheme.rsa_pss_rsae_sha512: 2054 (0x0806)>, <SignatureScheme.rsa_pkcs1_sha256: 1025 (0x0401)>, <SignatureScheme.rsa_pkcs1_sha384: 1281 (0x0501)>, <SignatureScheme.rsa_pkcs1_sha512: 1537 (0x0601)>])
+Data:
+0000: 00 0d 00 1e 00 1c 04 03  05 03 06 03 08 07 08 08  0d0.0.43 53638788
+0010: 08 09 08 0a 08 0b 08 04  08 05 08 06 04 01 05 01  898a8b84 85864151
+0020: 06 01                                             61 
+
+DEBUG:siotls.serial:Serializing SupportedVersionsRequest
+Struct:
+struct {
+    ProtocolVersion versions<2..254>;
+} SupportedVersions;
+Self:
+SupportedVersionsRequest(versions=[<TLSVersion.TLS_1_3: 772 (0x0304)>])
+Data:
+0000: 02 03 04                                          234 
+
+DEBUG:siotls.serial:Serializing SupportedVersionsRequest
+Struct:
+struct {
+    ProtocolVersion versions<2..254>;
+} SupportedVersions;
+Self:
+SupportedVersionsRequest(versions=[<TLSVersion.TLS_1_3: 772 (0x0304)>])
+Data:
+0000: 00 2b 00 03 02 03 04                              0+03234 
+
+DEBUG:siotls.serial:Serializing PskKeyExchangeModes
+Struct:
+struct {
+    PskKeyExchangeMode ke_modes<1..255>;
+} PskKeyExchangeModes;
+Self:
+PskKeyExchangeModes(ke_modes=[<PskKeyExchangeMode.PSK_DHE_KE: 1 (0x01)>])
+Data:
+0000: 01 01                                             11 
+
+DEBUG:siotls.serial:Serializing PskKeyExchangeModes
+Struct:
+struct {
+    PskKeyExchangeMode ke_modes<1..255>;
+} PskKeyExchangeModes;
+Self:
+PskKeyExchangeModes(ke_modes=[<PskKeyExchangeMode.PSK_DHE_KE: 1 (0x01)>])
+Data:
+0000: 00 2d 00 02 01 01                                 0-0211 
+
+DEBUG:siotls.serial:Serializing KeyShareRequest
+Struct:
+struct {
+    NamedGroup group;
+    opaque key_exchange<1..2^16-1>;
+} KeyShareEntry;
+
+struct {
+    KeyShareEntry client_shares<0..2^16-1>;
+} KeyShareClientHello;
+Self:
+KeyShareRequest(client_shares=[KeyShareEntry(group=<NamedGroup.x25519: 29 (0x001d)>, key_exchange=b"\xa9\xdaJ\x99\xbe\xc46\x0fe\x1b_\xc3\xcb?\x88\xad\x8c\xdb\x1b\xb6\x1b\xfe2}4\xb7\x15\xec@\xca'w")])
+Data:
+0000: 00 24 00 1d 00 20 a9 da  4a 99 be c4 36 0f 65 1b  0$0.0 .. J...6fe.
+0010: 5f c3 cb 3f 88 ad 8c db  1b b6 1b fe 32 7d 34 b7  _..?.... ....2}4.
+0020: 15 ec 40 ca 27 77                                 ..@.'w 
+
+DEBUG:siotls.serial:Serializing KeyShareRequest
+Struct:
+struct {
+    NamedGroup group;
+    opaque key_exchange<1..2^16-1>;
+} KeyShareEntry;
+
+struct {
+    KeyShareEntry client_shares<0..2^16-1>;
+} KeyShareClientHello;
+Self:
+KeyShareRequest(client_shares=[KeyShareEntry(group=<NamedGroup.x25519: 29 (0x001d)>, key_exchange=b"\xa9\xdaJ\x99\xbe\xc46\x0fe\x1b_\xc3\xcb?\x88\xad\x8c\xdb\x1b\xb6\x1b\xfe2}4\xb7\x15\xec@\xca'w")])
+Data:
+0000: 00 33 00 26 00 24 00 1d  00 20 a9 da 4a 99 be c4  030&0$0. 0 ..J...
+0010: 36 0f 65 1b 5f c3 cb 3f  88 ad 8c db 1b b6 1b fe  6fe._..? ........
+0020: 32 7d 34 b7 15 ec 40 ca  27 77                    2}4...@. 'w
+
+DEBUG:siotls.serial:Serializing Padding
+Struct:
+struct {
+    opaque zeros[Extension.extension_length];
+} PaddingExtension;
+Self:
+Padding(zeros_count=247)
+Data:
+0000: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0010: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0020: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0030: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0040: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0050: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0060: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00                              0000000 
+
+DEBUG:siotls.serial:Serializing Padding
+Struct:
+struct {
+    opaque zeros[Extension.extension_length];
+} PaddingExtension;
+Self:
+Padding(zeros_count=247)
+Data:
+0000: 00 15 00 f7 00 00 00 00  00 00 00 00 00 00 00 00  0.0.0000 00000000
+0010: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0020: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0030: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0040: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0050: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0060: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0070: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0080: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+0090: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00a0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00c0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00d0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00e0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00000000 00000000
+00f0: 00 00 00 00 00 00 00 00  00 00 00                 00000000 000
+
+> /home/julien/Projects/siotls/src/siotls/handshakes/client_hello.py(81)serialize_body()
+-> return b''.join([
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) --KeyboardInterrupt--
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) --KeyboardInterrupt--
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) --KeyboardInterrupt--
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) --KeyboardInterrupt--
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) --KeyboardInterrupt--
+(Pdb) *** SyntaxError: invalid syntax
+(Pdb) E
+======================================================================
+ERROR: test_wire_client_hello0 (tests.test_wire_client_hello.TestWireExtension)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/julien/Projects/siotls/tests/test_wire_client_hello.py", line 41, in test_wire_client_hello0
+    self.assertEqual(handshake.serialize().hex(), payload)
+  File "/home/julien/Projects/siotls/src/siotls/serial.py", line 40, in wrapped
+    data = func(self)
+  File "/home/julien/Projects/siotls/src/siotls/handshakes/__init__.py", line 49, in serialize
+    msg_data = self.serialize_body()
+  File "/home/julien/Projects/siotls/src/siotls/serial.py", line 40, in wrapped
+    data = func(self)
+  File "/home/julien/Projects/siotls/src/siotls/handshakes/client_hello.py", line 81, in serialize_body
+    return b''.join([
+  File "/home/julien/Projects/siotls/src/siotls/handshakes/client_hello.py", line 81, in serialize_body
+    return b''.join([
+  File "/home/julien/.pyenv/versions/3.10.6/lib/python3.10/bdb.py", line 90, in trace_dispatch
+    return self.dispatch_line(frame)
+  File "/home/julien/.pyenv/versions/3.10.6/lib/python3.10/bdb.py", line 115, in dispatch_line
+    if self.quitting: raise BdbQuit
+bdb.BdbQuit
+
+----------------------------------------------------------------------
+Ran 1 test in 9.988s
+
+FAILED (errors=1)

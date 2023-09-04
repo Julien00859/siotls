@@ -1,7 +1,15 @@
+import hashlib
+import logging
 import textwrap
-from siotls.iana import HandshakeType
-from siotls.serial import SerializableBody
+from siotls.iana import CipherSuites, HandshakeType, TLSVersion
+from siotls.serial import SerialIO, SerializableBody
+from siotls.utils import sentinel_raise_exception, try_cast
 from . import Handshake
+from ..contents import alerts
+from ..extensions import Extension
+
+logger = logging.getLogger(__name__)
+
 
 class ServerHello(Handshake, SerializableBody):
     msg_type = HandshakeType.SERVER_HELLO
@@ -21,4 +29,84 @@ class ServerHello(Handshake, SerializableBody):
             Extension extensions<6..2^16-1>;
         } ServerHello;
     """).strip('\n')
-    ...
+    legacy_version: int = TLSVersion.TLS_1_2
+    random: bytes
+    legacy_session_id_echo: bytes = b''
+    cipher_suite: CipherSuites | int
+    legacy_compression_methods: int = 0  # "null" compression method
+    extensions: list[Extension]
+
+    def __init__(self, random_, cipher_suite, extensions):
+        self.legacy_version = type(self).legacy_version
+        self.random = random_
+        self.legacy_session_id_echo = type(self).legacy_session_id_echo
+        self.cipher_suite = cipher_suite
+        self.legacy_compression_methods = type(self).legacy_compression_methods
+        self.extensions = extensions
+
+    @classmethod
+    def parse_body(cls, stream):
+        legacy_version = stream.read_int(2)
+        if legacy_version != TLSVersion.TLS_1_2:
+            raise alerts.ProtocolVersion()
+        legacy_version = TLSVersion(legacy_version)
+
+        random_ = stream.read_exactly(32)
+        legacy_session_id_echo = stream.read_var(1)
+
+        cipher_suite = try_cast(CipherSuites, stream.read_int(2))
+
+        legacy_compression_methods = stream.read_int(1)
+        if legacy_compression_methods != 0:  # "null" compression method
+            raise alerts.IllegalParameter()
+
+        extensions = []
+        list_stream = SerialIO(stream.read_var(2))
+        while not list_stream.is_eof():
+            extension = Extension.parse(list_stream, handshake_type=cls.msg_type)
+            logger.debug("Found extension %s", extension)
+            extensions.append(extension)
+
+        if random_ == HelloRetryRequest.random:
+            cls = HelloRetryRequest
+        else:
+            cls = ServerHello
+        self = cls(random_, cipher_suite, extensions)
+        self.legacy_session_id_echo = legacy_session_id_echo
+        return self
+
+    def serialize_body(self):
+        extensions = b''.join((ext.serialize() for ext in self.extensions))
+
+        return b''.join([
+            self.legacy_version.to_bytes(2, 'big'),
+            self.random,
+
+            len(self.legacy_session_id_echo).to_bytes(1, 'big'),
+            self.legacy_session_id_echo,
+
+            (len(self.cipher_suites) * 2).to_bytes(2, 'big'),
+            *[cs.to_bytes(2, 'big') for cs in self.cipher_suites],
+
+            self.legacy_compression_methods.to_bytes(1, 'big'),
+
+            len(extensions).to_bytes(2, 'big'),
+            extensions,
+        ])
+
+    def get_extension(self, extension_id, default=sentinel_raise_exception):
+        for extension in self.extensions:
+            if extension.extension_id == extension_id:
+                return extension
+        if default is not sentinel_raise_exception:
+            msg = f"Extension {extension_id} not present."
+            raise LookupError(msg)
+        return default
+
+
+class HelloRetryRequest(ServerHello):
+    # hashlib.sha256("HelloRetryRequest").digest()
+    random = bytes.fromhex(
+        "CF 21 AD 74 E5 9A 61 11 BE 1D 8C 02 1E 65 B8 91"
+        "C2 A2 11 16 7A BB 8C 5E 07 9E 09 E2 C8 A8 33 9C"
+    )

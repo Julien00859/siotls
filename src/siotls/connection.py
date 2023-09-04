@@ -120,8 +120,3 @@ class TLSConnection:
         content_data = self._input_handshake
         self._input_handshake = b''
         return content_type, content_data
-
-
-    def _process_contents(contents):
-        return contents
-        #return []

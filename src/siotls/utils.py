@@ -55,3 +55,8 @@ def is_string(proto):
     except UnicodeDecodeError:
         return False
     return True
+
+
+class sentinel_raise_exception:
+    def __init__(self):
+        raise NotImplementedError("this class only acts as a named sentinel")

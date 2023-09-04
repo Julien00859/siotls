@@ -42,6 +42,10 @@ class Handshake(Content, Serializable):
             cls = _handshake_registry[HandshakeType(msg_type)]
         except ValueError as exc:
             raise alerts.UnrecognizedName() from exc
+        if (msg_type == HandshakeType.SERVER_HELLO
+            and HelloRetryRequest.is_hrr(msg_type, length)):
+            cls = HelloRetryRequest
+
         with stream.limit(length):
             return cls.parse_body(stream)
 
@@ -56,7 +60,7 @@ class Handshake(Content, Serializable):
 
 # ruff: isort: off
 from .client_hello import ClientHello
-from .server_hello import ServerHello
+from .server_hello import ServerHello, HelloRetryRequest
 from .end_of_early_data import EndOfEarlyData
 from .encrypted_extensions import EncryptedExtensions
 from .certificate_request import CertificateRequest

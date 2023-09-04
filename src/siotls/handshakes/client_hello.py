@@ -2,7 +2,7 @@ import logging
 import textwrap
 from siotls.iana import CipherSuites, HandshakeType, TLSVersion
 from siotls.serial import SerializableBody, SerialIO
-from siotls.utils import try_cast
+from siotls.utils import try_cast, sentinel_raise_exception
 from . import Handshake
 from ..contents import alerts
 from ..extensions import Extension
@@ -31,7 +31,7 @@ class ClientHello(Handshake, SerializableBody):
     legacy_version: int = TLSVersion.TLS_1_2
     random: bytes
     legacy_session_id: bytes = b''
-    cipher_suites: list
+    cipher_suites: list[CipherSuites | int]
     legacy_compression_methods: bytes = b'\x00'  # "null" compression method
     extensions: list[Extension]
 
@@ -92,3 +92,12 @@ class ClientHello(Handshake, SerializableBody):
             len(extensions).to_bytes(2, 'big'),
             extensions,
         ])
+
+    def get_extension(self, extension_id, default=sentinel_raise_exception):
+        for extension in self.extensions:
+            if extension.extension_id == extension_id:
+                return extension
+        if default is sentinel_raise_exception:
+            msg = f"Extension {extension_id} not present."
+            raise LookupError(msg)
+        return default
