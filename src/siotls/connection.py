@@ -10,9 +10,11 @@ from siotls.iana import (
     SignatureScheme,
     NamedGroup,
     ALPNProtocol,
+    MaxFragmentLength,
 )
 from siotls.serial import TooMuchData, SerialIO
 from .contents import Content, ApplicationData, alerts
+from .states import ClientStart, ServerStart
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +42,13 @@ class TLSConfiguration:
     ]
 
     # extensions
-    max_fragment_length: typing.Literal[512, 1024, 2048, 4096, 16384] = 16384
+    max_fragment_length: typing.Literal[
+        MaxFragmentLength.LIMIT_512,
+        MaxFragmentLength.LIMIT_1024,
+        MaxFragmentLength.LIMIT_2048,
+        MaxFragmentLength.LIMIT_4096,
+        DEFAULT_MAX_FRAGMENT_LENGTH,
+    ] = DEFAULT_MAX_FRAGMENT_LENGTH
     can_send_heartbeat: bool = False
     can_echo_heartbeat: bool = True
     alpn: list[ALPNProtocol] | None = None
@@ -52,20 +60,10 @@ class TLSNegociation:
     cipher_suite: CipherSuites
     digital_signature: SignatureScheme
     key_exchange: NamedGroup
-    version: TLSVersion
-
     alpn: ALPNProtocol | None
     can_send_heartbeat: bool
     can_echo_heartbeat: bool
     max_fragment_length: int
-
-
-default_negociated_config = TLSNegociation(
-    cipher_suite = CipherSuites.TLS_CHACHA20_POLY1305_SHA256,
-    digital_signature = SignatureScheme.rsa_pkcs1_sha256,
-    key_exchange = NamedGroup.x25519,
-    version = TLSVersion.TLS_1_3,
-)
 
 
 class TLSConnection:
@@ -75,6 +73,24 @@ class TLSConnection:
         self._input_data = b''
         self._input_handshake = b''
         self._output_data = b''
+
+        self.state = (
+            ClientStart(self)
+            if self.config.side == 'client' else
+            ServerStart(self)
+        )
+
+    @property
+    def is_encrypted(self):
+        return self.state.is_encrypted
+
+    @property
+    def max_fragment_length(self):
+        return (
+            self.nconfig.max_fragment_length
+            if self.nconfig else
+            DEFAULT_MAX_FRAGMENT_LENGTH
+        ) + (256 if self.is_encrypted else 0)
 
     def receive_data(self, data):
         if not data:
@@ -101,33 +117,29 @@ class TLSConnection:
     def _send_content(self, content: Content):
         data = (
             self.encrypt(content)
-            if self.state.is_encrypted else
+            if self.is_encrypted else
             content.serialize()
         )
-        max_fragment_length = self.nconfig.max_fragment_length + (
-            256 if self.state.is_encrypted else 0
-        )
 
-        if len(data) < max_fragment_length:
+        if len(data) < self.max_fragment_length:
             iter_fragments = (data,)
-        elif self.state.can_fragment:
+        elif content.can_fragment:
             iter_fragments = (
-                data[i : i + max_fragment_length]
-                for i in range(0, len(data), max_fragment_length)
+                data[i : i + self.max_fragment_length]
+                for i in range(0, len(data), self.max_fragment_length)
             )
         else:
-            msg = (
-                f"Serialized content ({len(data)} bytes) cannot fit in "
-                f"a single record (max {max_fragment_length} bytes) and"
-                " cannot be fragmented over multiple TLS 1.2 records."
-            )
+            msg = (f"Serialized content ({len(data)} bytes) cannot fit "
+                   f"in a single record (max {self.max_fragment_length}"
+                   " bytes) and cannot be fragmented over multiple TLS"
+                   " 1.2 records.")
             raise ValueError(msg)
 
         self._output_data += b''.join((
             b''.join(
                 (
                     ContentType.APPLICATION_DATA
-                    if self.state.is_encrypted else
+                    if self.is_encrypted else
                     content.msg_type
                 ).to_bytes(1, 'big'),
                 TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
@@ -144,14 +156,10 @@ class TLSConnection:
         content_type, _legacy_version, content_length = \
             struct.unpack('!BHH', self._input_data[:5])
 
-        max_fragment_length = getattr(
-            self.nconfig, 'max_fragment_length',
-            DEFAULT_MAX_FRAGMENT_LENGTH
-        ) + (256 if self.state.is_encrypted else 0)
-
-        if content_length > max_fragment_length:
-            msg = (f'The record is longer ({content_length} bytes) than '
-                   f'the allowed maximum ({max_fragment_length} bytes).')
+        if content_length > self.max_fragment_length:
+            msg = (f"The record is longer ({content_length} bytes) than "
+                   f"the allowed maximum ({self.max_fragment_length}"
+                   " bytes).")
             raise alerts.RecordOverFlow(msg)
 
         if len(self._input_data) - 5 < content_length:
@@ -160,7 +168,7 @@ class TLSConnection:
         fragment = self._input_data[5:content_length + 5]
         self._input_data = self._input_data[content_length + 5:]
 
-        if not self.state.is_encrypted or content_type == ContentType.CHANGE_CIPHER_SPEC:
+        if not self.is_encrypted or content_type == ContentType.CHANGE_CIPHER_SPEC:
             return content_type, fragment
 
         innertext = self.decrypt(fragment)

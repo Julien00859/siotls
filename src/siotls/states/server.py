@@ -1,35 +1,5 @@
-client_sm = r"""
-                              START <----+
-               Send ClientHello |        | Recv HelloRetryRequest
-          [K_send = early data] |        |
-                                v        |
-           /                 WAIT_SH ----+
-           |                    | Recv ServerHello
-           |                    | K_recv = handshake
-       Can |                    V
-      send |                 WAIT_EE
-     early |                    | Recv EncryptedExtensions
-      data |           +--------+--------+
-           |     Using |                 | Using certificate
-           |       PSK |                 v
-           |           |            WAIT_CERT_CR
-           |           |        Recv |       | Recv CertificateRequest
-           |           | Certificate |       v
-           |           |             |    WAIT_CERT
-           |           |             |       | Recv Certificate
-           |           |             v       v
-           |           |              WAIT_CV
-           |           |                 | Recv CertificateVerify
-           |           +> WAIT_FINISHED <+
-           |                  | Recv Finished
-           \                  | [Send EndOfEarlyData]
-                              | K_send = handshake
-                              | [Send Certificate [+ CertificateVerify]]
-    Can send                  | Send Finished
-    app data   -->            | K_send = K_recv = application
-    after here                v
-                          CONNECTED
-"""
+from . import State
+
 
 server_sm = r"""
                               START <-----+
@@ -73,3 +43,39 @@ server_sm = r"""
                                 v
                             CONNECTED
 """
+
+class ServerStart(State):
+    _order = 0
+    is_encrypted = False
+
+class ServerRecvdCh(State):
+    _order = 1
+    is_encrypted = False
+
+class ServerNegotiated(State):
+    _order = 2
+    is_encrypted = True
+
+class ServerWaitEoed(State):
+    _order = 3
+    is_encrypted = True
+
+class ServerWaitFlight2(State):
+    _order = 4
+    is_encrypted = True
+
+class ServerWaitCert(State):
+    _order = 5
+    is_encrypted = True
+
+class ServerWaitCv(State):
+    _order = 6
+    is_encrypted = True
+
+class ServerWaitFinished(State):
+    _order = 7
+    is_encrypted = True
+
+class ServerConnected(State):
+    _order = 8
+    is_encrypted = True
