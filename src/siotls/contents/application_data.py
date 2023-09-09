@@ -6,6 +6,7 @@ from . import Content
 
 class ApplicationData(Content, Serializable):
     content_type = ContentType.APPLICATION_DATA
+    can_fragment = True
 
     _struct = textwrap.dedent("""
         opaque content_data[TLSPlaintext.length];
@@ -20,4 +21,4 @@ class ApplicationData(Content, Serializable):
         return cls(stream.read())
 
     def serialize(self):
-        return self.data
+        return self.content_data

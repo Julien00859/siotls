@@ -6,6 +6,7 @@ from . import Content, alerts
 
 class Heartbeat(Content, Serializable):
     content_type = ContentType.HEARTBEAT
+    can_fragment = False
 
     _struct = textwrap.dedent("""
         struct {

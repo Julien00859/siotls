@@ -8,6 +8,8 @@ _handshake_registry = {}
 
 class Handshake(Content, Serializable):
     content_type = ContentType.HANDSHAKE
+    can_fragment = True
+
     _struct = textwrap.dedent("""
         struct {
             HandshakeType msg_type;    /* handshake type */
@@ -26,7 +28,6 @@ class Handshake(Content, Serializable):
             };
         } Handshake;
     """).strip('\n')
-
     msg_type: HandshakeType
 
     def __init_subclass__(cls, register=True, **kwargs):

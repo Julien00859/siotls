@@ -8,6 +8,7 @@ _alert_registry = {}
 
 class Alert(Exception, Content, Serializable):
     content_type = ContentType.ALERT
+    can_fragment = False
 
     _struct = textwrap.dedent("""
         struct {

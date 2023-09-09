@@ -6,6 +6,7 @@ from . import Content, alerts
 
 class ChangeCipherSpec(Content, Serializable):
     content_type = ContentType.CHANGE_CIPHER_SPEC
+    can_fragment = False
 
     _struct = textwrap.dedent("""
         opaque data = 0x01;

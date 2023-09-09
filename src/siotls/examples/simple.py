@@ -2,8 +2,8 @@ import logging
 from pprint import pp
 from socket import socket
 import secrets
-from siotls import alerts
 from siotls.connection import TLSConnection
+from siotls.contents import alerts
 from siotls.handshakes import ServerHello
 from siotls.utils import hexdump
 from siotls.iana import (
