@@ -44,38 +44,52 @@ server_sm = r"""
                             CONNECTED
 """
 
+
 class ServerStart(State):
-    _order = 0
+    can_send_application_data = False
     is_encrypted = False
+
 
 class ServerRecvdCh(State):
-    _order = 1
+    can_send_application_data = False
     is_encrypted = False
 
+
 class ServerNegotiated(State):
-    _order = 2
+    can_send_application_data = False
     is_encrypted = True
+
 
 class ServerWaitEoed(State):
-    _order = 3
+    can_send_application_data = True
     is_encrypted = True
+
 
 class ServerWaitFlight2(State):
-    _order = 4
+    can_send_application_data = True
     is_encrypted = True
+
 
 class ServerWaitCert(State):
-    _order = 5
+    can_send_application_data = True
     is_encrypted = True
+
 
 class ServerWaitCv(State):
-    _order = 6
+    can_send_application_data = True
     is_encrypted = True
+
 
 class ServerWaitFinished(State):
-    _order = 7
+    can_send_application_data = True
     is_encrypted = True
 
+
 class ServerConnected(State):
-    _order = 8
+    can_send_application_data = True
     is_encrypted = True
+
+
+class ServerClosed(State):
+    can_send_application_data = True
+    is_encrypted = False

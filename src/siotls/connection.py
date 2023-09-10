@@ -1,6 +1,7 @@
 import dataclasses
 import typing
 import logging
+import secrets
 import struct
 
 from siotls.iana import (
@@ -12,13 +13,17 @@ from siotls.iana import (
     ALPNProtocol,
     MaxFragmentLength,
 )
-from siotls.serial import TooMuchData, SerialIO
+from siotls.serial import SerializationError, TooMuchData, SerialIO
 from .contents import Content, ApplicationData, alerts
 from .states import ClientStart, ServerStart
 
 
 logger = logging.getLogger(__name__)
 DEFAULT_MAX_FRAGMENT_LENGTH = 16384
+
+
+def starswith_change_cipher_spec(data):
+    return data[0:1] == b'\x14' and data[3:6] == b'\x00\x01\x01'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -53,6 +58,10 @@ class TLSConfiguration:
     can_echo_heartbeat: bool = True
     alpn: list[ALPNProtocol] | None = None
 
+    # runtime defined values
+    random: bytes = dataclasses.field(
+        default=b'', init=False,
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -67,18 +76,17 @@ class TLSNegociation:
 
 
 class TLSConnection:
-    def __init__(self, config):
+    def __init__(self, config, host_names=(), pre_shared_key=None):
         self.config = config
         self.nconfig = None
-        self._input_data = b''
-        self._input_handshake = b''
-        self._output_data = b''
-
-        self.state = (
-            ClientStart(self)
-            if self.config.side == 'client' else
-            ServerStart(self)
-        )
+        self.host_names = host_names
+        self._cookie = None
+        self._pre_shared_key = pre_shared_key
+        self._random = secrets.token_bytes(32)
+        self._input_data = bytearray()
+        self._input_handshake = bytearray()
+        self._output_data = bytearray()
+        self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
 
     @property
     def is_encrypted(self):
@@ -87,69 +95,67 @@ class TLSConnection:
     @property
     def max_fragment_length(self):
         return (
-            self.nconfig.max_fragment_length
-            if self.nconfig else
-            DEFAULT_MAX_FRAGMENT_LENGTH
-        ) + (256 if self.is_encrypted else 0)
+            (self.nconfig or self.config).max_fragment_length
+            + (256 if self.is_encrypted else 0)
+        )
+
+    #-------------------------------------------------------------------
+    # Public APIs
+    #-------------------------------------------------------------------
+
+    def initiate_connection(self):
+        if isinstance(self.state, ClientStart):
+
+        elif isinstance(self.state, ServerStart):
+            self.state = ServerWaitCh(self)
+        else:
+            msg = "Cannot re-initiate an already initiated connection"
+            raise ValueError(msg)
 
     def receive_data(self, data):
         if not data:
             return
         self._input_data += data
 
-        contents = []
-        for content_type, content_data in iter(self._read_next_content, None):
-            stream = SerialIO(content_data)
-            content = Content.get_parser(content_type).parse(stream)
-            stream.assert_eof()
-            contents.append(content)
+        events = []
 
-        return contents
+        while next_content := self._read_next_content():
+            content_type, content_data = next_content
+            stream = SerialIO(content_data)
+            try:
+                try:
+                    content = Content.get_parser(content_type).parse(stream)
+                    stream.assert_eof()
+                except SerializationError as exc:
+                    raise alerts.DecodeError() from exc
+                self.state.process(content)
+            except alerts.Alert as alert:
+                raise NotImplementedError("todo")
+                self._send_content(alert)
+                self.events.append(...)
+                break
+
+        return events
+
+    def send_data(self, data: bytes):
+        self._send_content(ApplicationData(data))
 
     def data_to_send(self):
         output = self._output_data
         self._output_data = b''
         return output
 
-    def send_data(self, data: bytes):
-        self._send_content(ApplicationData(data))
+    #-------------------------------------------------------------------
+    # Internal APIs
+    #-------------------------------------------------------------------
 
-    def _send_content(self, content: Content):
-        data = (
-            self.encrypt(content)
-            if self.is_encrypted else
-            content.serialize()
-        )
-
-        if len(data) < self.max_fragment_length:
-            iter_fragments = (data,)
-        elif content.can_fragment:
-            iter_fragments = (
-                data[i : i + self.max_fragment_length]
-                for i in range(0, len(data), self.max_fragment_length)
-            )
-        else:
-            msg = (f"Serialized content ({len(data)} bytes) cannot fit "
-                   f"in a single record (max {self.max_fragment_length}"
-                   " bytes) and cannot be fragmented over multiple TLS"
-                   " 1.2 records.")
-            raise ValueError(msg)
-
-        self._output_data += b''.join((
-            b''.join(
-                (
-                    ContentType.APPLICATION_DATA
-                    if self.is_encrypted else
-                    content.msg_type
-                ).to_bytes(1, 'big'),
-                TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
-                len(fragment).to_bytes(2, 'big'),
-                fragment,
-            )
-            for fragment in iter_fragments
-        ))
+    def _move_to_state(self, state_type):
+        self.state = state_type(self)
 
     def _read_next_record(self):
+        while starswith_change_cipher_spec(self._input_data):
+            self._input_data = self._input_data[6:]
+
         if len(self._input_data) < 5:
             return
 
@@ -168,20 +174,19 @@ class TLSConnection:
         fragment = self._input_data[5:content_length + 5]
         self._input_data = self._input_data[content_length + 5:]
 
-        if not self.is_encrypted or content_type == ContentType.CHANGE_CIPHER_SPEC:
-            return content_type, fragment
+        if self.is_encrypted:
+            innertext = self.decrypt(fragment)
+            for i in range(len(innertext) -1, -1, -1):
+                if innertext[i]:
+                    break
+            else:
+                msg = "missing content type in encrypted record"
+                raise alerts.UnexpectedMessage(msg)
+            content_type = innertext[i]
+            fragment = innertext[:i]
 
-        innertext = self.decrypt(fragment)
-        for i in range(len(innertext) -1, -1, -1):
-            if innertext[i]:
-                break
-        else:
-            return  # only padding
-
-        content_type = innertext[i]
-        fragment = innertext[:i-1]
         if content_type == ContentType.CHANGE_CIPHER_SPEC:
-            msg = f"cannot receive encrypted {ContentType.CHANGE_CIPHER_SPEC}"
+            msg = f"invalid {ContentType.CHANGE_CIPHER_SPEC} record"
             raise alerts.UnexpectedMessage(msg)
 
         return content_type, fragment
@@ -228,5 +233,40 @@ class TLSConnection:
             raise TooMuchData(msg)
 
         content_data = self._input_handshake
-        self._input_handshake = b''
+        self._input_handshake = bytearray()
         return content_type, content_data
+
+    def _send_content(self, content: Content):
+        data = (
+            self.encrypt(content)
+            if self.is_encrypted else
+            content.serialize()
+        )
+
+        if len(data) < self.max_fragment_length:
+            iter_fragments = (data,)
+        elif content.can_fragment:
+            iter_fragments = (
+                data[i : i + self.max_fragment_length]
+                for i in range(0, len(data), self.max_fragment_length)
+            )
+        else:
+            msg = (f"Serialized content ({len(data)} bytes) cannot fit "
+                   f"in a single record (max {self.max_fragment_length}"
+                   " bytes) and cannot be fragmented over multiple TLS"
+                   " 1.2 records.")
+            raise ValueError(msg)
+
+        self._output_data += b''.join((
+            b''.join(
+                (
+                    ContentType.APPLICATION_DATA
+                    if self.is_encrypted else
+                    content.msg_type
+                ).to_bytes(1, 'big'),
+                TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
+                len(fragment).to_bytes(2, 'big'),
+                fragment,
+            )
+            for fragment in iter_fragments
+        ))

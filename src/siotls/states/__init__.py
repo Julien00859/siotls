@@ -1,39 +1,21 @@
 class State:
-    _order: int
     is_encrypted: bool
+    can_send_application_data: bool
 
     def __init__(self, connection):
-        self.conn = connection
+        self.connection = connection
 
-    @property
-    def is_encrypted(self):
-        return self._order >= 2
+    def __getattr__(self, name):
+        return getattr(self.connection, name)
 
-    def __lt__(self, other):
-        if not isinstance(other State):
-            msg = f"Cannot compare {self} and {other}"
-            raise TypeError(msg)
-        return self._order < other._order
+    def initiate_connection(self):
+        raise NotImplementedError("cannot initiate connection in this state")
 
-    def __le__(self, other):
-        if not isinstance(other State):
-            msg = f"Cannot compare {self} and {other}"
-            raise TypeError(msg)
-        return self._order <= other._order
-
-    def __gt__(self, other):
-        if not isinstance(other State):
-            msg = f"Cannot compare {self} and {other}"
-            raise TypeError(msg)
-        return self._order > other._order
-
-    def __ge__(self, other):
-        if not isinstance(other State):
-            msg = f"Cannot compare {self} and {other}"
-            raise TypeError(msg)
-        return self._order >= other._order
+    def process(self, content):
+        raise NotImplementedError("cannot process content in this state")
 
 
+# ruff: isort: off
 from .client import (
     ClientStart,
     ClientWaitSh,
@@ -44,6 +26,7 @@ from .client import (
     ClientWaitFinished,
     ClientConnected,
 )
+
 from .server import (
     ServerStart,
     ServerRecvdCh,

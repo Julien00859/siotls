@@ -14,10 +14,6 @@ class PreSharedKeyRequest(Extension, SerializableBody):
     extension_type = ExtensionType.PRE_SHARED_KEY
     _handshake_types = {HT.CLIENT_HELLO}
 
-    def __init__(self, identities, binders):
-        self.identities = identities
-        self.binders = binders
-
     _struct = textwrap.dedent("""\
         struct {
             opaque identity<1..2^16-1>;
@@ -33,6 +29,10 @@ class PreSharedKeyRequest(Extension, SerializableBody):
     """).strip()
     identities: list[PskIdentity]
     binders: list[bytes]
+
+    def __init__(self, identities, binders):
+        self.identities = identities
+        self.binders = binders
 
     @classmethod
     def parse_body(cls, stream):

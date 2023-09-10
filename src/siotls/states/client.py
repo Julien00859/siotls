@@ -1,3 +1,15 @@
+from siotls.iana import TLSVersion
+from siotls.handshakes import ClientHello
+from siotls.extensions import (
+    SupportedVersionsRequest,
+    PreSharedKeyRequest, PskKeyExchangeModes,
+    SignatureAlgorithms,
+    #SignatureAlgorithmsCert,
+    SupportedGroups,
+    KeyShareRequest, KeyShareEntry,
+    ServerNameList, HostName,
+    Cookie,
+)
 from . import State
 
 
@@ -34,34 +46,76 @@ client_sm = r"""
                           CONNECTED
 """
 
+
 class ClientStart(State):
-    _order = 0
     is_encrypted = False
+
+    def initiate_connection(self):
+        client_hello = ClientHello(self.random, self.config.cipher_suites, [
+            SupportedVersionsRequest([TLSVersion.TLS_1_3]),
+        ])
+
+        if not self._pre_shared_key:
+            client_hello.extensions.extend([
+                SignatureAlgorithms(self.config.digital_signatures),
+                SupportedGroups(self.config.key_exchanges),
+                KeyShareRequest([KeyShareEntry(...)]),
+            ])
+
+        if self._cookie:
+            client_hello.extensions.append(Cookie(self._cookie))
+
+        if self.host_names:
+            client_hello.extensions.append(ServerNameList([
+                HostName(host_name) for host_name in self.host_names
+            ]))
+
+        if self._pre_shared_key:
+            raise NotImplementedError("todo")
+            client_hello.extensions.extend([
+                PskKeyExchangeModes(...),
+                PreSharedKeyRequest(...),  # this must be the last extension
+            ])
+
+        self._send_content(client_hello)
+        self._move_to_state(ClientWaitSh)
+
 
 class ClientWaitSh(State):
-    _order = 1
     is_encrypted = False
+    can_send_application_data = False
+
 
 class ClientWaitEe(State):
-    _order = 2
     is_encrypted = True
+    can_send_application_data = False
+
 
 class ClientWaitCertCr(State):
-    _order = 3
     is_encrypted = True
+    can_send_application_data = False
+
 
 class ClientWaitCert(State):
-    _order = 4
     is_encrypted = True
+    can_send_application_data = False
+
 
 class ClientWaitCv(State):
-    _order = 5
     is_encrypted = True
+    can_send_application_data = False
+
 
 class ClientWaitFinished(State):
-    _order = 6
     is_encrypted = True
+    can_send_application_data = False
+
 
 class ClientConnected(State):
-    _order = 7
     is_encrypted = True
+    can_send_application_data = True
+
+
+class ClientClosed(State):
+    is_encrypted = False
+    can_send_application_data = False

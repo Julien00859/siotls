@@ -78,7 +78,7 @@ class Alert(Exception, Content, Serializable):
         return cls('', level)
 
     def serialize(self):
-        return ((self.level << 8) + self.description).to_bytes('big')
+        return ((self.level << 8) + self.description).to_bytes(2, 'big')
 
 
 class CloseNotify(Alert):
