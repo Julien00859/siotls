@@ -5,7 +5,7 @@ server_sm = r"""
                               START <-----+
                Recv ClientHello |         | Send HelloRetryRequest
                                 v         |
-                             RECVD_CH ----+
+                              WAIT_CH ----+
                                 | Select parameters
                                 v
                              NEGOTIATED
@@ -49,10 +49,16 @@ class ServerStart(State):
     can_send_application_data = False
     is_encrypted = False
 
+    def initiate_connection(self):
+        self._move_to_state(ServerWaitCh)
 
-class ServerRecvdCh(State):
+
+class ServerWaitCh(State):
     can_send_application_data = False
     is_encrypted = False
+
+    def process(self, content):
+        ...
 
 
 class ServerNegotiated(State):

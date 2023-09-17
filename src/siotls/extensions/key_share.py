@@ -6,10 +6,31 @@ from siotls.serial import SerializableBody, SerialIO, SerializationError
 from siotls.utils import try_cast
 from . import Extension
 
+sizes = {
+    NamedGroup.secp256r1: 32,
+    NamedGroup.secp384r1: 48,
+    NamedGroup.secp521r1: 66,
+    NamedGroup.x25519: 32,
+    NamedGroup.x448: 56,
+}
 
 class KeyShareEntry(NamedTuple):
     group: NamedGroup | int
     key_exchange: bytes
+
+    def parse_dh(self):
+        return int.from_bytes(self.key_exchange, 'big')
+
+    def parse_secp(self):
+        stream = SerialIO(self.key_exchange)
+        _legacy_form = stream.read_int(1)
+        x = stream.read_int(sizes[self.group])
+        y = stream.read_int(sizes[self.group])
+        stream.assert_eof()
+        return x, y
+
+    def parse_x(self):
+        raise NotImplementedError("todo")
 
 
 class KeyShareRequest(Extension, SerializableBody):

@@ -48,20 +48,11 @@ class TLSConfiguration:
 
     # extensions
     max_fragment_length: typing.Literal[
-        MaxFragmentLength.LIMIT_512,
-        MaxFragmentLength.LIMIT_1024,
-        MaxFragmentLength.LIMIT_2048,
-        MaxFragmentLength.LIMIT_4096,
-        DEFAULT_MAX_FRAGMENT_LENGTH,
+        512, 1024, 2048, 4096, DEFAULT_MAX_FRAGMENT_LENGTH,
     ] = DEFAULT_MAX_FRAGMENT_LENGTH
     can_send_heartbeat: bool = False
     can_echo_heartbeat: bool = True
     alpn: list[ALPNProtocol] | None = None
-
-    # runtime defined values
-    random: bytes = dataclasses.field(
-        default=b'', init=False,
-    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -82,6 +73,7 @@ class TLSConnection:
         self.host_names = host_names
         self._cookie = None
         self._pre_shared_key = pre_shared_key
+        self._key_exchange_privkeys = {}
         self._random = secrets.token_bytes(32)
         self._input_data = bytearray()
         self._input_handshake = bytearray()
@@ -104,13 +96,7 @@ class TLSConnection:
     #-------------------------------------------------------------------
 
     def initiate_connection(self):
-        if isinstance(self.state, ClientStart):
-
-        elif isinstance(self.state, ServerStart):
-            self.state = ServerWaitCh(self)
-        else:
-            msg = "Cannot re-initiate an already initiated connection"
-            raise ValueError(msg)
+        self.state.initiate_connection()
 
     def receive_data(self, data):
         if not data:

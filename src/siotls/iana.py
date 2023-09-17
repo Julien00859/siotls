@@ -151,6 +151,18 @@ class NamedGroup(Hex2Enum):
     ffdhe6144 = 0x0103
     ffdhe8192 = 0x0104
 
+    @classmethod
+    def is_secp(cls, group):
+        return cls.secp256r1 <= group <= cls.secp521r1
+
+    @classmethod
+    def is_x(cls, group):
+        return cls.x25519 <= group <= cls.x448
+
+    @classmethod
+    def is_ff(cls, group):
+        return cls.ffdhe2048 <= group <= cls.ffdhe8192
+
 
 class SignatureScheme(Hex2Enum):
     # RSASSA-PKCS1-v1_5 algorithms
