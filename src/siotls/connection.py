@@ -60,6 +60,7 @@ class TLSNegociation:
     cipher_suite: CipherSuites
     digital_signature: SignatureScheme
     key_exchange: NamedGroup
+    shared_secret: bytes
     alpn: ALPNProtocol | None
     can_send_heartbeat: bool
     can_echo_heartbeat: bool

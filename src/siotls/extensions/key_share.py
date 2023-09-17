@@ -1,5 +1,4 @@
 import textwrap
-from typing import NamedTuple
 from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType as HT, NamedGroup
 from siotls.serial import SerializableBody, SerialIO, SerializationError
@@ -13,24 +12,6 @@ sizes = {
     NamedGroup.x25519: 32,
     NamedGroup.x448: 56,
 }
-
-class KeyShareEntry(NamedTuple):
-    group: NamedGroup | int
-    key_exchange: bytes
-
-    def parse_dh(self):
-        return int.from_bytes(self.key_exchange, 'big')
-
-    def parse_secp(self):
-        stream = SerialIO(self.key_exchange)
-        _legacy_form = stream.read_int(1)
-        x = stream.read_int(sizes[self.group])
-        y = stream.read_int(sizes[self.group])
-        stream.assert_eof()
-        return x, y
-
-    def parse_x(self):
-        raise NotImplementedError("todo")
 
 
 class KeyShareRequest(Extension, SerializableBody):
@@ -47,19 +28,21 @@ class KeyShareRequest(Extension, SerializableBody):
             KeyShareEntry client_shares<0..2^16-1>;
         } KeyShareClientHello;
     """).strip()
-    client_shares: list[KeyShareEntry]
+    client_shares: dict[NamedGroup | int, bytes]
 
     def __init__(self, client_shares):
         self.client_shares = client_shares
 
     @classmethod
     def parse_body(cls, stream):
-        client_shares = []
+        client_shares = {}
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
             group = try_cast(NamedGroup, list_stream.read_int(2))
             key_exchange = list_stream.read_var(2)
-            client_shares.append(KeyShareEntry(group, key_exchange))
+            if group in client_shares:
+                raise alerts.IllegalParameter()
+            client_shares[group] = key_exchange
         return cls(client_shares)
 
     def serialize_body(self):
@@ -76,7 +59,8 @@ class KeyShareRequest(Extension, SerializableBody):
             client_shares,
         ])
 
-class KeyShareResponse(Extension, SerializableBody):
+
+class KeyShareRetry(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
     _handshake_types = {HT.SERVER_HELLO}
 
@@ -99,3 +83,35 @@ class KeyShareResponse(Extension, SerializableBody):
         except ValueError as exc:
             raise alerts.IllegalParameter() from exc
         return cls(selected_group)
+
+    def serialize_body(self):
+        return self.selected_group.to_bytes(2, 'big')
+
+
+class KeyShareResponse(Extension, SerializableBody):
+    extension_type = ExtensionType.KEY_SHARE
+    _handshake_types = {HT.SERVER_HELLO}
+
+    _struct = textwrap.dedent("""\
+        struct {
+            KeyShareEntry server_share;
+        } KeyShareServerHello;
+    """).strip()
+    server_share_group: NamedGroup | int
+    server_share_key_exchange: bytes
+
+    @classmethod
+    def parse_body(cls, stream):
+        group = try_cast(NamedGroup, stream.read_int(2))
+        key_exchange = stream.read_var(2)
+        return cls(group, key_exchange)
+
+    def serialize_body(self):
+        return b''.join(
+            self.group.to_bytes(2, 'big'),
+            len(self.server_share_key_exchange).to_bytes(2, 'big'),
+            self.server_share_key_exchange,
+        )
+
+
+empty_key_share_request = KeyShareRequest()

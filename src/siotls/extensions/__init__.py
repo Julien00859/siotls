@@ -47,6 +47,10 @@ class Extension(Serializable):
         if register and Extension in cls.__bases__:
             for handshake_type in cls._handshake_types:
                 registry = _extension_registry.setdefault(cls.extension_type, {})
+                if registry.get(handshake_type, None) not in (cls, None):
+                    msg = ("Cannot register another parser for pair "
+                          f"{handshake_type}/{cls.extension_type}")
+                    raise ValueError(msg)
                 registry[handshake_type] = cls
 
     @classmethod

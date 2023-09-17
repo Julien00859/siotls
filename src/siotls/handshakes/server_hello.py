@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import textwrap
 from siotls.iana import CipherSuites, HandshakeType, TLSVersion
@@ -110,3 +109,6 @@ class HelloRetryRequest(ServerHello):
         "CF 21 AD 74 E5 9A 61 11 BE 1D 8C 02 1E 65 B8 91"
         "C2 A2 11 16 7A BB 8C 5E 07 9E 09 E2 C8 A8 33 9C"
     )
+
+    def __init__(self, cipher_suite, extensions):
+        super().__init__(self.random, cipher_suite, extensions)

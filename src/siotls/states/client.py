@@ -78,7 +78,6 @@ class ClientStart(State):
             client_hello.extensions.extend([
                 PskKeyExchangeModes(...),
                 PreSharedKeyRequest(...),  # this must be the last extension
-
             ])
         else:
             key_share_entries = self._init_key_share()

@@ -1,6 +1,6 @@
 import logging
 import textwrap
-from siotls.iana import CipherSuites, HandshakeType, TLSVersion
+from siotls.iana import CipherSuites, HandshakeType, ExtensionType, TLSVersion
 from siotls.serial import SerializableBody, SerialIO
 from siotls.utils import try_cast, sentinel_raise_exception
 from . import Handshake
@@ -33,7 +33,7 @@ class ClientHello(Handshake, SerializableBody):
     legacy_session_id: bytes = b''
     cipher_suites: list[CipherSuites | int]
     legacy_compression_methods: bytes = b'\x00'  # "null" compression method
-    extensions: list[Extension]
+    extensions: dict[ExtensionType | int, Extension]
 
     def __init__(self, random_, cipher_suites, extensions):
         self.legacy_version = type(self).legacy_version
@@ -62,12 +62,14 @@ class ClientHello(Handshake, SerializableBody):
         if legacy_compression_methods != b'\x00':  # "null" compression method
             raise alerts.IllegalParameter()
 
-        extensions = []
+        extensions = {}
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
             extension = Extension.parse(list_stream, handshake_type=cls.msg_type)
             logger.debug("Found extension %s", extension)
-            extensions.append(extension)
+            if extension.extension_id in extension:
+                raise alerts.IllegalParameter()
+            extensions[extension.extension_id] = extension
 
         self = cls(random_, cipher_suites, extensions)
         self.legacy_session_id = legacy_session_id
@@ -92,12 +94,3 @@ class ClientHello(Handshake, SerializableBody):
             len(extensions).to_bytes(2, 'big'),
             extensions,
         ])
-
-    def get_extension(self, extension_id, default=sentinel_raise_exception):
-        for extension in self.extensions:
-            if extension.extension_id == extension_id:
-                return extension
-        if default is sentinel_raise_exception:
-            msg = f"Extension {extension_id} not present."
-            raise LookupError(msg)
-        return default
