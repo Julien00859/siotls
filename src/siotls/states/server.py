@@ -4,14 +4,25 @@ from siotls.iana import (
     HandshakeType,
     ExtensionType,
     NamedGroup,
+    TLSVersion,
 )
 from siotls.contents import alerts
 from siotls.crypto import ffdhe
 from . import State
 
 from siotls.contents import ChangeCipherSpec
-from siotls.handshakes import ServerHello, HelloRetryRequest
-from siotls.extensions import KeyShareResponse, empty_key_share_request
+from siotls.handshakes import (
+    HelloRetryRequest,
+    ServerHello,
+    EncryptedExtensions,
+    Certificate,
+    CertificateVerify,
+    Finished,
+)
+from siotls.extensions import (
+    SupportedVersionsResponse,
+    KeyShareResponse, KeyShareRetry
+)
 
 
 server_sm = r"""
@@ -69,107 +80,127 @@ class ServerStart(State):
 class ServerWaitCh(State):
     can_send_application_data = False
     is_encrypted = False
-    did_send_change_cipher_spec = False
+    _did_send_change_cipher_spec = False
 
-    def process(self, content):
-        if content.msg_type != ContentType.HANDSHAKE:
+    def process(self, client_hello):
+        if client_hello.msg_type != ContentType.HANDSHAKE:
             raise alerts.UnexpectedMessage()
-        if content.handshake_type != HandshakeType.CLIENT_HELLO:
+        if client_hello.handshake_type != HandshakeType.CLIENT_HELLO:
             raise alerts.UnexpectedMessage()
 
-        if psk := content.extensions.get(ExtensionType.PRE_SHARED_KEY):
+        if psk := client_hello.extensions.get(ExtensionType.PRE_SHARED_KEY):
             raise NotImplementedError("todo")
 
-        # Find the common key exchange (like DH), cipher (like AES) and
-        # digital signature (like RSA/Ed25519)
-        common_key_exchange = (
-            self._find_common_key_exchange_via_key_share(content) or
-            self._find_common_key_exchange_via_supported_groups(content)
-        )
-        if not common_key_exchange:
+        cipher_suite = self._find_common_cipher_suite(client_hello)
+        digital_signature = self._find_common_digital_signature(client_hello)
+        key_exchange = (
+            self._find_common_key_exchange_via_key_share(client_hello) or
+            self._find_common_key_exchange_via_supported_groups(client_hello))
+        if not (key_exchange and cipher_suite and digital_signature):
             raise alerts.HandshakeFailure()
 
-        common_cipher_suite = self._find_common_cipher_suite(content)
-        if not common_cipher_suite:
-            raise alerts.HandshakeFailure()
-
-        common_digital_signature = self._find_common_digital_signature(content)
-        if not common_digital_signature:
-            raise alerts.HandshakeFailure()
-
-        # The client can pre-shoot a few KeyShare (material for the key
-        # exchange) for all or a subset of the offered supported groups.
-        # In case he didn't sent any, or that he didn't pre-shoot a
-        # KeyShare for the supported group that we actually selected,
-        # then ask the client to repeat the handshake: this time with a
-        # KeyShare containing the supported group that we selected.
-        peer_key_exchange = content.extensions.get(
-            ExtensionType.KEY_SHARE, empty_key_share_request
-        ).client_shares.get(common_key_exchange)
-        if not peer_key_exchange:
-            hello_retry_request = self._make_hello_retry_request()
-            self._send_content(hello_retry_request)
-            if not self.did_send_change_cipher_spec:
-                self._send_content(ChangeCipherSpec())
-                self.did_send_change_cipher_spec = True
+        if not self._can_resume_key_share(client_hello, key_exchange):
+            self._send_hello_retry_request(cipher_suite, key_exchange)
             return
 
-        server_hello = ServerHello(self.random, common_cipher_suite)
-        shared_secret, my_key_exchange = self._resume_key_share(
-            common_key_exchange, peer_key_exchange)
+        clear_extensions, encrypted_extensions, self.nconfig = self._negociate(
+            client_hello, cipher_suite, digital_signature, key_exchange)
 
-        KeyShareResponse(common_key_exchange, my_key_exchange)
+        self._send_content(ServerHello(
+            self.random, self.nconfig.cipher_suite, clear_extensions))
 
-    def _find_common_key_exchange_via_key_share(self, content):
-        key_share = content.extensions.get(ExtensionType.KEY_SHARE)
+        if not self._did_send_change_cipher_spec:
+            self._send_content(ChangeCipherSpec())
+
+        self.is_encrypted = True
+
+        self._send_content(EncryptedExtensions(encrypted_extensions))
+        self._send_content(Certificate(...))
+        self._send_content(CertificateVerify(...))
+        self._send_content(Finished(...))
+        self._move_to_state(ServerWaitFlight2)
+
+    def _find_common_key_exchange_via_key_share(self, client_hello):
+        key_share = client_hello.extensions.get(ExtensionType.KEY_SHARE)
         if not key_share:
             return
         for group in self.config.key_exchanges:
             if group in key_share.client_shares:
                 return group
 
-    def _find_common_key_exchange_via_supported_groups(self, content):
+    def _find_common_key_exchange_via_supported_groups(self, client_hello):
         try:
-            supported_groups = content.extensions[ExtensionType.KEY_SHARE]
+            supported_groups = client_hello.extensions[ExtensionType.KEY_SHARE]
         except KeyError as exc:
             raise alerts.MissingExtension() from exc
         for group in self.config.key_exchanges:
             if group in supported_groups.named_group_list:
                 return group
 
-    def _find_common_cipher(self, content):
+    def _find_common_cipher(self, client_hello):
         for cipher_suite in self.config.cipher_suites:
-            if cipher_suite in content.cipher_suites:
+            if cipher_suite in client_hello.cipher_suites:
                 return cipher_suite
 
-    def _find_common_digital_signature(self, content):
+    def _find_common_digital_signature(self, client_hello):
         try:
-            ext = content.extensions[ExtensionType.SIGNATURE_ALGORITHMS]
+            ext = client_hello.extensions[ExtensionType.SIGNATURE_ALGORITHMS]
         except KeyError as exc:
             raise alerts.MissingExtension() from exc
         for digital_signatures in self.config.key_exchanges:
             if digital_signatures in ext.supported_signature_algorithms:
                 return digital_signatures
 
-    def _resume_key_share(self, named_group, client_key_exchange):
-        if not NamedGroup.is_ff(named_group):
+    def _can_resume_key_share(self, client_hello, key_exchange):
+        key_share = client_hello.extensions.get(ExtensionType.KEY_SHARE)
+        return key_share and key_exchange in key_share.client_shares
+
+    def _send_hello_retry_request(self, cipher_suite, key_exchange):
+        if self._did_send_change_cipher_spec:
+            msg = "invalid KeyShare in second ClientHello"
+            raise alerts.IllegalParameter(msg)
+        self._send_content(HelloRetryRequest(self.random, cipher_suite, [
+            SupportedVersionsResponse(TLSVersion.TLS_1_3),
+            KeyShareRetry(key_exchange),
+        ]))
+        self._send_content(ChangeCipherSpec())
+        self._did_send_change_cipher_spec = True
+
+    def _resume_key_share(self, key_exchange, peer_key_share_data):
+        if not NamedGroup.is_ff(key_exchange):
             raise NotImplementedError("todo")
 
-        p, g, q, p_length, min_key_length = ffdhe.groups[named_group]
-        if len(client_key_exchange) < min_key_length:
+        p, g, q, p_length, min_key_length = ffdhe.groups[key_exchange]
+        if len(peer_key_share_data) < min_key_length:
             raise alerts.InsufficientSecurity()
 
         pn = dh.DHParameterNumbers(p, q)
-        x = int.from_bytes(client_key_exchange, 'big')
+        x = int.from_bytes(peer_key_share_data, 'big')
         pubkey = dh.DHPublicNumbers(x, pn).public_key()
 
         privkey = pn.parameters().generate_private_key()
         y = privkey.public_key().public_numbers().y
-        key_exchange = y.to_bytes(p_length, 'big')
+        my_key_share_data = y.to_bytes(p_length, 'big')
 
         shared_secret = privkey.exchange(pubkey)
-        return shared_secret, key_exchange
+        return shared_secret, my_key_share_data
 
+    def _negociate(self, client_hello, cipher_suite, digital_signature, key_exchange):
+        clear_extensions = [SupportedVersionsResponse(TLSVersion.TLS_1_3)]
+        encrypted_extensions = []
+
+        key_share = client_hello.extensions[ExtensionType.KEY_SHARE]
+        shared_secret, key_share_data = self._resume_key_share(
+            key_exchange, key_share.client_shares[key_exchange])
+        clear_extensions.append(KeyShareResponse(key_exchange, key_share_data))
+
+        from siotls.connection import TLSNegociation  # noqa
+        return clear_extensions, encrypted_extensions, TLSNegociation(
+            cipher_suite=cipher_suite,
+            digital_signature=digital_signature,
+            key_exchange=key_exchange,
+            shared_secret=shared_secret,
+        )
 
 class ServerWaitEoed(State):
     can_send_application_data = True

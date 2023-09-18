@@ -35,13 +35,13 @@ class ClientHello(Handshake, SerializableBody):
     legacy_compression_methods: bytes = b'\x00'  # "null" compression method
     extensions: dict[ExtensionType | int, Extension]
 
-    def __init__(self, random_, cipher_suites, extensions):
+    def __init__(self, random_, cipher_suites, extensions: list[Extension]):
         self.legacy_version = type(self).legacy_version
         self.random = random_
         self.legacy_session_id = type(self).legacy_session_id
         self.cipher_suites = cipher_suites
         self.legacy_compression_methods = type(self).legacy_compression_methods
-        self.extensions = extensions
+        self.extensions = {ext.extension_type: ext for ext in extensions}
 
     @classmethod
     def parse_body(cls, stream):
@@ -62,14 +62,12 @@ class ClientHello(Handshake, SerializableBody):
         if legacy_compression_methods != b'\x00':  # "null" compression method
             raise alerts.IllegalParameter()
 
-        extensions = {}
+        extensions = []
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
             extension = Extension.parse(list_stream, handshake_type=cls.msg_type)
             logger.debug("Found extension %s", extension)
-            if extension.extension_id in extension:
-                raise alerts.IllegalParameter()
-            extensions[extension.extension_id] = extension
+            extensions.append(extension)
 
         self = cls(random_, cipher_suites, extensions)
         self.legacy_session_id = legacy_session_id

@@ -112,6 +112,3 @@ class KeyShareResponse(Extension, SerializableBody):
             len(self.server_share_key_exchange).to_bytes(2, 'big'),
             self.server_share_key_exchange,
         )
-
-
-empty_key_share_request = KeyShareRequest()

@@ -56,7 +56,7 @@ class TLSConfiguration:
 
 
 @dataclasses.dataclass(frozen=True)
-class TLSNegociation:
+class TLSNegociatedConfiguration:
     cipher_suite: CipherSuites
     digital_signature: SignatureScheme
     key_exchange: NamedGroup

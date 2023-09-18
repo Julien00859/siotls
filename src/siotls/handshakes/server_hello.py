@@ -1,6 +1,7 @@
+import collections.abc
 import logging
 import textwrap
-from siotls.iana import CipherSuites, HandshakeType, TLSVersion
+from siotls.iana import CipherSuites, HandshakeType, TLSVersion, ExtensionType
 from siotls.serial import SerialIO, SerializableBody
 from siotls.utils import sentinel_raise_exception, try_cast
 from . import Handshake
@@ -33,15 +34,15 @@ class ServerHello(Handshake, SerializableBody):
     legacy_session_id_echo: bytes = b''
     cipher_suite: CipherSuites | int
     legacy_compression_methods: int = 0  # "null" compression method
-    extensions: list[Extension]
+    extensions: dict[ExtensionType, Extension]
 
-    def __init__(self, random_, cipher_suite, extensions):
+    def __init__(self, random_, cipher_suite, extensions: list[Extension]):
         self.legacy_version = type(self).legacy_version
         self.random = random_
         self.legacy_session_id_echo = type(self).legacy_session_id_echo
         self.cipher_suite = cipher_suite
         self.legacy_compression_methods = type(self).legacy_compression_methods
-        self.extensions = extensions
+        self.extensions = {ext.extension_type: ext for ext in extensions}
 
     @classmethod
     def parse_body(cls, stream):
