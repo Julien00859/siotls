@@ -30,20 +30,23 @@ class TLSConfiguration:
     side: typing.Literal['client', 'server']
 
     # mandatory
-    cipher_suites: list[CipherSuites | int] = [
-        CipherSuites.TLS_CHACHA20_POLY1305_SHA256,
-        CipherSuites.TLS_AES_256_GCM_SHA384,
-        CipherSuites.TLS_AES_128_GCM_SHA256,
-    ]
-    digital_signatures: list[SignatureScheme | int] = [
-        SignatureScheme.rsa_pkcs1_sha256,
-        SignatureScheme.rsa_pss_rsae_sha256,
-        SignatureScheme.ecdsa_secp256r1_sha256,
-    ]
-    key_exchanges: list[NamedGroup | int] = [
-        NamedGroup.x25519,
-        NamedGroup.secp256r1,
-    ]
+    cipher_suites: list[CipherSuites | int] = \
+        dataclasses.field(default_factory=[
+            CipherSuites.TLS_CHACHA20_POLY1305_SHA256,
+            CipherSuites.TLS_AES_256_GCM_SHA384,
+            CipherSuites.TLS_AES_128_GCM_SHA256,
+        ].copy)
+    digital_signatures: list[SignatureScheme | int] = \
+        dataclasses.field(default_factory=[
+            SignatureScheme.rsa_pkcs1_sha256,
+            SignatureScheme.rsa_pss_rsae_sha256,
+            SignatureScheme.ecdsa_secp256r1_sha256,
+        ].copy)
+    key_exchanges: list[NamedGroup | int] = \
+        dataclasses.field(default_factory=[
+            NamedGroup.x25519,
+            NamedGroup.secp256r1,
+        ].copy)
 
     # extensions
     max_fragment_length: typing.Literal[

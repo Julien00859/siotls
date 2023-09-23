@@ -1,23 +1,22 @@
-from siotls import alerts
-from siotls.crypto import key_share
+from siotls.contents import alerts
+from siotls.crypto.key_share import init as key_share_init
 from siotls.iana import (
     TLSVersion,
     ContentType,
     HandshakeType,
-    NamedGroup,
 )
-from siotls.handshakes import ClientHello
+from siotls.handshakes import ClientHello, HelloRetryRequest
 from siotls.extensions import (
     SupportedVersionsRequest,
     PreSharedKeyRequest, PskKeyExchangeModes,
     SignatureAlgorithms,
     #SignatureAlgorithmsCert,
     SupportedGroups,
-    KeyShareRequest, KeyShareEntry,
+    KeyShareRequest,
     ServerNameList, HostName,
     Cookie,
 )
-from . import State, hello_retry_request_magic
+from . import State
 
 
 client_sm = r"""
@@ -99,7 +98,7 @@ class ClientStart(State):
         # save a round-trip. At worse we'll just send another in reply
         # to a HelloRetryRequest.
 
-        entries = []
+        entries = {}
         has_seen_ecdhe = False
         has_seen_ffdhe = False
 
@@ -111,9 +110,9 @@ class ClientStart(State):
             else:
                 continue
 
-            private_key, my_key_share = key_share.init(key_exchange)
+            private_key, my_key_share = key_share_init(key_exchange)
             self._key_exchange_privkeys[key_exchange] = private_key
-            entries.append(KeyShareEntry(key_exchange, my_key_share))
+            entries[key_exchange] = my_key_share
 
         return entries
 
@@ -128,7 +127,7 @@ class ClientWaitSh(State):
         if content.handshake_type != HandshakeType.SERVER_HELLO:
             raise alerts.UnexpectedMessage()
 
-        if content.random == hello_retry_request_magic:
+        if content.random == HelloRetryRequest.random:
             self._process_hello_retry_request(content)
         else:
             self._process_server_hello(content)

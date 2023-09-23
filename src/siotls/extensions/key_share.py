@@ -43,20 +43,20 @@ class KeyShareRequest(Extension, SerializableBody):
         client_shares = {}
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
-            group = try_cast(NamedGroup, list_stream.read_int(2))
-            key_exchange = list_stream.read_var(2)
-            if group in client_shares:
+            key_exchange = try_cast(NamedGroup, list_stream.read_int(2))
+            key_share = list_stream.read_var(2)
+            if key_exchange in client_shares:
                 raise alerts.IllegalParameter()
-            client_shares[group] = key_exchange
+            client_shares[key_exchange] = key_share
         return cls(client_shares)
 
     def serialize_body(self):
         client_shares = b''.join([
             b''.join([
-                entry.group.to_bytes(2, 'big'),
-                len(entry.key_exchange).to_bytes(2, 'big'),
-                entry.key_exchange,
-            ]) for entry in self.client_shares
+                key_exchange.to_bytes(2, 'big'),
+                len(key_share).to_bytes(2, 'big'),
+                key_share,
+            ]) for key_exchange, key_share in self.client_shares.items()
         ])
 
         return b''.join([

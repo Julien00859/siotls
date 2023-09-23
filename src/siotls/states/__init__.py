@@ -31,15 +31,9 @@ from .client import (
     ClientConnected,
 )
 
-hello_retry_request_magic = bytes.fromhex("""
-    CF 21 AD 74 E5 9A 61 11 BE 1D 8C 02 1E 65 B8 91
-    C2 A2 11 16 7A BB 8C 5E 07 9E 09 E2 C8 A8 33 9C
-""")
-
 from .server import (
     ServerStart,
-    ServerRecvdCh,
-    ServerNegotiated,
+    ServerWaitCh,
     ServerWaitEoed,
     ServerWaitFlight2,
     ServerWaitCert,
