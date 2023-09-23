@@ -1,6 +1,11 @@
 import textwrap
 from siotls.contents import alerts
-from siotls.iana import ExtensionType, HandshakeType as HT, NamedGroup
+from siotls.iana import (
+    ExtensionType,
+    HandshakeType as HT,
+    HandshakeType_ as HT_,
+    NamedGroup,
+)
 from siotls.serial import SerializableBody, SerialIO, SerializationError
 from siotls.utils import try_cast
 from . import Extension
@@ -62,7 +67,7 @@ class KeyShareRequest(Extension, SerializableBody):
 
 class KeyShareRetry(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
-    _handshake_types = {HT.SERVER_HELLO}
+    _handshake_types = {HT_.HELLO_RETRY_REQUEST}
 
     _struct = textwrap.dedent("""\
         struct {
@@ -90,7 +95,7 @@ class KeyShareRetry(Extension, SerializableBody):
 
 class KeyShareResponse(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
-    _handshake_types = {HT.HELLO_RETRY_REQUEST}
+    _handshake_types = {HT.SERVER_HELLO}
 
     _struct = textwrap.dedent("""\
         struct {

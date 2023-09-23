@@ -1,7 +1,8 @@
-import collections.abc
 import logging
 import textwrap
-from siotls.iana import CipherSuites, HandshakeType, TLSVersion, ExtensionType
+from siotls.iana import (
+    CipherSuites, HandshakeType, HandshakeType_, TLSVersion, ExtensionType
+)
 from siotls.serial import SerialIO, SerializableBody
 from siotls.utils import sentinel_raise_exception, try_cast
 from . import Handshake
@@ -105,6 +106,8 @@ class ServerHello(Handshake, SerializableBody):
 
 
 class HelloRetryRequest(ServerHello):
+    handshake_type = HandshakeType_.HELLO_RETRY_REQUEST
+
     # hashlib.sha256("HelloRetryRequest").digest()
     random = bytes.fromhex(
         "CF 21 AD 74 E5 9A 61 11 BE 1D 8C 02 1E 65 B8 91"

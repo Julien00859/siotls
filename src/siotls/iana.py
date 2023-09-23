@@ -89,7 +89,6 @@ class ContentType(Hex1Enum):
 class HandshakeType(Hex1Enum):
     CLIENT_HELLO = 1
     SERVER_HELLO = 2
-    HELLO_RETRY_REQUEST = 2
     NEW_SESSION_TICKET = 4
     END_OF_EARLY_DATA = 5
     ENCRYPTED_EXTENSIONS = 8
@@ -99,6 +98,10 @@ class HandshakeType(Hex1Enum):
     FINISHED = 20
     KEY_UPDATE = 24
     MESSAGE_HASH = 254
+
+
+class HandshakeType_(Hex1Enum):
+    HELLO_RETRY_REQUEST = 2
 
 
 class HeartbeatMessageType(Hex1Enum):

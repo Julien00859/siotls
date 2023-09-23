@@ -43,9 +43,13 @@ class Handshake(Content, Serializable):
             cls = _handshake_registry[HandshakeType(msg_type)]
         except ValueError as exc:
             raise alerts.UnrecognizedName() from exc
-        if (msg_type == HandshakeType.SERVER_HELLO
-            and HelloRetryRequest.is_hrr(msg_type, length)):
-            cls = HelloRetryRequest
+
+        # ServerHello and HelloRetryRequest share the same handshake id,
+        # their "random" field is used to distingate the two
+        if msg_type == HandshakeType.SERVER_HELLO:
+            with stream.lookahead(), stream.limit(length):
+                if stream.read_exactly(34)[2:] == HelloRetryRequest.random:
+                    cls = HelloRetryRequest
 
         with stream.limit(length):
             return cls.parse_body(stream)

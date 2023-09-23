@@ -1,14 +1,15 @@
 import textwrap
 from typing import Literal
-from siotls.iana import HandshakeType, ExtensionType
+from siotls.iana import HandshakeType, HandshakeType_, ExtensionType
 from siotls.serial import Serializable, SerializableBody
+from siotls.contents import alerts
 
 
 ANY_HANDSHAKE = -1
 _extension_registry = {}
 
 class Extension(Serializable):
-    _handshake_types: set[HandshakeType | Literal[ANY_HANDSHAKE]]
+    _handshake_types: set[HandshakeType | HandshakeType_ | Literal[ANY_HANDSHAKE]]
     _struct = textwrap.dedent("""
         struct {
             ExtensionType extension_type;
@@ -56,14 +57,16 @@ class Extension(Serializable):
                 registry[handshake_name] = cls
 
     @classmethod
-    def parse(abc, stream, *, handshake_name):
+    def parse(abc, stream, *, handshake_type):
         extension_type = stream.read_int(2)
 
         if registry := _extension_registry.get(extension_type):
             try:
-                cls = registry.get(ANY_HANDSHAKE) or registry[handshake_name]
+                cls = registry.get(ANY_HANDSHAKE) or registry[handshake_type.name]
             except KeyError:
-                raise NotImplementedError("todo")
+                msg = (f"cannot receive extension {extension_type!r} "
+                       f"with handshake {handshake_type.name}")
+                raise alerts.IllegalParameter(msg)
         else:
             cls = type(
                 f'UnkonwnExtension{extension_type}',
@@ -130,4 +133,4 @@ from .psk_key_exchange_modes import PskKeyExchangeModes
 from .certificate_authorities import CertificateAuthorities
 from .oid_filters import OIDFilters, OIDFilter
 from .post_handshake_auth import PostHandshakeAuth
-from .key_share import KeyShareRequest, KeyShareResponse, KeyShareEntry
+from .key_share import KeyShareRequest, KeyShareResponse, KeyShareRetry
