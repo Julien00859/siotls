@@ -1,7 +1,5 @@
-from cryptography.hazmat.primitives.asymmetric import dh
-
 from siotls import alerts
-from siotls.crypto import ffdhe
+from siotls.crypto import key_share
 from siotls.iana import (
     TLSVersion,
     ContentType,
@@ -57,23 +55,24 @@ client_sm = r"""
 
 
 class ClientStart(State):
-    is_encrypted = False
-
     def initiate_connection(self):
 
-        client_hello = ClientHello(self.random, self.config.cipher_suites, [
-            SupportedVersionsRequest([TLSVersion.TLS_1_3]),
-        ])
+        client_hello = ClientHello(
+            self._nonce,
+            self.config.cipher_suites, [
+                SupportedVersionsRequest([TLSVersion.TLS_1_3]),
+            ]
+        )
 
         if self._cookie:
             client_hello.extensions.append(Cookie(self._cookie))
 
-        if self.host_names:
+        if self.config.hostnames:
             client_hello.extensions.append(ServerNameList([
-                HostName(host_name) for host_name in self.host_names
+                HostName(hostname) for hostname in self.hostnames
             ]))
 
-        if self._pre_shared_key:
+        if self.secrets.pre_shared_key:
             raise NotImplementedError("todo")
             client_hello.extensions.extend([
                 PskKeyExchangeModes(...),
@@ -101,45 +100,26 @@ class ClientStart(State):
         # to a HelloRetryRequest.
 
         entries = []
-        has_seen_secp = False
-        has_seen_x = False
-        has_seen_ff = False
+        has_seen_ecdhe = False
+        has_seen_ffdhe = False
 
-        for group in self.config.key_exchanges:
-            if NamedGroup.is_secp(group) and not has_seen_secp:
-                privkey, key_exchange = self._make_key_exchange_secp(group)
-                has_seen_secp = True
-            elif NamedGroup.is_x(group) and not has_seen_x:
-                privkey, key_exchange = self._make_key_exchange_x(group)
-                has_seen_x = True
-            elif NamedGroup.is_ff(group) and not has_seen_ff:
-                privkey, key_exchange = self._make_key_exchange_ff(group)
-                has_seen_ff = True
+        for key_exchange in self.config.key_exchanges:
+            if key_exchange.is_ff() and not has_seen_ffdhe:
+                has_seen_ffdhe = True
+            elif not key_exchange.is_ff() and not has_seen_ecdhe:
+                has_seen_ecdhe = True
             else:
                 continue
-            self._key_exchange_privkeys[group] = privkey
-            entries.append(KeyShareEntry(group, key_exchange))
+
+            private_key, my_key_share = key_share.init(key_exchange)
+            self._key_exchange_privkeys[key_exchange] = private_key
+            entries.append(KeyShareEntry(key_exchange, my_key_share))
 
         return entries
 
-    def _make_key_exchange_secp(self, group):
-        raise NotImplementedError("todo")
 
-    def _make_key_exchange_x(self, group):
-        raise NotImplementedError("todo")
-
-    def _make_key_exchange_ff(self, group):
-        p, g, q, p_length, min_key_length = ffdhe.groups[group]
-        params = dh.DHParameterNumbers(p, q).parameters()
-        privkey = params.generate_private_key()
-
-        y = privkey.public_key().public_numbers().y
-        key_exchange = y.to_bytes(p_length, 'big')
-
-        return privkey, key_exchange
 
 class ClientWaitSh(State):
-    is_encrypted = False
     can_send_application_data = False
 
     def process(self, content):
@@ -163,35 +143,28 @@ class ClientWaitSh(State):
 
 
 class ClientWaitEe(State):
-    is_encrypted = True
     can_send_application_data = False
 
 
 class ClientWaitCertCr(State):
-    is_encrypted = True
     can_send_application_data = False
 
 
 class ClientWaitCert(State):
-    is_encrypted = True
     can_send_application_data = False
 
 
 class ClientWaitCv(State):
-    is_encrypted = True
     can_send_application_data = False
 
 
 class ClientWaitFinished(State):
-    is_encrypted = True
     can_send_application_data = False
 
 
 class ClientConnected(State):
-    is_encrypted = True
     can_send_application_data = True
 
 
 class ClientClosed(State):
-    is_encrypted = False
     can_send_application_data = False

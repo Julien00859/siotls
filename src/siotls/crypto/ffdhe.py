@@ -1,3 +1,9 @@
+"""
+RFC 7919 - Negotiated Finite Field Diffie-Hellman Ephemeral Parameters
+for Transport Layer Security (TLS)
+"""
+
+
 import collections
 import functools
 from siotls.iana import NamedGroup
@@ -297,8 +303,7 @@ groups = {
 
 
 if __name__ == '__main__':
-    # Test code, assert that the constants are what they claim to be:
-    # "safe" primes, i.e. primes numbers
+    # assert that the constants are what they claim to be: safe primes
 
     from sympy import isprime  # pip install sympy
 

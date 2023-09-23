@@ -3,6 +3,7 @@ try:
     from enum import StrEnum
 except ImportError:
     StrEnum = str
+import hashlib
 
 
 class Hex1Enum(enum.IntEnum):
@@ -62,6 +63,18 @@ class CipherSuites(Hex2Enum):
     TLS_AES_128_CCM_SHA256 = 0x1304
     TLS_AES_128_CCM_8_SHA256 = 0x1305
 
+    @property
+    def digest(self):
+        return _cipher_digest_map[self]
+
+_cipher_digest_map = {
+    CipherSuites.TLS_AES_128_GCM_SHA256: hashlib.sha256,
+    CipherSuites.TLS_AES_256_GCM_SHA384: hashlib.sha384,
+    CipherSuites.TLS_CHACHA20_POLY1305_SHA256: hashlib.sha256,
+    CipherSuites.TLS_AES_128_CCM_SHA256: hashlib.sha256,
+    CipherSuites.TLS_AES_128_CCM_8_SHA256: hashlib.sha256,
+}
+
 
 class ContentType(Hex1Enum):
     INVALID = 0
@@ -76,6 +89,7 @@ class ContentType(Hex1Enum):
 class HandshakeType(Hex1Enum):
     CLIENT_HELLO = 1
     SERVER_HELLO = 2
+    HELLO_RETRY_REQUEST = 2
     NEW_SESSION_TICKET = 4
     END_OF_EARLY_DATA = 5
     ENCRYPTED_EXTENSIONS = 8
@@ -126,10 +140,10 @@ class NameType(Hex1Enum):
 
 
 class MaxFragmentLength(Hex1Enum):
-    LIMIT_512 = 1
-    LIMIT_1024 = 2
-    LIMIT_2048 = 3
-    LIMIT_4096 = 4
+    MAX_512 = 1
+    MAX_1024 = 2
+    MAX_2048 = 3
+    MAX_4096 = 4
 
 
 class CertificateStatusType(Hex1Enum):
@@ -151,17 +165,17 @@ class NamedGroup(Hex2Enum):
     ffdhe6144 = 0x0103
     ffdhe8192 = 0x0104
 
-    @classmethod
-    def is_secp(cls, group):
-        return cls.secp256r1 <= group <= cls.secp521r1
+    @property
+    def is_sec(self):
+        return type(self).secp256r1 <= self <= type(self).secp521r1
 
-    @classmethod
-    def is_x(cls, group):
-        return cls.x25519 <= group <= cls.x448
+    @property
+    def is_x(self):
+        return type(self).x25519 <= self <= type(self).x448
 
-    @classmethod
-    def is_ff(cls, group):
-        return cls.ffdhe2048 <= group <= cls.ffdhe8192
+    @property
+    def is_ff(self):
+        return type(self).ffdhe2048 <= self <= type(self).ffdhe8192
 
 
 class SignatureScheme(Hex2Enum):

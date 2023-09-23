@@ -11,7 +11,6 @@ from siotls.iana import (
     SignatureScheme,
     NamedGroup,
     ALPNProtocol,
-    MaxFragmentLength,
 )
 from siotls.serial import SerializationError, TooMuchData, SerialIO
 from .contents import Content, ApplicationData, alerts
@@ -19,14 +18,14 @@ from .states import ClientStart, ServerStart
 
 
 logger = logging.getLogger(__name__)
-DEFAULT_MAX_FRAGMENT_LENGTH = 16384
+SERVER_MAX_FRAGMENT_LENGTH = 16384
 
 
 def starswith_change_cipher_spec(data):
     return data[0:1] == b'\x14' and data[3:6] == b'\x00\x01\x01'
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass()
 class TLSConfiguration:
     side: typing.Literal['client', 'server']
 
@@ -48,11 +47,12 @@ class TLSConfiguration:
 
     # extensions
     max_fragment_length: typing.Literal[
-        512, 1024, 2048, 4096, DEFAULT_MAX_FRAGMENT_LENGTH,
-    ] = DEFAULT_MAX_FRAGMENT_LENGTH
+        512, 1024, 2048, 4096, SERVER_MAX_FRAGMENT_LENGTH,
+    ] = SERVER_MAX_FRAGMENT_LENGTH
     can_send_heartbeat: bool = False
     can_echo_heartbeat: bool = True
-    alpn: list[ALPNProtocol] | None = None
+    alpn: list[ALPNProtocol] = dataclasses.field(default_factory=list)
+    hostnames: list[bytes] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -60,30 +60,61 @@ class TLSNegociatedConfiguration:
     cipher_suite: CipherSuites
     digital_signature: SignatureScheme
     key_exchange: NamedGroup
-    shared_secret: bytes
     alpn: ALPNProtocol | None
     can_send_heartbeat: bool
     can_echo_heartbeat: bool
     max_fragment_length: int
 
+    @property
+    def digestmod(self):
+        return cipher_hash_map[self.cipher_suite]
+
+
+@dataclasses.dataclass()
+class TLSSecrets:
+    pre_shared_key: bytes = b''
+    shared_key: bytes | None = None
+
+    binder_key: bytes | None = None
+    client_early_traffic: bytes | None = None
+    early_exporter_master: bytes | None = None
+    client_handshake_traffic: bytes | None = None
+    server_handshake_traffic: bytes | None = None
+    client_application_traffic: bytes | None = None
+    server_application_traffic: bytes | None = None
+    exporter_master: bytes | None = None
+    resumption_master: bytes | None = None
+
 
 class TLSConnection:
-    def __init__(self, config, host_names=(), pre_shared_key=None):
+    def __init__(self, config, pre_shared_key=b'', **config_changes):
+        config = dataclasses.replace(config, **config_changes)
+        if config.side == 'server':
+            if config.max_fragment_length != SERVER_MAX_FRAGMENT_LENGTH:
+                msg = "max fragment length is only configurable client side"
+                raise ValueError(msg)
+
         self.config = config
         self.nconfig = None
-        self.host_names = host_names
-        self._cookie = None
-        self._pre_shared_key = pre_shared_key
-        self._key_exchange_privkeys = {}
-        self._random = secrets.token_bytes(32)
+        self.secrets = TLSSecrets(pre_shared_key)
+        self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
+
+        self._nonce = secrets.token_bytes(32)
         self._input_data = bytearray()
         self._input_handshake = bytearray()
         self._output_data = bytearray()
-        self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
+
+        self._cookie = None
+        self._key_exchange_privkeys = {}
+        self._pre_shared_key = pre_shared_key
+
+        self._transcript = b''  # until we know digestmod
+        self._transcript_hash = None
+
 
     @property
     def is_encrypted(self):
-        return self.state.is_encrypted
+        return self.nconfig is not None
 
     @property
     def max_fragment_length(self):
@@ -219,16 +250,16 @@ class TLSConnection:
                    f"{len(self._input_handshake)} read.")
             raise TooMuchData(msg)
 
-        content_data = self._input_handshake
+        record_data = self._input_handshake
         self._input_handshake = bytearray()
-        return content_type, content_data
+        self._transcript_hash.update(record_data)
+        return content_type, record_data[4:]
 
     def _send_content(self, content: Content):
-        data = (
-            self.encrypt(content)
-            if self.is_encrypted else
-            content.serialize()
-        )
+        data = content.serialize()
+        self._transcript_hash.update(data)
+        if self.is_encrypted:
+            data = self.encrypt(data)
 
         if len(data) < self.max_fragment_length:
             iter_fragments = (data,)
@@ -257,3 +288,13 @@ class TLSConnection:
             )
             for fragment in iter_fragments
         ))
+
+    def _setup_transcript_hash(self, digestmod):
+        self._transcript_hash = digestmod(self._transcript)
+        del self._transcript
+
+    def _update_transcript_hash(self, data):
+        if self._transcript_hash:
+            self._transcript_hash.update(data)
+        else:
+            self._transcript += data

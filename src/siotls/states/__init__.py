@@ -1,5 +1,4 @@
 class State:
-    is_encrypted: bool
     can_send_application_data: bool
 
     def __init__(self, connection):

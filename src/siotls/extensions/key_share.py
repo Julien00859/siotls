@@ -90,7 +90,7 @@ class KeyShareRetry(Extension, SerializableBody):
 
 class KeyShareResponse(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
-    _handshake_types = {HT.SERVER_HELLO}
+    _handshake_types = {HT.HELLO_RETRY_REQUEST}
 
     _struct = textwrap.dedent("""\
         struct {

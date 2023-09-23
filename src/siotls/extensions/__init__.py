@@ -46,20 +46,22 @@ class Extension(Serializable):
         super().__init_subclass__(**kwargs)
         if register and Extension in cls.__bases__:
             for handshake_type in cls._handshake_types:
+                handshake_name = handshake_type.name
                 registry = _extension_registry.setdefault(cls.extension_type, {})
-                if registry.get(handshake_type, None) not in (cls, None):
-                    msg = ("Cannot register another parser for pair "
-                          f"{handshake_type}/{cls.extension_type}")
+                if (x:=registry.get(handshake_name, None)) not in (cls, None):
+                    msg =(f"Cannot register {cls} at pair "
+                          f"({handshake_name}, {cls.extension_type.name}), "
+                          f"another exist already: {x}")
                     raise ValueError(msg)
-                registry[handshake_type] = cls
+                registry[handshake_name] = cls
 
     @classmethod
-    def parse(abc, stream, *, handshake_type):
+    def parse(abc, stream, *, handshake_name):
         extension_type = stream.read_int(2)
 
         if registry := _extension_registry.get(extension_type):
             try:
-                cls = registry.get(ANY_HANDSHAKE) or registry[handshake_type]
+                cls = registry.get(ANY_HANDSHAKE) or registry[handshake_name]
             except KeyError:
                 raise NotImplementedError("todo")
         else:
