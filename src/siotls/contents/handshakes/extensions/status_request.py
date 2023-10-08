@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, CertificateStatusType
 from siotls.serial import SerializableBody
 from . import Extension
-from ..contents import alerts
+from .. import alerts
 
 
 _status_request_registry = {}

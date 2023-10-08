@@ -5,8 +5,8 @@ from siotls.iana import (
     ContentType,
     HandshakeType,
 )
-from siotls.handshakes import ClientHello, HelloRetryRequest
-from siotls.extensions import (
+from siotls.contents.handshakes import ClientHello, HelloRetryRequest
+from siotls.contents.handshakes.extensions import (
     SupportedVersionsRequest,
     PreSharedKeyRequest, PskKeyExchangeModes,
     SignatureAlgorithms,
@@ -122,9 +122,9 @@ class ClientWaitSh(State):
     can_send_application_data = False
 
     def process(self, content):
-        if content.msg_type != ContentType.HANDSHAKE:
+        if content.content_type != ContentType.HANDSHAKE:
             raise alerts.UnexpectedMessage()
-        if content.handshake_type != HandshakeType.SERVER_HELLO:
+        if content.msg_type != HandshakeType.SERVER_HELLO:
             raise alerts.UnexpectedMessage()
 
         if content.random == HelloRetryRequest.random:

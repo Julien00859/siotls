@@ -1,9 +1,9 @@
 import logging
 from socket import socket
 import secrets
-from siotls.connection import TLSConnection
+from siotls.connection import TLSConfiguration, TLSConnection
 from siotls.contents import alerts
-from siotls.handshakes import ServerHello
+from siotls.contents.handshakes import ServerHello
 from siotls.utils import hexdump
 from siotls.iana import (
     HandshakeType as HT,
@@ -40,7 +40,9 @@ def serve(host, port, tlscert, tlskey):
 
 
 def handle_one(client, client_info):
-    conn = TLSConnection(config=None)
+    config = TLSConfiguration('server')
+    conn = TLSConnection(config)
+    conn.initiate_connection()
     message = client.recv(16384)
     logger.info("%s bytes from %s:\n%s", len(message), client_info[1], hexdump(message))
 

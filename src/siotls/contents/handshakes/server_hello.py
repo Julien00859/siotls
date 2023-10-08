@@ -5,10 +5,10 @@ from siotls.iana import (
     CipherSuites, HandshakeType, HandshakeType_, TLSVersion, ExtensionType
 )
 from siotls.serial import SerialIO, SerializableBody
-from siotls.utils import sentinel_raise_exception, try_cast
+from siotls.utils import try_cast
+from .extensions import Extension
 from . import Handshake
-from ..contents import alerts
-from ..extensions import Extension
+from .. import alerts
 
 logger = logging.getLogger(__name__)
 
@@ -96,15 +96,6 @@ class ServerHello(Handshake, SerializableBody):
             len(extensions).to_bytes(2, 'big'),
             extensions,
         ])
-
-    def get_extension(self, extension_id, default=sentinel_raise_exception):
-        for extension in self.extensions:
-            if extension.extension_id == extension_id:
-                return extension
-        if default is not sentinel_raise_exception:
-            msg = f"Extension {extension_id} not present."
-            raise LookupError(msg)
-        return default
 
 
 class HelloRetryRequest(ServerHello):

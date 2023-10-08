@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, NameType
 from siotls.serial import Serializable, SerializableBody, SerialIO
 from . import Extension
-from ..contents import alerts
+from .. import alerts
 
 
 logger = logging.getLogger(__name__)

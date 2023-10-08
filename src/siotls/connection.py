@@ -251,12 +251,12 @@ class TLSConnection:
 
         record_data = self._input_handshake
         self._input_handshake = bytearray()
-        self._transcript_hash.update(record_data)
-        return content_type, record_data[4:]
+        self._update_transcript_hash(record_data)
+        return content_type, record_data
 
     def _send_content(self, content: Content):
         data = content.serialize()
-        self._transcript_hash.update(data)
+        self._update_transcript_hash(data)
         if self.is_encrypted:
             data = self.encrypt(data)
 

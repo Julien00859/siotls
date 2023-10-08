@@ -8,7 +8,7 @@ from siotls.iana import (
     TLSVersion,
 )
 from siotls.contents import alerts, ChangeCipherSpec
-from siotls.handshakes import (
+from siotls.contents.handshakes import (
     HelloRetryRequest,
     ServerHello,
     EncryptedExtensions,
@@ -16,7 +16,7 @@ from siotls.handshakes import (
     CertificateVerify,
     Finished,
 )
-from siotls.extensions import (
+from siotls.contents.handshakes.extensions import (
     SupportedVersionsResponse,
     KeyShareResponse, KeyShareRetry
 )
@@ -84,9 +84,9 @@ class ServerWaitCh(State):
     def process(self, client_hello):
         from siotls.connection import TLSNegociatedConfiguration  # noqa
 
-        if client_hello.msg_type != ContentType.HANDSHAKE:
+        if client_hello.content_type != ContentType.HANDSHAKE:
             raise alerts.UnexpectedMessage()
-        if client_hello.handshake_type != HandshakeType.CLIENT_HELLO:
+        if client_hello.msg_type != HandshakeType.CLIENT_HELLO:
             raise alerts.UnexpectedMessage()
 
         if psk := client_hello.extensions.get(ExtensionType.PRE_SHARED_KEY):  # noqa: F841
@@ -98,14 +98,17 @@ class ServerWaitCh(State):
         if self._is_first_client_hello:
             self._setup_transcript_hash(nconfig.cipher_suite.digest)
 
-        if not self._can_resume_key_share(client_hello):
+        if not self._can_resume_key_share(client_hello, nconfig.key_exchange):
             self._send_hello_retry_request()
             return
 
         clear_extensions, encrypted_extensions = (
             self._negociate_extensions(client_hello.extensions, nconfig))
 
-        key_share_response = self._resume_key_share()
+        key_share_response = self._resume_key_share(
+            client_hello.extensions[ExtensionType.KEY_SHARE],
+            nconfig.key_exchange
+        )
         clear_extensions.append(key_share_response)
 
         self._send_content(ServerHello(
@@ -162,7 +165,7 @@ class ServerWaitCh(State):
             if group in supported_groups.named_group_list:
                 return group
 
-    def _find_common_cipher(self, client_hello):
+    def _find_common_cipher_suite(self, client_hello):
         for cipher_suite in self.config.cipher_suites:
             if cipher_suite in client_hello.cipher_suites:
                 return cipher_suite

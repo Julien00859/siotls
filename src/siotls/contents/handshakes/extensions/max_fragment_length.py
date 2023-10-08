@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, MaxFragmentLength
 from siotls.serial import SerializableBody, SerializationError
 from . import Extension
-from ..contents import alerts
+from .. import alerts
 
 to_int = {
     MaxFragmentLength.MAX_512: 512,

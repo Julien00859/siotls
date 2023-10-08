@@ -170,17 +170,14 @@ class NamedGroup(Hex2Enum):
     ffdhe6144 = 0x0103
     ffdhe8192 = 0x0104
 
-    @property
-    def is_sec(self):
-        return type(self).secp256r1 <= self <= type(self).secp521r1
+    def is_sec(named_group):
+        return NamedGroup.secp256r1 <= named_group <= NamedGroup.secp521r1
 
-    @property
-    def is_x(self):
-        return type(self).x25519 <= self <= type(self).x448
+    def is_x(named_group):
+        return NamedGroup.x25519 <= named_group <= NamedGroup.x448
 
-    @property
-    def is_ff(self):
-        return type(self).ffdhe2048 <= self <= type(self).ffdhe8192
+    def is_ff(named_group):
+        return NamedGroup.ffdhe2048 <= named_group <= NamedGroup.ffdhe8192
 
 
 class SignatureScheme(Hex2Enum):

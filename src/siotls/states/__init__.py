@@ -7,7 +7,7 @@ class State:
     def __getattr__(self, name):
         if hasattr(self.connection, name):
             return getattr(self.connection, name)
-        return object.__getattr__(self, name)
+        return object.__getattribute__(self, name)
 
     def __setattr__(self, name, value):
         return setattr(self.connection, name, value)

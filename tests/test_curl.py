@@ -3,11 +3,11 @@ import shutil
 import socket
 import subprocess as sp
 import unittest
-from siotls.connection import TLSConnection
+from siotls.connection import TLSConfiguration, TLSConnection
 
 HOST = '127.0.0.2'
 PORT = 8446
-CURL_PATH = None#shutil.which('curl')
+CURL_PATH = shutil.which('curl')
 
 
 def curl(
@@ -57,11 +57,12 @@ class TestCURL(unittest.TestCase):
         self.socket.settimeout(1)
 
     def test_truc(self):
-        conn = TLSConnection(config=None)
-        curl()
-        client, client_info = self.socket.accept()
+        config = TLSConfiguration('server')
+        conn = TLSConnection(config)
+        conn.initiate_connection()
+        proc = curl()
+        self.client, client_info = self.socket.accept()
 
-        data = client.recv(256)
-        print(len(data))
-        client.close()
+        data = self.client.recv(16384)
         records = conn.receive_data(data)
+        self.client.close()

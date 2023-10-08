@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, HeartbeatMode
 from siotls.serial import SerializableBody, SerializationError
 from . import Extension
-from ..contents import alerts
+from .. import alerts
 
 
 @dataclass(init=False)
