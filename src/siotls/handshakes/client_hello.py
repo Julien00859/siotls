@@ -3,7 +3,7 @@ import textwrap
 from dataclasses import dataclass
 from siotls.iana import CipherSuites, HandshakeType, ExtensionType, TLSVersion
 from siotls.serial import SerializableBody, SerialIO
-from siotls.utils import try_cast, sentinel_raise_exception
+from siotls.utils import try_cast
 from . import Handshake
 from ..contents import alerts
 from ..extensions import Extension

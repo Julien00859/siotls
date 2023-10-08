@@ -1,7 +1,7 @@
 import textwrap
 from dataclasses import dataclass
 from siotls.iana import ContentType, HeartbeatMessageType
-from siotls.serial import Serializable, SerialIO
+from siotls.serial import Serializable
 from . import Content, alerts
 
 

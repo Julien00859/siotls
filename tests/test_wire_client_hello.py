@@ -1,13 +1,10 @@
 import unittest
 from siotls.handshakes import Handshake, ClientHello
 from siotls.iana import (
-    HandshakeType,
     ExtensionType,
-    TLSVersion,
     CipherSuites,
 )
 from siotls.serial import SerialIO
-from siotls.utils import hexdump
 
 
 class TestWireExtension(unittest.TestCase):
@@ -35,10 +32,6 @@ class TestWireExtension(unittest.TestCase):
 
         handshake = Handshake.parse(stream)
         self.assertEqual(stream.read(), b'', "stream should be at end of file")
-        from pprint import pp
-        print()
-        pp(handshake)
-        print()
 
         client_hello = ClientHello(
             random=bytes.fromhex("""

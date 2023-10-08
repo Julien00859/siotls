@@ -17,7 +17,7 @@ class Content:
         return _content_registry[ContentType(content_type)]
 
 
-# ruff: isort: off
+# ruff: noqa: F401, E402
 from .change_cipher_spec import ChangeCipherSpec
 from .alerts import Alert
 from ..handshakes import Handshake

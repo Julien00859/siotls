@@ -1,5 +1,4 @@
 import logging
-from pprint import pp
 from socket import socket
 import secrets
 from siotls.connection import TLSConnection

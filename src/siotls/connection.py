@@ -68,10 +68,6 @@ class TLSNegociatedConfiguration:
     can_echo_heartbeat: bool
     max_fragment_length: int
 
-    @property
-    def digestmod(self):
-        return cipher_hash_map[self.cipher_suite]
-
 
 @dataclasses.dataclass()
 class TLSSecrets:

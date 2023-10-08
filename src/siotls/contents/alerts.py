@@ -1,7 +1,7 @@
 import textwrap
 from dataclasses import dataclass
 from siotls.iana import AlertLevel, AlertDescription, ContentType
-from siotls.serial import SerialIO, Serializable
+from siotls.serial import Serializable
 from . import Content
 
 

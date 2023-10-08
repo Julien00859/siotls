@@ -19,7 +19,7 @@ class State:
         raise NotImplementedError("cannot process content in this state")
 
 
-# ruff: isort: off
+# ruff: noqa: F401, E402
 from .client import (
     ClientStart,
     ClientWaitSh,
