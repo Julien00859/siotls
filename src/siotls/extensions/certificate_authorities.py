@@ -1,9 +1,11 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT
 from siotls.serial import SerializableBody
 from . import Extension
 
 
+@dataclass(init=False)
 class CertificateAuthorities(Extension, SerializableBody):
     extension_type = ExtensionType.CERTIFICATE_AUTHORITIES
     _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}

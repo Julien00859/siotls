@@ -1,4 +1,5 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, SignatureScheme
 from siotls.serial import SerializableBody
 from siotls.utils import try_cast
@@ -34,11 +35,13 @@ class _SignAlgoMixin(SerializableBody):
         ])
 
 
+@dataclass(init=False)
 class SignatureAlgorithms(Extension, _SignAlgoMixin):
     extension_type = ExtensionType.SIGNATURE_ALGORITHMS
     _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
 
 
+@dataclass(init=False)
 class SignatureAlgorithmsCert(Extension, _SignAlgoMixin):
     extension_type = ExtensionType.SIGNATURE_ALGORITHMS_CERT
     _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}

@@ -1,4 +1,5 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.contents import alerts
 from siotls.iana import (
     ExtensionType,
@@ -19,6 +20,7 @@ sizes = {
 }
 
 
+@dataclass(init=False)
 class KeyShareRequest(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
     _handshake_types = {HT.CLIENT_HELLO}
@@ -65,6 +67,7 @@ class KeyShareRequest(Extension, SerializableBody):
         ])
 
 
+@dataclass(init=False)
 class KeyShareRetry(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
     _handshake_types = {HT_.HELLO_RETRY_REQUEST}
@@ -93,6 +96,7 @@ class KeyShareRetry(Extension, SerializableBody):
         return self.selected_group.to_bytes(2, 'big')
 
 
+@dataclass(init=False)
 class KeyShareResponse(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
     _handshake_types = {HT.SERVER_HELLO}

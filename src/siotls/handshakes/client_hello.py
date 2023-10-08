@@ -1,5 +1,6 @@
 import logging
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import CipherSuites, HandshakeType, ExtensionType, TLSVersion
 from siotls.serial import SerializableBody, SerialIO
 from siotls.utils import try_cast, sentinel_raise_exception
@@ -10,6 +11,7 @@ from ..extensions import Extension
 logger = logging.getLogger(__name__)
 
 
+@dataclass(init=False)
 class ClientHello(Handshake, SerializableBody):
     msg_type = HandshakeType.CLIENT_HELLO
     _struct = textwrap.dedent("""
@@ -35,9 +37,9 @@ class ClientHello(Handshake, SerializableBody):
     legacy_compression_methods: bytes = b'\x00'  # "null" compression method
     extensions: dict[ExtensionType | int, Extension]
 
-    def __init__(self, random_, cipher_suites, extensions: list[Extension]):
+    def __init__(self, random, cipher_suites, extensions: list[Extension]):
         self.legacy_version = type(self).legacy_version
-        self.random = random_
+        self.random = random
         self.legacy_session_id = type(self).legacy_session_id
         self.cipher_suites = cipher_suites
         self.legacy_compression_methods = type(self).legacy_compression_methods
@@ -50,7 +52,7 @@ class ClientHello(Handshake, SerializableBody):
             raise alerts.ProtocolVersion()
         legacy_version = TLSVersion(legacy_version)
 
-        random_ = stream.read_exactly(32)
+        random = stream.read_exactly(32)
         legacy_session_id = stream.read_var(1)
 
         cipher_suites = [
@@ -69,12 +71,12 @@ class ClientHello(Handshake, SerializableBody):
             logger.debug("Found extension %s", extension)
             extensions.append(extension)
 
-        self = cls(random_, cipher_suites, extensions)
+        self = cls(random, cipher_suites, extensions)
         self.legacy_session_id = legacy_session_id
         return self
 
     def serialize_body(self):
-        extensions = b''.join((ext.serialize() for ext in self.extensions))
+        extensions = b''.join((ext.serialize() for ext in self.extensions.values()))
 
         return b''.join([
             self.legacy_version.to_bytes(2, 'big'),

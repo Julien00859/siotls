@@ -1,4 +1,5 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType as HT, CertificateType
 from siotls.serial import SerializableBody, SerializationError
@@ -50,6 +51,7 @@ class _CertificateTypeResponse(SerializableBody):
     def serialize_body(self):
         return self.certificate_type.to_bytes(1, 'big')
 
+@dataclass(init=False)
 class ClientCertificateTypeRequest(Extension, _CertificateTypeRequest):
     extension_type = ExtensionType.CLIENT_CERTIFICATE_TYPE
     _struct = textwrap.dedent("""\
@@ -58,6 +60,7 @@ class ClientCertificateTypeRequest(Extension, _CertificateTypeRequest):
         } ClientCertTypeExtension;
     """).strip()
 
+@dataclass(init=False)
 class ClientCertificateTypeResponse(Extension, _CertificateTypeResponse):
     extension_type = ExtensionType.CLIENT_CERTIFICATE_TYPE
     _struct = textwrap.dedent("""\
@@ -66,6 +69,7 @@ class ClientCertificateTypeResponse(Extension, _CertificateTypeResponse):
         } ClientCertTypeExtension;
     """).strip()
 
+@dataclass(init=False)
 class ServerCertificateTypeRequest(Extension, _CertificateTypeRequest):
     extension_type = ExtensionType.SERVER_CERTIFICATE_TYPE
     _struct = textwrap.dedent("""\
@@ -74,6 +78,7 @@ class ServerCertificateTypeRequest(Extension, _CertificateTypeRequest):
         } ServerCertTypeExtension;
     """).strip()
 
+@dataclass(init=False)
 class ServerCertificateTypeResponse(Extension, _CertificateTypeResponse):
     extension_type = ExtensionType.SERVER_CERTIFICATE_TYPE
     _struct = textwrap.dedent("""\

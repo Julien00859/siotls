@@ -2,6 +2,7 @@ import contextlib
 import logging
 import textwrap
 import idna
+from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, NameType
 from siotls.serial import Serializable, SerializableBody, SerialIO
 from . import Extension
@@ -11,6 +12,7 @@ from ..contents import alerts
 logger = logging.getLogger(__name__)
 _server_name_registry = {}
 
+@dataclass(init=False)
 class ServerName(Serializable):
     _struct = textwrap.dedent("""
         struct {
@@ -76,6 +78,7 @@ class HostName(ServerName, SerializableBody):
             idna.encode(self.host_name, uts46=True),
         ])
 
+@dataclass(init=False)
 class ServerNameList(Extension, SerializableBody):
     extension_type = ExtensionType.SERVER_NAME
     _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}

@@ -8,7 +8,7 @@ from siotls.extensions import (
     SupportedVersionsRequest,
     PskKeyExchangeModes,
     PostHandshakeAuth,
-    KeyShareRequest, KeyShareEntry,
+    KeyShareRequest,
 )
 from siotls.iana import (
     HandshakeType,
@@ -123,13 +123,10 @@ class TestWireExtension(unittest.TestCase):
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
         self.assertEqual(stream.read(), b'', "stream should be at end of file")
-        self.assertEqual(ext, KeyShareRequest([
-            KeyShareEntry(
-                NamedGroup.x25519,
-                bytes.fromhex("""
-                    ad4061d3f71e40a1bacce42538e303abadbc2c9485fabbfada051b859e
-                    5e961b
-                """),
-            ),
-        ]))
+        self.assertEqual(ext, KeyShareRequest({
+            NamedGroup.x25519: bytes.fromhex("""
+                ad4061d3f71e40a1bacce42538e303abadbc2c9485fabbfada051b859e5e96
+                1b
+            """),
+        }))
         self.assertEqual(ext.serialize().hex(), payload)

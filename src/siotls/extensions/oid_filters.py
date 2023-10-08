@@ -1,4 +1,5 @@
 import textwrap
+from dataclasses import dataclass
 from typing import NamedTuple
 from siotls.iana import ExtensionType, HandshakeType as HT
 from siotls.serial import SerializableBody, SerialIO
@@ -10,6 +11,7 @@ class OIDFilter(NamedTuple):
     certificate_extension_values: bytes
 
 
+@dataclass(init=False)
 class OIDFilters(Extension, SerializableBody):
     extension_type = ExtensionType.OID_FILTERS
     _handshake_types = {HT.CERTIFICATE_REQUEST}

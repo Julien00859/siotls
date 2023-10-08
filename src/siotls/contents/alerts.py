@@ -1,4 +1,5 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import AlertLevel, AlertDescription, ContentType
 from siotls.serial import SerialIO, Serializable
 from . import Content
@@ -6,6 +7,7 @@ from . import Content
 
 _alert_registry = {}
 
+@dataclass(init=False)
 class Alert(Exception, Content, Serializable):
     content_type = ContentType.ALERT
     can_fragment = False

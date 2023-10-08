@@ -1,4 +1,5 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import ContentType, HandshakeType
 from siotls.serial import Serializable
 from ..contents import Content, alerts
@@ -6,6 +7,7 @@ from ..contents import Content, alerts
 
 _handshake_registry = {}
 
+@dataclass(init=False)
 class Handshake(Content, Serializable):
     content_type = ContentType.HANDSHAKE
     can_fragment = True

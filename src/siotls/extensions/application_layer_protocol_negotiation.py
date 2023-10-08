@@ -1,10 +1,12 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, ALPNProtocol
 from siotls.serial import SerializableBody
 from siotls.utils import try_cast, is_string
 from . import Extension
 
 
+@dataclass(init=False)
 class ApplicationLayerProtocolNegotiation(Extension, SerializableBody):
     extension_type = ExtensionType.APPLICATION_LAYER_PROTOCOL_NEGOTIATION
     _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}

@@ -1,10 +1,12 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, PskKeyExchangeMode
 from siotls.serial import SerializableBody
 from siotls.utils import try_cast
 from . import Extension
 
 
+@dataclass(init=False)
 class PskKeyExchangeModes(Extension, SerializableBody):
     extension_type = ExtensionType.PSK_KEY_EXCHANGE_MODES
     _handshake_types = {HT.CLIENT_HELLO}

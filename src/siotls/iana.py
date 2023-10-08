@@ -2,7 +2,8 @@ import enum
 try:
     from enum import StrEnum
 except ImportError:
-    StrEnum = str
+    class StrEnum(str, enum.Enum):
+        pass
 import hashlib
 
 
@@ -101,6 +102,7 @@ class HandshakeType(Hex1Enum):
 
 
 class HandshakeType_(Hex1Enum):
+    ANY = -1  # for when an extension can be present in any handshake
     HELLO_RETRY_REQUEST = 2
 
 

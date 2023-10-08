@@ -80,31 +80,6 @@ class Serializable(metaclass=abc.ABCMeta):
             if 'serialize' in cls.__dict__:
                 cls.serialize = serialize_verbose(cls.serialize)
 
-    def __repr__(self):
-        output = [type(self).__name__, '(']
-
-        for key, value in vars(self).items():
-            if key.startswith('_'):
-                continue
-            output.append(f'{key}={value!r}')
-            output.append(', ')
-
-        if output[-1] == ', ':
-            output.pop()
-        output.append(')')
-        return ''.join(output)
-
-    def __eq__(self, other):
-        if type(self) != type(other):
-            return False
-        notset = object()
-        for key, value in vars(self).items():
-            if key.startswith('_'):
-                continue
-            if value != getattr(other, key, notset):
-                return False
-        return True
-
 
 class SerializableBody(metaclass=abc.ABCMeta):
     _struct: str

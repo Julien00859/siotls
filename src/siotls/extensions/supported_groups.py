@@ -1,10 +1,12 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, NamedGroup
 from siotls.serial import SerializableBody
 from siotls.utils import try_cast
 from . import Extension
 
 
+@dataclass(init=False)
 class SupportedGroups(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_GROUPS
     _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}

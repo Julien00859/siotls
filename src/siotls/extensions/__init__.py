@@ -1,15 +1,16 @@
 import textwrap
+from dataclasses import dataclass
 from typing import Literal
 from siotls.iana import HandshakeType, HandshakeType_, ExtensionType
 from siotls.serial import Serializable, SerializableBody
 from siotls.contents import alerts
 
 
-ANY_HANDSHAKE = -1
 _extension_registry = {}
 
+@dataclass(init=False)
 class Extension(Serializable):
-    _handshake_types: set[HandshakeType | HandshakeType_ | Literal[ANY_HANDSHAKE]]
+    _handshake_types: set[HandshakeType | HandshakeType_]
     _struct = textwrap.dedent("""
         struct {
             ExtensionType extension_type;
@@ -62,7 +63,7 @@ class Extension(Serializable):
 
         if registry := _extension_registry.get(extension_type):
             try:
-                cls = registry.get(ANY_HANDSHAKE) or registry[handshake_type.name]
+                cls = registry.get(HandshakeType_.ANY.name) or registry[handshake_type.name]
             except KeyError:
                 msg = (f"cannot receive extension {extension_type!r} "
                        f"with handshake {handshake_type.name}")
@@ -88,7 +89,7 @@ class Extension(Serializable):
 
 
 class UnknownExtension(SerializableBody):
-    _handshake_types = {ANY_HANDSHAKE}
+    _handshake_types = {HandshakeType_.ANY}
 
     _struct = textwrap.dedent("""
         struct {

@@ -1,5 +1,6 @@
 import logging
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import (
     CipherSuites, HandshakeType, HandshakeType_, TLSVersion, ExtensionType
 )
@@ -12,6 +13,7 @@ from ..extensions import Extension
 logger = logging.getLogger(__name__)
 
 
+@dataclass(init=False)
 class ServerHello(Handshake, SerializableBody):
     msg_type = HandshakeType.SERVER_HELLO
 
@@ -37,9 +39,9 @@ class ServerHello(Handshake, SerializableBody):
     legacy_compression_methods: int = 0  # "null" compression method
     extensions: dict[ExtensionType, Extension]
 
-    def __init__(self, random_, cipher_suite, extensions: list[Extension]):
+    def __init__(self, random, cipher_suite, extensions: list[Extension]):
         self.legacy_version = type(self).legacy_version
-        self.random = random_
+        self.random = random
         self.legacy_session_id_echo = type(self).legacy_session_id_echo
         self.cipher_suite = cipher_suite
         self.legacy_compression_methods = type(self).legacy_compression_methods
@@ -52,7 +54,7 @@ class ServerHello(Handshake, SerializableBody):
             raise alerts.ProtocolVersion()
         legacy_version = TLSVersion(legacy_version)
 
-        random_ = stream.read_exactly(32)
+        random = stream.read_exactly(32)
         legacy_session_id_echo = stream.read_var(1)
 
         cipher_suite = try_cast(CipherSuites, stream.read_int(2))
@@ -68,11 +70,11 @@ class ServerHello(Handshake, SerializableBody):
             logger.debug("Found extension %s", extension)
             extensions.append(extension)
 
-        if random_ == HelloRetryRequest.random:
+        if random == HelloRetryRequest.random:
             cls = HelloRetryRequest
         else:
             cls = ServerHello
-        self = cls(random_, cipher_suite, extensions)
+        self = cls(random, cipher_suite, extensions)
         self.legacy_session_id_echo = legacy_session_id_echo
         return self
 

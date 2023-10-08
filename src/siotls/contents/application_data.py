@@ -1,9 +1,11 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import ContentType
 from siotls.serial import Serializable
 from . import Content
 
 
+@dataclass(init=False)
 class ApplicationData(Content, Serializable):
     content_type = ContentType.APPLICATION_DATA
     can_fragment = True

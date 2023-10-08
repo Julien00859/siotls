@@ -1,10 +1,12 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, HeartbeatMode
 from siotls.serial import SerializableBody, SerializationError
 from . import Extension
 from ..contents import alerts
 
 
+@dataclass(init=False)
 class Heartbeat(Extension, SerializableBody):
     extension_type = ExtensionType.HEARTBEAT
     _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}

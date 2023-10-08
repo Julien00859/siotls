@@ -1,4 +1,5 @@
 import textwrap
+from dataclasses import dataclass
 from siotls.iana import ExtensionType, HandshakeType as HT, MaxFragmentLength
 from siotls.serial import SerializableBody, SerializationError
 from . import Extension
@@ -18,6 +19,7 @@ to_enum = {
 }.__getitem__
 
 
+@dataclass(init=False)
 class MaxFragmentLength(Extension, SerializableBody):
     extension_type = ExtensionType.MAX_FRAGMENT_LENGTH
     _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
