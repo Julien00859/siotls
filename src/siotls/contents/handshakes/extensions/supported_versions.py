@@ -1,8 +1,8 @@
 import textwrap
-from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType as HT, TLSVersion
 from siotls.serial import SerializableBody, SerializationError
 from siotls.utils import try_cast
+from ... import alerts
 from . import Extension
 
 

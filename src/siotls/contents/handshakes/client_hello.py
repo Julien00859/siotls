@@ -3,9 +3,9 @@ import textwrap
 from siotls.iana import CipherSuites, HandshakeType, TLSVersion
 from siotls.serial import SerializableBody, SerialIO
 from siotls.utils import try_cast
+from .. import alerts
 from . import Handshake
-from ..contents import alerts
-from ..extensions import Extension
+from .extensions import Extension
 
 logger = logging.getLogger(__name__)
 

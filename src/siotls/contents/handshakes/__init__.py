@@ -1,7 +1,7 @@
 import textwrap
 from siotls.iana import ContentType, HandshakeType
 from siotls.serial import Serializable
-from ..contents import Content, alerts
+from .. import Content, alerts
 
 
 _handshake_registry = {}

@@ -1,9 +1,9 @@
 import textwrap
 from typing import NamedTuple
-from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType as HT, NamedGroup
 from siotls.serial import SerializableBody, SerialIO, SerializationError
 from siotls.utils import try_cast
+from ... import alerts
 from . import Extension
 
 
