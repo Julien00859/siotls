@@ -127,10 +127,10 @@ class NameType(Hex1Enum):
 
 
 class MaxFragmentLength(Hex1Enum):
-    LIMIT_512 = 1
-    LIMIT_1024 = 2
-    LIMIT_2048 = 3
-    LIMIT_4096 = 4
+    MAX_512 = 1
+    MAX_1024 = 2
+    MAX_2048 = 3
+    MAX_4096 = 4
 
 
 class CertificateStatusType(Hex1Enum):
