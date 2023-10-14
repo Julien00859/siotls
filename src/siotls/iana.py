@@ -2,7 +2,8 @@ import enum
 try:
     from enum import StrEnum
 except ImportError:
-    StrEnum = str
+    class StrEnum(str, enum.Enum):
+        pass
 
 
 class Hex1Enum(enum.IntEnum):

@@ -23,4 +23,4 @@ class ApplicationData(Content, Serializable):
         return cls(stream.read())
 
     def serialize(self):
-        return self.data
+        return self.content_type

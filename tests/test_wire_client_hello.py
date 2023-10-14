@@ -40,7 +40,7 @@ class TestWireExtension(unittest.TestCase):
         handshake.extensions = [e.extension_type for e in handshake.extensions]
 
         client_hello = ClientHello(
-            random_=bytes.fromhex("""
+            random=bytes.fromhex("""
                 3019520a80cf1a5b038de9c17e6a7f376425194f6cdaf8df484f646d930ee35f
             """),
             cipher_suites=[
