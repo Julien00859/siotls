@@ -2,7 +2,7 @@ import dataclasses
 import logging
 import textwrap
 from siotls.iana import (
-    CipherSuites, HandshakeType, HandshakeType_, TLSVersion
+    CipherSuites, HandshakeType, HandshakeType_, ExtensionType, TLSVersion
 )
 from siotls.serial import SerialIO, SerializableBody
 from siotls.utils import try_cast
@@ -37,15 +37,15 @@ class ServerHello(Handshake, SerializableBody):
     legacy_session_id_echo: bytes = b''
     cipher_suite: CipherSuites | int
     legacy_compression_methods: int = 0  # "null" compression method
-    extensions: list[Extension]
+    extensions: dict[ExtensionType | int, Extension]
 
-    def __init__(self, random, cipher_suite, extensions):
+    def __init__(self, random, cipher_suite, extensions: list[Extension]):
         self.legacy_version = type(self).legacy_version
         self.random = random
         self.legacy_session_id_echo = type(self).legacy_session_id_echo
         self.cipher_suite = cipher_suite
         self.legacy_compression_methods = type(self).legacy_compression_methods
-        self.extensions = extensions
+        self.extensions = {ext.extension_type: ext for ext in extensions}
 
     @classmethod
     def parse_body(cls, stream):
@@ -78,7 +78,7 @@ class ServerHello(Handshake, SerializableBody):
         return self
 
     def serialize_body(self):
-        extensions = b''.join((ext.serialize() for ext in self.extensions))
+        extensions = b''.join((ext.serialize() for ext in self.extensions.values()))
 
         return b''.join([
             self.legacy_version.to_bytes(2, 'big'),
