@@ -57,7 +57,7 @@ class Handshake(Content, Serializable):
         ])
 
 
-# ruff: isort: off
+# ruff: noqa: F401, E402
 from .client_hello import ClientHello
 from .server_hello import ServerHello, HelloRetryRequest
 from .end_of_early_data import EndOfEarlyData
