@@ -111,7 +111,7 @@ class UnknownExtension(SerializableBody):
         return self.extension_data
 
 
-# ruff: isort: off
+# ruff: noqa: F401, E402
 from .server_name import ServerName, HostName, ServerNameList
 from .max_fragment_length import MaxFragmentLength
 from .status_request import CertificateStatusRequest, OCSPStatusRequest
