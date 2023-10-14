@@ -1,16 +1,15 @@
 import dataclasses
 import textwrap
-from typing import Literal
-from siotls.iana import HandshakeType, ExtensionType
+from siotls.iana import HandshakeType, HandshakeType_, ExtensionType
 from siotls.serial import Serializable, SerializableBody
+from ... import alerts
 
 
-ANY_HANDSHAKE = -1
 _extension_registry = {}
 
 @dataclasses.dataclass(init=False)
 class Extension(Serializable):
-    _handshake_types: set[HandshakeType | Literal[ANY_HANDSHAKE]]
+    _handshake_types: set[HandshakeType | HandshakeType_]
     _struct = textwrap.dedent("""
         struct {
             ExtensionType extension_type;
@@ -48,8 +47,15 @@ class Extension(Serializable):
         super().__init_subclass__(**kwargs)
         if register and Extension in cls.__bases__:
             for handshake_type in cls._handshake_types:
+                htname = handshake_type.name
                 registry = _extension_registry.setdefault(cls.extension_type, {})
                 registry[handshake_type] = cls
+                if (existing_cls := registry.get(htname, None)) not in (cls, None):
+                    etname = cls.extension_type.name
+                    msg = (f"Cannot register {cls} at pair ({htname}, {etname}), "
+                           f"another exist already: {existing_cls}")
+                    raise ValueError(msg)
+                registry[htname] = cls
 
     @classmethod
     def parse(abc, stream, *, handshake_type):
@@ -57,9 +63,12 @@ class Extension(Serializable):
 
         if registry := _extension_registry.get(extension_type):
             try:
-                cls = registry.get(ANY_HANDSHAKE) or registry[handshake_type]
+                cls = registry.get(HandshakeType_.ANY.name) or registry[handshake_type.name]
             except KeyError:
-                raise NotImplementedError("todo")
+                msg = (f"cannot receive extension {extension_type!r} "
+                       f"with handshake {handshake_type.name}")
+                raise alerts.IllegalParameter(msg)
+
         else:
             cls = type(
                 f'UnkonwnExtension{extension_type}',
@@ -82,7 +91,7 @@ class Extension(Serializable):
 
 @dataclasses.dataclass(init=False)
 class UnknownExtension(SerializableBody):
-    _handshake_types = {ANY_HANDSHAKE}
+    _handshake_types = {HandshakeType_.ANY}
 
     _struct = textwrap.dedent("""
         struct {

@@ -87,6 +87,10 @@ class HandshakeType(Hex1Enum):
     KEY_UPDATE = 24
     MESSAGE_HASH = 254
 
+class HandshakeType_(Hex1Enum):
+    ANY = -1  # for when an extension can be present in any handshake
+    HELLO_RETRY_REQUEST = 2
+
 
 class HeartbeatMessageType(Hex1Enum):
     heartbeat_request = 1
