@@ -8,6 +8,7 @@ from . import Content
 @dataclasses.dataclass(init=False)
 class ApplicationData(Content, Serializable):
     content_type = ContentType.APPLICATION_DATA
+    can_fragment = True
 
     _struct = textwrap.dedent("""
         opaque content_data[TLSPlaintext.length];

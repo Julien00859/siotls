@@ -10,6 +10,7 @@ _alert_registry = {}
 @dataclasses.dataclass(init=False)
 class Alert(Exception, Content, Serializable):
     content_type = ContentType.ALERT
+    can_fragment = False
 
     _struct = textwrap.dedent("""
         struct {
