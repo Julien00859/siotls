@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import textwrap
 from siotls.iana import CipherSuites, HandshakeType, TLSVersion
@@ -10,6 +11,7 @@ from .extensions import Extension
 logger = logging.getLogger(__name__)
 
 
+@dataclasses.dataclass(init=False)
 class ClientHello(Handshake, SerializableBody):
     msg_type = HandshakeType.CLIENT_HELLO
     _struct = textwrap.dedent("""

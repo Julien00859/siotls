@@ -1,3 +1,4 @@
+import dataclasses
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, CertificateType
 from siotls.serial import SerializableBody, SerializationError
@@ -6,6 +7,7 @@ from ... import alerts
 from . import Extension
 
 
+@dataclasses.dataclass(init=False)
 class _CertificateTypeRequest(SerializableBody):
     _handshake_types = {HT.CLIENT_HELLO}
     certificate_types: list[CertificateType | int]
@@ -28,6 +30,7 @@ class _CertificateTypeRequest(SerializableBody):
             *[ct.to_bytes(1, 'big') for ct in self.certificate_types],
         ])
 
+@dataclasses.dataclass(init=False)
 class _CertificateTypeResponse(SerializableBody):
     _handshake_types = {HT.ENCRYPTED_EXTENSIONS}
     certificate_type: CertificateType

@@ -1,3 +1,4 @@
+import dataclasses
 import textwrap
 from typing import Literal
 from siotls.iana import HandshakeType, ExtensionType
@@ -7,6 +8,7 @@ from siotls.serial import Serializable, SerializableBody
 ANY_HANDSHAKE = -1
 _extension_registry = {}
 
+@dataclasses.dataclass(init=False)
 class Extension(Serializable):
     _handshake_types: set[HandshakeType | Literal[ANY_HANDSHAKE]]
     _struct = textwrap.dedent("""
@@ -78,6 +80,7 @@ class Extension(Serializable):
         ])
 
 
+@dataclasses.dataclass(init=False)
 class UnknownExtension(SerializableBody):
     _handshake_types = {ANY_HANDSHAKE}
 

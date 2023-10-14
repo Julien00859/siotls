@@ -1,9 +1,11 @@
+import dataclasses
 import textwrap
 from siotls.iana import ContentType, HeartbeatMessageType
 from siotls.serial import Serializable, SerialIO
 from . import Content, alerts
 
 
+@dataclasses.dataclass(init=False)
 class Heartbeat(Content, Serializable):
     content_type = ContentType.HEARTBEAT
 

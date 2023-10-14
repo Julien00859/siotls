@@ -1,9 +1,11 @@
+import dataclasses
 import textwrap
 from siotls.iana import ContentType
 from siotls.serial import Serializable
 from . import Content, alerts
 
 
+@dataclasses.dataclass(init=False)
 class ChangeCipherSpec(Content, Serializable):
     content_type = ContentType.CHANGE_CIPHER_SPEC
 

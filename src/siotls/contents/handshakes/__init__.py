@@ -1,3 +1,4 @@
+import dataclasses
 import textwrap
 from siotls.iana import ContentType, HandshakeType
 from siotls.serial import Serializable
@@ -6,6 +7,7 @@ from .. import Content, alerts
 
 _handshake_registry = {}
 
+@dataclasses.dataclass(init=False)
 class Handshake(Content, Serializable):
     content_type = ContentType.HANDSHAKE
     _struct = textwrap.dedent("""

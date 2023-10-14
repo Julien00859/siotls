@@ -1,3 +1,4 @@
+import dataclasses
 import contextlib
 import logging
 import textwrap
@@ -11,6 +12,7 @@ from . import Extension
 logger = logging.getLogger(__name__)
 _server_name_registry = {}
 
+@dataclasses.dataclass(init=False)
 class ServerName(Serializable):
     _struct = textwrap.dedent("""
         struct {
@@ -50,6 +52,7 @@ class ServerName(Serializable):
             self.serialize_body(),
         ])
 
+@dataclasses.dataclass(init=False)
 class HostName(ServerName, SerializableBody):
     name_type = NameType.HOST_NAME
 
@@ -76,6 +79,7 @@ class HostName(ServerName, SerializableBody):
             idna.encode(self.host_name, uts46=True),
         ])
 
+@dataclasses.dataclass(init=False)
 class ServerNameList(Extension, SerializableBody):
     extension_type = ExtensionType.SERVER_NAME
     _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}

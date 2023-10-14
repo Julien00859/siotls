@@ -63,7 +63,6 @@ class Serializable(metaclass=abc.ABCMeta):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if logger.isEnabledFor(logging.DEBUG):
-
             if getattr(cls.parse, '__isabstractmethod__', False):
                 pass
             elif 'parse' in cls.__dict__:
@@ -76,34 +75,8 @@ class Serializable(metaclass=abc.ABCMeta):
                 cls.parse = parse_verbose(cls.parse.meth)
                 cls.parse.cls = cls
 
-
             if 'serialize' in cls.__dict__:
                 cls.serialize = serialize_verbose(cls.serialize)
-
-    def __repr__(self):
-        output = [type(self).__name__, '(']
-
-        for key, value in vars(self).items():
-            if key.startswith('_'):
-                continue
-            output.append(f'{key}={value!r}')
-            output.append(', ')
-
-        if output[-1] == ', ':
-            output.pop()
-        output.append(')')
-        return ''.join(output)
-
-    def __eq__(self, other):
-        if type(self) != type(other):
-            return False
-        notset = object()
-        for key, value in vars(self).items():
-            if key.startswith('_'):
-                continue
-            if value != getattr(other, key, notset):
-                return False
-        return True
 
 
 class SerializableBody(metaclass=abc.ABCMeta):
@@ -120,7 +93,6 @@ class SerializableBody(metaclass=abc.ABCMeta):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if logger.isEnabledFor(logging.DEBUG):
-
             if getattr(cls.parse_body, '__isabstractmethod__', False):
                 pass
             elif 'parse_body' in cls.__dict__:
