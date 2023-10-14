@@ -1,14 +1,14 @@
 import logging
-from pprint import pp
 from socket import socket
-from siotls.connection import TLSConnection
+from siotls.connection import TLSConnection, TLSConfiguration
 from siotls.utils import hexdump
 
 logger = logging.getLogger(__name__)
 
 def handle_one(client, client_info):
 
-    conn = TLSConnection(config=None)
+    config = TLSConfiguration(side='server')
+    conn = TLSConnection(config)
 
     while message := client.recv(1024):
         logger.info("%s bytes from %s:\n%s", len(message), client_info[1], hexdump(message))

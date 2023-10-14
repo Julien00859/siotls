@@ -1,29 +1,85 @@
+import dataclasses
 import logging
 import struct
+import typing
 
-from siotls.iana import ContentType
+from siotls.iana import (
+    ContentType,
+    CipherSuites,
+    SignatureScheme,
+    NamedGroup,
+    ALPNProtocol,
+)
 from siotls.serial import TooMuchData, SerialIO
 from .contents import Content, alerts
 
 
 logger = logging.getLogger(__name__)
+SERVER_MAX_FRAGMENT_LENGTH = 16384
 
 
+def starswith_change_cipher_spec(data):
+    return data[0:1] == b'\x14' and data[3:6] == b'\x00\x01\x01'
+
+
+@dataclasses.dataclass()
 class TLSConfiguration:
-    def __init__(self, side):
-        assert side in ('server', 'client')
-        self.side = side
+    side: typing.Literal['client', 'server']
+
+    # mandatory
+    cipher_suites: list[CipherSuites | int] = \
+        dataclasses.field(default_factory=[
+            CipherSuites.TLS_CHACHA20_POLY1305_SHA256,
+            CipherSuites.TLS_AES_256_GCM_SHA384,
+            CipherSuites.TLS_AES_128_GCM_SHA256,
+        ].copy)
+    digital_signatures: list[SignatureScheme | int] = \
+        dataclasses.field(default_factory=[
+            SignatureScheme.rsa_pkcs1_sha256,
+            SignatureScheme.rsa_pss_rsae_sha256,
+            SignatureScheme.ecdsa_secp256r1_sha256,
+        ].copy)
+    key_exchanges: list[NamedGroup | int] = \
+        dataclasses.field(default_factory=[
+            NamedGroup.x25519,
+            NamedGroup.secp256r1,
+        ].copy)
+
+    # extensions
+    max_fragment_length: typing.Literal[
+        512, 1024, 2048, 4096, 16384,
+    ] = SERVER_MAX_FRAGMENT_LENGTH
+    can_send_heartbeat: bool = False
+    can_echo_heartbeat: bool = True
+    alpn: list[ALPNProtocol] = dataclasses.field(default_factory=list)
+    hostnames: list[bytes] = dataclasses.field(default_factory=list)
 
 
 class TLSConnection:
-    def __init__(self, config):
+    def __init__(self, config, **config_changes):
+        config = dataclasses.replace(config, **config_changes)
+        if config.side == 'server':
+            if config.max_fragment_length != SERVER_MAX_FRAGMENT_LENGTH:
+                msg = "max fragment length is only configurable client side"
+                raise ValueError(msg)
+
         self.config = config
-        self.negociated_config = ...
+        self.nconfig = None
         self._input_data = b''
         self._input_handshake = b''
         self._output_data = b''
         #self.state = (... if self.config.side == 'server' else ...)(self)
-        self.encrypted = False
+
+    @property
+    def is_encrypted(self):
+        return self.nconfig is not None
+
+    @property
+    def max_fragment_length(self):
+        return (self.nconfig or self.config).max_fragment_length + (
+            256 if self.is_encrypted else 0
+        )
+
 
     def receive_data(self, data):
         if not data:
@@ -40,16 +96,19 @@ class TLSConnection:
         return contents
 
     def _read_next_record(self):
+        while starswith_change_cipher_spec(self._input_data):
+            self._input_data = self._input_data[6:]
+
         if len(self._input_data) < 5:
             return
 
         content_type, _legacy_version, content_length = \
             struct.unpack('!BHH', self._input_data[:5])
 
-        max_fragment_length = 2 ** 14 + (256 if self.encrypted else 0)
-        if content_length > max_fragment_length:
-            msg = (f'The record is longer ({content_length} bytes) than '
-                   f'the allowed maximum ({max_fragment_length} bytes).')
+        if content_length > self.max_fragment_length:
+            msg = (f"The record is longer ({content_length} bytes) than "
+                   f"the allowed maximum ({self.max_fragment_length}"
+                   " bytes).")
             raise alerts.RecordOverFlow(msg)
 
         if len(self._input_data) - 5 < content_length:
@@ -58,20 +117,19 @@ class TLSConnection:
         fragment = self._input_data[5:content_length + 5]
         self._input_data = self._input_data[content_length + 5:]
 
-        if not self.encrypted or content_type == ContentType.CHANGE_CIPHER_SPEC:
-            return content_type, fragment
+        if self.is_encrypted:
+            innertext = self.decrypt(fragment)
+            for i in range(len(innertext) -1, -1, -1):
+                if innertext[i]:
+                    break
+            else:
+                msg = "missing content type in encrypted record"
+                raise alerts.UnexpectedMessage(msg)
+            content_type = innertext[i]
+            fragment = innertext[:i]
 
-        innertext = self.decrypt(fragment)
-        for i in range(len(innertext) -1, -1, -1):
-            if innertext[i]:
-                break
-        else:
-            return  # only padding
-
-        content_type = innertext[i]
-        fragment = innertext[:i-1]
         if content_type == ContentType.CHANGE_CIPHER_SPEC:
-            msg = f"cannot receive encrypted {ContentType.CHANGE_CIPHER_SPEC}"
+            msg = f"invalid {ContentType.CHANGE_CIPHER_SPEC} record"
             raise alerts.UnexpectedMessage(msg)
 
         return content_type, fragment
