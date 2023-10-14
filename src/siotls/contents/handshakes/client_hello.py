@@ -33,13 +33,13 @@ class ClientHello(Handshake, SerializableBody):
     legacy_version: int = TLSVersion.TLS_1_2
     random: bytes
     legacy_session_id: bytes = b''
-    cipher_suites: list
+    cipher_suites: list[CipherSuites | int]
     legacy_compression_methods: bytes = b'\x00'  # "null" compression method
     extensions: list[Extension]
 
-    def __init__(self, random_, cipher_suites, extensions):
+    def __init__(self, random, cipher_suites, extensions):
         self.legacy_version = type(self).legacy_version
-        self.random = random_
+        self.random = random
         self.legacy_session_id = type(self).legacy_session_id
         self.cipher_suites = cipher_suites
         self.legacy_compression_methods = type(self).legacy_compression_methods
@@ -52,7 +52,7 @@ class ClientHello(Handshake, SerializableBody):
             raise alerts.ProtocolVersion()
         legacy_version = TLSVersion(legacy_version)
 
-        random_ = stream.read_exactly(32)
+        random = stream.read_exactly(32)
         legacy_session_id = stream.read_var(1)
 
         cipher_suites = [
@@ -71,7 +71,7 @@ class ClientHello(Handshake, SerializableBody):
             logger.debug("Found extension %s", extension)
             extensions.append(extension)
 
-        self = cls(random_, cipher_suites, extensions)
+        self = cls(random, cipher_suites, extensions)
         self.legacy_session_id = legacy_session_id
         return self
 
