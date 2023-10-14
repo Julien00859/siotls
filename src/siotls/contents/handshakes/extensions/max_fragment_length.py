@@ -6,6 +6,19 @@ from ... import alerts
 from . import Extension
 
 
+to_int = {
+    MaxFragmentLength.MAX_512: 512,
+    MaxFragmentLength.MAX_1024: 1024,
+    MaxFragmentLength.MAX_2048: 2048,
+    MaxFragmentLength.MAX_4096: 4096,
+}.__getitem__
+to_enum = {
+    512: MaxFragmentLength.MAX_512,
+    1024: MaxFragmentLength.MAX_1024,
+    2048: MaxFragmentLength.MAX_2048,
+    4096: MaxFragmentLength.MAX_4096,
+}.__getitem__
+
 @dataclasses.dataclass(init=False)
 class MaxFragmentLength(Extension, SerializableBody):
     extension_type = ExtensionType.MAX_FRAGMENT_LENGTH
@@ -16,10 +29,10 @@ class MaxFragmentLength(Extension, SerializableBody):
             2^9(0x01), 2^10(0x02), 2^11(0x03), 2^12(0x04), (0xff)
         } MaxFragmentLength;
     """).strip('\n')
-    max_fragment_length: MaxFragmentLength
+    max_fragment_length: int
 
-    def __init__(self, max_fragment_length):
-        self.max_fragment_length = max_fragment_length
+    def __init__(self, max_fragment_length: MaxFragmentLength):
+        self.max_fragment_length = to_int(max_fragment_length)
 
     @classmethod
     def parse_body(cls, stream):
@@ -32,4 +45,4 @@ class MaxFragmentLength(Extension, SerializableBody):
         return cls(max_fragment_length)
 
     def serialize_body(self):
-        return self.max_fragment_length.to_bytes(1, 'big')
+        return to_enum(self.max_fragment_length).to_bytes(1, 'big')
