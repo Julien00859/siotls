@@ -94,7 +94,7 @@ class TestWireExtension(unittest.TestCase):
         stream = SerialIO(bytes.fromhex(payload))
 
         handshake = Handshake.parse(stream)
-        self.assertEqual(stream.read(), b'', "stream should be at end of file")
+        self.assertTrue(stream.is_eof(), stream.read())
 
         self.maxDiff = None
         self.assertEqual(handshake.serialize().hex(), payload)
