@@ -1,5 +1,5 @@
 import unittest
-from siotls.extensions import (
+from siotls.contents.handshakes.extensions import (
     Extension,
     ServerNameList, HostName,
     SupportedGroups,

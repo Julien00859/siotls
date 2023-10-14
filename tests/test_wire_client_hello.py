@@ -1,5 +1,5 @@
 import unittest
-from siotls.handshakes import Handshake, ClientHello
+from siotls.contents.handshakes import Handshake, ClientHello
 from siotls.iana import (
     HandshakeType,
     ExtensionType,

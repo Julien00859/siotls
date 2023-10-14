@@ -19,6 +19,6 @@ class Content:
 # ruff: isort: off
 from .change_cipher_spec import ChangeCipherSpec
 from .alerts import Alert
-from ..handshakes import Handshake
+from .handshakes import Handshake
 from .application_data import ApplicationData
 from .heartbeat import Heartbeat

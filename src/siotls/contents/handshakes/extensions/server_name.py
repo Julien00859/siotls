@@ -4,8 +4,8 @@ import textwrap
 import idna
 from siotls.iana import ExtensionType, HandshakeType as HT, NameType
 from siotls.serial import Serializable, SerializableBody, SerialIO
+from ... import alerts
 from . import Extension
-from ..contents import alerts
 
 
 logger = logging.getLogger(__name__)

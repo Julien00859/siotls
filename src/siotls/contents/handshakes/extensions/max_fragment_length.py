@@ -1,8 +1,8 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, MaxFragmentLength
 from siotls.serial import SerializableBody, SerializationError
+from ... import alerts
 from . import Extension
-from ..contents import alerts
 
 
 class MaxFragmentLength(Extension, SerializableBody):

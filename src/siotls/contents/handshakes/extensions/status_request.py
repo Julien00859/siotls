@@ -1,8 +1,8 @@
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, CertificateStatusType
 from siotls.serial import SerializableBody, SerialIO
+from ... import alerts
 from . import Extension
-from ..contents import alerts
 
 
 _status_request_registry = {}
