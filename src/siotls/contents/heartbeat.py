@@ -8,6 +8,7 @@ from . import Content, alerts
 @dataclasses.dataclass(init=False)
 class Heartbeat(Content, Serializable):
     content_type = ContentType.HEARTBEAT
+    can_fragment = False
 
     _struct = textwrap.dedent("""
         struct {

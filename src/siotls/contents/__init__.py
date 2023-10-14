@@ -5,6 +5,7 @@ _content_registry = {}
 
 class Content:
     content_type: ContentType
+    can_fragment: bool
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

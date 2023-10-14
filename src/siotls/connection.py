@@ -9,9 +9,10 @@ from siotls.iana import (
     SignatureScheme,
     NamedGroup,
     ALPNProtocol,
+    TLSVersion,
 )
 from siotls.serial import TooMuchData, SerialIO
-from .contents import Content, alerts
+from .contents import Content, ApplicationData, alerts
 
 
 logger = logging.getLogger(__name__)
@@ -65,9 +66,9 @@ class TLSConnection:
 
         self.config = config
         self.nconfig = None
-        self._input_data = b''
-        self._input_handshake = b''
-        self._output_data = b''
+        self._input_data = bytearray()
+        self._input_handshake = bytearray()
+        self._output_data = bytearray()
         #self.state = (... if self.config.side == 'server' else ...)(self)
 
     @property
@@ -79,7 +80,6 @@ class TLSConnection:
         return (self.nconfig or self.config).max_fragment_length + (
             256 if self.is_encrypted else 0
         )
-
 
     def receive_data(self, data):
         if not data:
@@ -94,6 +94,14 @@ class TLSConnection:
             contents.append(content)
 
         return contents
+
+    def send_data(self, data: bytes):
+        self._send_content(ApplicationData(data))
+
+    def data_to_send(self):
+        output = self._output_data
+        self._output_data = bytearray()
+        return output
 
     def _read_next_record(self):
         while starswith_change_cipher_spec(self._input_data):
@@ -176,9 +184,41 @@ class TLSConnection:
             raise TooMuchData(msg)
 
         content_data = self._input_handshake
-        self._input_handshake = b''
+        self._input_handshake = bytearray()
         return content_type, content_data
 
+    def _send_content(self, content: Content):
+        data = content.serialize()
+        if self.is_encrypted:
+            data = self.encrypt(data)
+
+        if len(data) < self.max_fragment_length:
+            iter_fragments = (data,)
+        elif content.can_fragment:
+            iter_fragments = (
+                data[i : i + self.max_fragment_length]
+                for i in range(0, len(data), self.max_fragment_length)
+            )
+        else:
+            msg = (f"Serialized content ({len(data)} bytes) cannot fit "
+                   f"in a single record (max {self.max_fragment_length}"
+                   " bytes) and cannot be fragmented over multiple TLS"
+                   " 1.2 records.")
+            raise ValueError(msg)
+
+        self._output_data += b''.join((
+            b''.join([
+                (
+                    ContentType.APPLICATION_DATA
+                    if self.is_encrypted else
+                    content.content_type
+                ).to_bytes(1, 'big'),
+                TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
+                len(fragment).to_bytes(2, 'big'),
+                fragment,
+            ])
+            for fragment in iter_fragments
+        ))
 
     def _process_contents(contents):
         return contents
