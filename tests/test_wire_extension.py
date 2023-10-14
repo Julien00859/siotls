@@ -30,7 +30,7 @@ class TestWireExtension(unittest.TestCase):
         payload = "0000000e000c0000096c6f63616c686f7374"
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
-        self.assertEqual(stream.read(), b'', "stream should be at end of file")
+        self.assertTrue(stream.is_eof(), stream.read())
         self.assertEqual(ext, ServerNameList([HostName("localhost")]))
         self.assertEqual(ext.serialize().hex(), payload)
 
@@ -38,7 +38,7 @@ class TestWireExtension(unittest.TestCase):
         payload = "000a00160014001d0017001e0019001801000101010201030104"
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
-        self.assertEqual(stream.read(), b'', "stream should be at end of file")
+        self.assertTrue(stream.is_eof(), stream.read())
         self.assertEqual(ext, SupportedGroups([
             NamedGroup.x25519,
             NamedGroup.secp256r1,
@@ -60,7 +60,7 @@ class TestWireExtension(unittest.TestCase):
         """.split())
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
-        self.assertEqual(stream.read(), b'', "stream should be at end of file")
+        self.assertTrue(stream.is_eof(), stream.read())
         self.assertEqual(ext, SignatureAlgorithms([
             SignatureScheme.ecdsa_secp256r1_sha256,
             SignatureScheme.ecdsa_secp384r1_sha384,
@@ -83,7 +83,7 @@ class TestWireExtension(unittest.TestCase):
         payload = "0010000e000c02683208687474702f312e31"
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
-        self.assertEqual(stream.read(), b'', "stream should be at end of file")
+        self.assertTrue(stream.is_eof(), stream.read())
         self.assertEqual(ext, ApplicationLayerProtocolNegotiation([
             "h2", "http/1.1"
         ]))
@@ -93,7 +93,7 @@ class TestWireExtension(unittest.TestCase):
         payload = "002b0003020304"
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
-        self.assertEqual(stream.read(), b'', "stream should be at end of file")
+        self.assertTrue(stream.is_eof(), stream.read())
         self.assertEqual(ext, SupportedVersionsRequest([TLSVersion.TLS_1_3]))
         self.assertEqual(ext.serialize().hex(), payload)
 
@@ -101,7 +101,7 @@ class TestWireExtension(unittest.TestCase):
         payload = "002d00020101"
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
-        self.assertEqual(stream.read(), b'', "stream should be at end of file")
+        self.assertTrue(stream.is_eof(), stream.read())
         self.assertEqual(ext, PskKeyExchangeModes([
             PskKeyExchangeMode.PSK_DHE_KE
         ]))
@@ -111,7 +111,7 @@ class TestWireExtension(unittest.TestCase):
         payload = "00310000"
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
-        self.assertEqual(stream.read(), b'', "stream should be at end of file")
+        self.assertTrue(stream.is_eof(), stream.read())
         self.assertEqual(ext, PostHandshakeAuth())
         self.assertEqual(ext.serialize().hex(), payload)
 
@@ -122,7 +122,7 @@ class TestWireExtension(unittest.TestCase):
         """.split())
         stream = SerialIO(bytes.fromhex(payload))
         ext = parse_extension(stream)
-        self.assertEqual(stream.read(), b'', "stream should be at end of file")
+        self.assertTrue(stream.is_eof(), stream.read())
         self.assertEqual(ext, KeyShareRequest({
             NamedGroup.x25519: bytes.fromhex("""
                 ad4061d3f71e40a1bacce42538e303abadbc2c9485fabbfada051b859e5e96
