@@ -25,6 +25,7 @@ classifiers = [
 ]
 
 dependencies = [
+  "cryptography",
   "idna"
 ]
 
