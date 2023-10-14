@@ -11,8 +11,9 @@ from siotls.iana import (
     ALPNProtocol,
     TLSVersion,
 )
-from siotls.serial import TooMuchData, SerialIO
+from siotls.serial import SerializationError, TooMuchData, SerialIO
 from .contents import Content, ApplicationData, alerts
+from .states import ClientStart, ServerStart
 
 
 logger = logging.getLogger(__name__)
@@ -66,10 +67,11 @@ class TLSConnection:
 
         self.config = config
         self.nconfig = None
+        self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
+
         self._input_data = bytearray()
         self._input_handshake = bytearray()
         self._output_data = bytearray()
-        #self.state = (... if self.config.side == 'server' else ...)(self)
 
     @property
     def is_encrypted(self):
@@ -81,19 +83,31 @@ class TLSConnection:
             256 if self.is_encrypted else 0
         )
 
+    #-------------------------------------------------------------------
+    # Public APIs
+    #-------------------------------------------------------------------
+
+    def initiate_connection(self):
+        self.state.initiate_connection()
+
     def receive_data(self, data):
         if not data:
             return
         self._input_data += data
 
-        contents = []
-        for content_type, content_data in iter(self._read_next_content, None):
+        while next_content := self._read_next_content():
+            content_type, content_data = next_content
             stream = SerialIO(content_data)
-            content = Content.get_parser(content_type).parse(stream)
-            stream.assert_eof()
-            contents.append(content)
-
-        return contents
+            try:
+                try:
+                    content = Content.get_parser(content_type).parse(stream)
+                    stream.assert_eof()
+                except SerializationError as exc:
+                    raise alerts.DecodeError() from exc
+                self.state.process(content)
+            except alerts.Alert as alert:
+                self._send_content(alert)
+                break
 
     def send_data(self, data: bytes):
         self._send_content(ApplicationData(data))
@@ -102,6 +116,13 @@ class TLSConnection:
         output = self._output_data
         self._output_data = bytearray()
         return output
+
+    #-------------------------------------------------------------------
+    # Internal APIs
+    #-------------------------------------------------------------------
+
+    def _move_to_state(self, state_type):
+        self.state = state_type(self)
 
     def _read_next_record(self):
         while starswith_change_cipher_spec(self._input_data):
@@ -219,7 +240,3 @@ class TLSConnection:
             ])
             for fragment in iter_fragments
         ))
-
-    def _process_contents(contents):
-        return contents
-        #return []
