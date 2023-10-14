@@ -59,7 +59,7 @@ class Handshake(Content, Serializable):
 
 # ruff: isort: off
 from .client_hello import ClientHello
-from .server_hello import ServerHello
+from .server_hello import ServerHello, HelloRetryRequest
 from .end_of_early_data import EndOfEarlyData
 from .encrypted_extensions import EncryptedExtensions
 from .certificate_request import CertificateRequest
