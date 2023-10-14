@@ -1,3 +1,4 @@
+import dataclasses
 import textwrap
 from typing import NamedTuple
 from siotls.iana import ExtensionType, HandshakeType as HT, NamedGroup
@@ -12,6 +13,7 @@ class KeyShareEntry(NamedTuple):
     key_exchange: bytes
 
 
+@dataclasses.dataclass(init=False)
 class KeyShareRequest(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
     _handshake_types = {HT.CLIENT_HELLO}
@@ -55,6 +57,7 @@ class KeyShareRequest(Extension, SerializableBody):
             client_shares,
         ])
 
+@dataclasses.dataclass(init=False)
 class KeyShareResponse(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
     _handshake_types = {HT.SERVER_HELLO}

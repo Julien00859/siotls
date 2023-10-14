@@ -1,3 +1,4 @@
+import dataclasses
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, CertificateStatusType
 from siotls.serial import SerializableBody, SerialIO
@@ -7,6 +8,7 @@ from . import Extension
 
 _status_request_registry = {}
 
+@dataclasses.dataclass(init=False)
 class CertificateStatusRequest(Extension, SerializableBody):
     extension_type = ExtensionType.STATUS_REQUEST
     _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}

@@ -1,3 +1,4 @@
+import dataclasses
 import textwrap
 from siotls.iana import AlertLevel, AlertDescription, ContentType
 from siotls.serial import SerialIO, Serializable
@@ -6,6 +7,7 @@ from . import Content
 
 _alert_registry = {}
 
+@dataclasses.dataclass(init=False)
 class Alert(Exception, Content, Serializable):
     content_type = ContentType.ALERT
 

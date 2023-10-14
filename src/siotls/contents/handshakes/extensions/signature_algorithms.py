@@ -1,3 +1,4 @@
+import dataclasses
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, SignatureScheme
 from siotls.serial import SerializableBody
@@ -5,6 +6,7 @@ from siotls.utils import try_cast
 from . import Extension
 
 
+@dataclasses.dataclass(init=False)
 class _SignAlgoMixin(SerializableBody):
     _struct = textwrap.dedent("""
         struct {

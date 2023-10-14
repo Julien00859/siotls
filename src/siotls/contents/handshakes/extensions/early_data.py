@@ -1,9 +1,11 @@
+import dataclasses
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT
 from siotls.serial import SerializableBody
 from . import Extension
 
 
+@dataclasses.dataclass(init=False)
 class EarlyData(Extension, SerializableBody):
     extension_type = ExtensionType.EARLY_DATA
     _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
@@ -22,6 +24,7 @@ class EarlyData(Extension, SerializableBody):
         return b''
 
 
+@dataclasses.dataclass(init=False)
 class NewSessionEarlyData(Extension, SerializableBody):
     extension_type = ExtensionType.EARLY_DATA
     _handshake_types = {HT.NEW_SESSION_TICKET}

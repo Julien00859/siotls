@@ -1,3 +1,4 @@
+import dataclasses
 import textwrap
 from siotls.iana import ExtensionType, HandshakeType as HT, TLSVersion
 from siotls.serial import SerializableBody, SerializationError
@@ -6,6 +7,7 @@ from ... import alerts
 from . import Extension
 
 
+@dataclasses.dataclass(init=False)
 class SupportedVersionsRequest(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_VERSIONS
     _handshake_types = {HT.CLIENT_HELLO}
@@ -35,6 +37,7 @@ class SupportedVersionsRequest(Extension, SerializableBody):
         ])
 
 
+@dataclasses.dataclass(init=False)
 class SupportedVersionsResponse(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_VERSIONS
     _handshake_types = {HT.SERVER_HELLO}

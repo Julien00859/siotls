@@ -1,3 +1,4 @@
+import dataclasses
 import textwrap
 from typing import NamedTuple
 from siotls.iana import ExtensionType, HandshakeType as HT
@@ -10,6 +11,7 @@ class PskIdentity(NamedTuple):
     obfuscated_ticket_age: int
 
 
+@dataclasses.dataclass(init=False)
 class PreSharedKeyRequest(Extension, SerializableBody):
     extension_type = ExtensionType.PRE_SHARED_KEY
     _handshake_types = {HT.CLIENT_HELLO}
@@ -64,6 +66,7 @@ class PreSharedKeyRequest(Extension, SerializableBody):
         ])
 
 
+@dataclasses.dataclass(init=False)
 class PreSharedKeyResponse(Extension, SerializableBody):
     extension_type = ExtensionType.PRE_SHARED_KEY
     _handshake_types = {HT.SERVER_HELLO}
