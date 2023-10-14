@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import secrets
 import struct
 import typing
 
@@ -72,6 +73,9 @@ class TLSConnection:
         self._input_data = bytearray()
         self._input_handshake = bytearray()
         self._output_data = bytearray()
+
+        self._nonce = secrets.token_bytes(32)
+        self._key_exchange_privkeys = {}
 
     @property
     def is_encrypted(self):
