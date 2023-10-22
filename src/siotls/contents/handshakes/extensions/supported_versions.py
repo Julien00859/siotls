@@ -64,7 +64,7 @@ class SupportedVersionsResponse(Extension, SerializableBody):
     @classmethod
     def parse_body(cls, stream):
         try:
-            selected_version = TLSVersion(stream.read_int(2, 'big'))
+            selected_version = TLSVersion(stream.read_int(2))
         except SerializationError:
             raise
         except ValueError as exc:
