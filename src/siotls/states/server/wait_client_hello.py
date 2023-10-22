@@ -2,18 +2,27 @@ from types import SimpleNamespace
 from siotls.iana import (
     ContentType,
     HandshakeType,
+    HeartbeatMode,
     ExtensionType,
     TLSVersion,
 )
+from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import alerts, ChangeCipherSpec
 from siotls.contents.handshakes import (
     HelloRetryRequest,
+    ServerHello,
+    EncryptedExtensions,
+    Certificate,
+    CertificateVerify,
+    Finished,
 )
 from siotls.contents.handshakes.extensions import (
     SupportedVersionsResponse,
-    KeyShareRetry,
+    KeyShareResponse, KeyShareRetry,
 )
+from siotls.crypto.key_share import resume as key_share_resume
 from .. import State
+from . import ServerWaitFlight2
 
 
 class ServerWaitClientHello(State):
@@ -45,7 +54,26 @@ class ServerWaitClientHello(State):
             self._move_to_state(ServerWaitClientHello)  # update _is_first_client_hello
             return
 
-        raise NotImplementedError("todo")
+        clear_extensions, encrypted_extensions = (
+            self._negociate_extensions(client_hello.extensions, nconfig))
+
+        self._send_content(ServerHello(
+            self._nonce,
+            client_hello.legacy_session_id,
+            nconfig.cipher_suite,
+            clear_extensions,
+        ))
+
+        if self._is_first_client_hello:
+            self._send_content(ChangeCipherSpec())
+
+        self.nconfig = TLSNegociatedConfiguration(**vars(nconfig))
+
+        self._send_content(EncryptedExtensions(encrypted_extensions))
+        self._send_content(Certificate(...))
+        self._send_content(CertificateVerify(...))
+        self._send_content(Finished(...))
+        self._move_to_state(ServerWaitFlight2)
 
     def _negociate_algorithms(self, client_hello, nconfig):
         nconfig.cipher_suite = self._find_common_cipher_suite(client_hello)
@@ -128,3 +156,57 @@ class ServerWaitClientHello(State):
             ]
         ))
         self._send_content(ChangeCipherSpec())
+
+    def _negociate_extensions(self, client_extensions, nconfig):
+        clear_extensions = [SupportedVersionsResponse(TLSVersion.TLS_1_3)]
+        encrypted_extensions = []
+
+        # Key Share
+        key_share = client_extensions[ExtensionType.KEY_SHARE]
+        peer_exchange = key_share.client_shares[nconfig.key_exchange]
+        shared_key, my_exchange = key_share_resume(
+            nconfig.key_exchange, None, peer_exchange)
+        clear_extensions.append(
+            KeyShareResponse(nconfig.key_exchange, my_exchange))
+
+        # Max Fragment Length
+        client_mfl = client_extensions.get(ExtensionType.MAX_FRAGMENT_LENGTH)
+        if client_mfl:
+            nconfig.max_fragment_length = client_mfl.max_fragment_length
+            encrypted_extensions.append(client_mfl)
+        else:
+            nconfig.max_fragment_length = self.config.max_fragment_length
+
+        # ALPN
+        client_alpn = client_extensions.get(
+            ExtensionType.APPLICATION_LAYER_PROTOCOL_NEGOTIATION)
+        if self.config.alpn and client_alpn:
+            for proto in self.config.alpn:
+                if proto in client_alpn.protocol_name_list:
+                    nconfig.alpn = proto
+                    encrypted_extensions.append(type(client_alpn)([proto]))
+                    break
+            else:
+                raise alerts.NO_APPLICATION_PROTOCOL()
+        else:
+            nconfig.alpn = None
+
+        # Heartbeat
+        client_hb = client_extensions.get(ExtensionType.HEARTBEAT)
+        server_hb = self.config.can_send_heartbeat or self.config.can_echo_heartbeat
+        if client_hb and server_hb:
+            nconfig.can_send_heartbeat = (
+                self.config.can_send_heartbeat and
+                client_hb.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
+            )
+            nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat
+            encrypted_extensions.append(type(client_hb)(
+                HeartbeatMode.PEER_ALLOWED_TO_SEND
+                if self.config.can_echo_heartbeat else
+                HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND
+            ))
+        else:
+            nconfig.can_send_heartbeat = False
+            nconfig.can_echo_heartbeat = False
+
+        return clear_extensions, encrypted_extensions
