@@ -91,7 +91,7 @@ class ServerHello(Handshake, SerializableBody):
 
 
 class HelloRetryRequest(ServerHello):
-    handshake_type = HandshakeType_.HELLO_RETRY_REQUEST
+    msg_type = HandshakeType_.HELLO_RETRY_REQUEST
 
     # hashlib.sha256("HelloRetryRequest").digest()
     random = bytes.fromhex(
