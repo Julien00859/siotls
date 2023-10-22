@@ -1,6 +1,6 @@
 import logging
 from socket import socket
-from siotls.connection import TLSConfiguration, TLSConnection
+from siotls import TLSConfiguration, TLSConnection
 from siotls.utils import hexdump
 
 
