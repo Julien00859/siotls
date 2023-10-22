@@ -34,15 +34,15 @@ class ServerHello(Handshake, SerializableBody):
     """).strip('\n')
     legacy_version: int = TLSVersion.TLS_1_2
     random: bytes
-    legacy_session_id_echo: bytes = b''
+    legacy_session_id_echo: bytes
     cipher_suite: CipherSuites | int
     legacy_compression_methods: int = 0  # "null" compression method
     extensions: dict[ExtensionType | int, Extension]
 
-    def __init__(self, random, cipher_suite, extensions: list[Extension]):
+    def __init__(self, random, legacy_session_id_echo, cipher_suite, extensions: list[Extension]):
         self.legacy_version = type(self).legacy_version
         self.random = random
-        self.legacy_session_id_echo = type(self).legacy_session_id_echo
+        self.legacy_session_id_echo = legacy_session_id_echo
         self.cipher_suite = cipher_suite
         self.legacy_compression_methods = type(self).legacy_compression_methods
         self.extensions = {ext.extension_type: ext for ext in extensions}
@@ -73,9 +73,7 @@ class ServerHello(Handshake, SerializableBody):
             logger.debug("Found extension %s", extension)
             extensions.append(extension)
 
-        self = cls(random, cipher_suite, extensions)
-        self.legacy_session_id_echo = legacy_session_id_echo
-        return self
+        return cls(random, legacy_session_id_echo, cipher_suite, extensions)
 
     def serialize_body(self):
         extensions = b''.join((ext.serialize() for ext in self.extensions.values()))
@@ -100,6 +98,3 @@ class HelloRetryRequest(ServerHello):
         "CF 21 AD 74 E5 9A 61 11 BE 1D 8C 02 1E 65 B8 91"
         "C2 A2 11 16 7A BB 8C 5E 07 9E 09 E2 C8 A8 33 9C"
     )
-
-    def __init__(self, cipher_suite, extensions):
-        super().__init__(self.random, cipher_suite, extensions)
