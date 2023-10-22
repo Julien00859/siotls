@@ -21,7 +21,7 @@ class ServerWaitClientHello(State):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._is_first_client_hello = True
+        self._is_first_client_hello = not bool(self._transcript_hash)
 
     def process(self, client_hello):
         if client_hello.content_type != ContentType.HANDSHAKE:
@@ -35,8 +35,14 @@ class ServerWaitClientHello(State):
         nconfig = SimpleNamespace()
         self._negociate_algorithms(client_hello, nconfig)
 
+        if self._is_first_client_hello:
+            digestmod = nconfig.cipher_suite.digestmod
+            self._transcript_hash = digestmod(self._last_client_hello)
+            self._last_client_hello = None
+
         if not self._can_resume_key_share(client_hello, nconfig.key_exchange):
             self._send_hello_retry_request(client_hello, nconfig)
+            self._move_to_state(ServerWaitClientHello)  # update _is_first_client_hello
             return
 
         raise NotImplementedError("todo")
@@ -104,6 +110,14 @@ class ServerWaitClientHello(State):
         self.config.digital_signatures = [nconfig.digital_signature]
         self.config.key_exchanges = [nconfig.key_exchange]
 
+        # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
+        digestmod = nconfig.cipher_suite.digestmod
+        self._transcript_hash = digestmod(b''.join([
+            HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
+            digestmod().digest_size.to_bytes(3, 'big'),
+            self._transcript_hash.digest(),
+        ]))
+
         self._send_content(HelloRetryRequest(
             HelloRetryRequest.random,
             client_hello.legacy_session_id,
@@ -114,4 +128,3 @@ class ServerWaitClientHello(State):
             ]
         ))
         self._send_content(ChangeCipherSpec())
-        self._is_first_client_hello = False

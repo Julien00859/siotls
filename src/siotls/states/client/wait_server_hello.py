@@ -49,8 +49,23 @@ class ClientWaitServerHello(State):
         self.config.cipher_suites = [hello_retry_request.cipher_suite]
         self.config.key_exchanges = [key_share.selected_group]
 
+        if cookie := hello_retry_request.extensions.get(ExtensionType.COOKIE):
+            self._cookie = cookie.cookie
+
+        # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
+        digestmod = hello_retry_request.cipher_suite.digestmod
+        self._transcript_hash = digestmod(b''.join([
+            HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
+            digestmod().digest_size.to_bytes(3, 'big'),
+            self._transcript_hash.digest(),
+            self._last_server_hello,
+        ]))
+        self._last_server_hello = None
+
         self._move_to_state(ClientStart)
         self.connection.initiate_connection()
 
     def _process_server_hello(self, server_hello):
+        self._transcript_hash.update(self._last_server_hello)
+        self._last_server_hello = None
         raise NotImplementedError("todo")
