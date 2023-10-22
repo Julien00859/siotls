@@ -14,12 +14,15 @@ class Content:
 
     @classmethod
     def get_parser(abc, content_type):
-        return _content_registry[ContentType(content_type)]
+        try:
+            return _content_registry[ContentType(content_type)]
+        except ValueError as exc:
+            raise DecodeError() from exc
 
 
 # ruff: noqa: F401, E402
 from .change_cipher_spec import ChangeCipherSpec
-from .alerts import Alert
+from .alerts import Alert, DecodeError
 from .handshakes import Handshake
 from .application_data import ApplicationData
 from .heartbeat import Heartbeat

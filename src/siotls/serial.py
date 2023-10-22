@@ -217,7 +217,9 @@ class SerialIO(io.BytesIO):
         self._limits.append(new_limit)
         try:
             yield
-        finally:
+        except:
+            raise
+        else:
             assert self._limits.pop() == new_limit, "another limit was pop"
             assert self._limits, "+inf was pop"
             if (remaining := new_limit - self.tell()):
