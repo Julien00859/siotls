@@ -62,7 +62,7 @@ class KeyShareRequest(Extension, SerializableBody):
 @dataclasses.dataclass(init=False)
 class KeyShareRetry(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
-    _handshake_types = {HT_.HELLO_RETRY_REQUEST}
+    _handshake_types = [HT_.HELLO_RETRY_REQUEST]
 
     _struct = textwrap.dedent("""\
         struct {
