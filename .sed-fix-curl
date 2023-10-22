@@ -1,0 +1,3 @@
+s/TLS header, Finished (20)/TLS header, Change Cipher Spec (20)/g
+s/TLS header, Unknown (21)/TLS header, Alert (21)/g
+s/TLS header, Certificate Status (22)/TLS header, Handshake (22)/g
