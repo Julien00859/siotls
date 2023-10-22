@@ -2,14 +2,9 @@ import dataclasses
 import logging
 import secrets
 import struct
-import typing
 
 from siotls.iana import (
     ContentType,
-    CipherSuites,
-    SignatureScheme,
-    NamedGroup,
-    ALPNProtocol,
     TLSVersion,
 )
 from siotls.serial import SerializationError, TooMuchData, SerialIO
@@ -18,53 +13,15 @@ from .states import ClientStart, ServerStart
 
 
 logger = logging.getLogger(__name__)
-SERVER_MAX_FRAGMENT_LENGTH = 16384
-
 
 def starswith_change_cipher_spec(data):
     return data[0:1] == b'\x14' and data[3:6] == b'\x00\x01\x01'
 
 
-@dataclasses.dataclass()
-class TLSConfiguration:
-    side: typing.Literal['client', 'server']
-
-    # mandatory
-    cipher_suites: list[CipherSuites | int] = \
-        dataclasses.field(default_factory=[
-            CipherSuites.TLS_CHACHA20_POLY1305_SHA256,
-            CipherSuites.TLS_AES_256_GCM_SHA384,
-            CipherSuites.TLS_AES_128_GCM_SHA256,
-        ].copy)
-    digital_signatures: list[SignatureScheme | int] = \
-        dataclasses.field(default_factory=[
-            SignatureScheme.rsa_pkcs1_sha256,
-            SignatureScheme.rsa_pss_rsae_sha256,
-            SignatureScheme.ecdsa_secp256r1_sha256,
-        ].copy)
-    key_exchanges: list[NamedGroup | int] = \
-        dataclasses.field(default_factory=[
-            NamedGroup.x25519,
-            NamedGroup.secp256r1,
-        ].copy)
-
-    # extensions
-    max_fragment_length: typing.Literal[
-        512, 1024, 2048, 4096, 16384,
-    ] = SERVER_MAX_FRAGMENT_LENGTH
-    can_send_heartbeat: bool = False
-    can_echo_heartbeat: bool = True
-    alpn: list[ALPNProtocol] = dataclasses.field(default_factory=list)
-    hostnames: list[bytes] = dataclasses.field(default_factory=list)
-
-
 class TLSConnection:
     def __init__(self, config, **config_changes):
         config = dataclasses.replace(config, **config_changes)
-        if config.side == 'server':
-            if config.max_fragment_length != SERVER_MAX_FRAGMENT_LENGTH:
-                msg = "max fragment length is only configurable client side"
-                raise ValueError(msg)
+        config.validate()
 
         self.config = config
         self.nconfig = None
