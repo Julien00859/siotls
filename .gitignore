@@ -133,3 +133,6 @@ dmypy.json
 .vscode
 .idea
 compile_commands.json
+
+# Wireshark files
+*.pcapng
