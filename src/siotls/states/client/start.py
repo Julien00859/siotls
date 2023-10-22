@@ -11,6 +11,7 @@ from siotls.contents.handshakes.extensions import (
     KeyShareRequest,
     ServerNameList, HostName,
     ApplicationLayerProtocolNegotiation as ALPN,
+    Cookie,
 )
 from .. import State
 from . import ClientWaitServerHello
@@ -31,6 +32,9 @@ class ClientStart(State):
             ]))
         if self.config.alpn:
             extensions.append(ALPN(self.config.alpn))
+        if self._cookie:
+            extensions.append(Cookie(self._cookie))
+            self._cookie = None
         extensions.append(KeyShareRequest(self._init_key_share()))
 
         self._send_content(ClientHello(

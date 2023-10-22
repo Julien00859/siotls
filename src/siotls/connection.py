@@ -10,6 +10,7 @@ from siotls.iana import (
 )
 from siotls.serial import SerializationError, TooMuchData, SerialIO
 from .contents import Content, ApplicationData, alerts
+from .contents.handshakes import ClientHello, ServerHello
 from .states import ClientStart, ServerStart
 from .utils import try_cast
 
@@ -35,6 +36,12 @@ class TLSConnection:
 
         self._nonce = secrets.token_bytes(32)
         self._key_exchange_privkeys = {}
+        self._cookie = None
+
+        self._transcript_hash = None
+        # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
+        self._last_client_hello = None
+        self._last_server_hello = None
 
     @property
     def is_encrypted(self):
@@ -75,6 +82,12 @@ class TLSConnection:
                     case alerts.Alert(level=AlertLevel.FATAL):
                         logger.error(content.description)
                         break  # TODO: close
+                    case ClientHello():
+                        self._last_client_hello = content_data
+                        self.state.process(content)
+                    case ServerHello():
+                        self._last_server_hello = content_data
+                        self.state.process(content)
                     case _:
                         self.state.process(content)
             except alerts.Alert as alert:
@@ -186,11 +199,21 @@ class TLSConnection:
 
         content_data = self._input_handshake
         self._input_handshake = bytearray()
+        if self._transcript_hash:
+            self._transcript_hash.update(content_data)
         return content_type, content_data
 
     def _send_content(self, content: Content):
         logger.info("will send %s", content.__class__.__name__)
         data = content.serialize()
+        if self._transcript_hash:
+            self._transcript_hash.update(data)
+        match content:
+            case ClientHello():
+                self._last_client_hello = data
+            case ServerHello():
+                self._last_server_hello = data
+
         if self.is_encrypted:
             data = self.encrypt(data)
 
