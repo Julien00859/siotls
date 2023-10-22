@@ -36,10 +36,15 @@ def handle_one(client, client_info):
     conn = TLSConnection(config)
     conn.initiate_connection()
 
-    while input_data := client.recv(16384):
+    while True:
+        input_data = client.recv(16384)
+        if not input_data:
+            break
         logger.info("%s bytes from %s:\n%s", len(input_data), client_info[1], hexdump(input_data))
         conn.receive_data(input_data)
 
         output_data = conn.data_to_send()
-        logger.info("%s bytes to %s:\n%s", len(input_data), client_info[1], hexdump(output_data))
+        if not output_data:
+            break
+        logger.info("%s bytes to %s:\n%s", len(output_data), client_info[1], hexdump(output_data))
         client.send(output_data)

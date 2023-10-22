@@ -45,10 +45,11 @@ def main():
         help="Increase logging verbosity (repeatable)")
     parser.add_argument('-s', '--silent', action='count', default=0,
         help="Decrease logging verbosity (repeatable)")
+    parser.add_argument('side', action='store', choices=('client', 'server'))
     parser.add_argument('--host', action='store', default='localhost',
-        help="IP address on which the server will listen")
+        help="IP address on which the server will listen / client will connect")
     parser.add_argument('--port', action='store', type=int, default=8446,
-        help="TCP port number on which the server will listen")
+        help="TCP port number on which the server will listen / client will connect")
     parser.add_argument('--tlscert', '--sslcert', action='store', type=pathlib.Path,
         default=importlib.resources.path('siotls.data', 'self-signed-cert.pem'),
         help="Path to the SSL/TLS certificate file")
@@ -74,17 +75,24 @@ def main():
         logging.critical("Cannot access TLS private key file at %s", options.tlscert)
         return 1
 
-    # Run server
+    # Run
     try:
-        from siotls.examples.simple import serve
-        serve(
-            options.host,
-            options.port,
-            os.fspath(options.tlscert),
-            os.fspath(options.tlskey),
-        )
+        if options.side == 'server':
+            from siotls.examples.simple_server import serve
+            serve(
+                options.host,
+                options.port,
+                os.fspath(options.tlscert),
+                os.fspath(options.tlskey),
+            )
+        else:
+            from siotls.examples.simple_client import connect
+            connect(
+                options.host,
+                options.port,
+            )
     except Exception as exc:
-        logger.critical("Fatal exception while running the server", exc_info=exc)
+        logger.critical("Fatal exception", exc_info=exc)
         return 1
 
     return 0
