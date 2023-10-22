@@ -44,3 +44,14 @@ class TLSConfiguration:
         if self.side == 'server' and self.max_fragment_length != 16384:
             msg = "max fragment length is only configurable client side"
             raise ValueError(msg)
+
+
+@dataclasses.dataclass(frozen=True)
+class TLSNegociatedConfiguration:
+    cipher_suite: CipherSuites
+    digital_signature: SignatureScheme
+    key_exchange: NamedGroup
+    alpn: ALPNProtocol | None
+    can_send_heartbeat: bool
+    can_echo_heartbeat: bool
+    max_fragment_length: int
