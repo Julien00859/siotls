@@ -4,12 +4,14 @@ import secrets
 import struct
 
 from siotls.iana import (
+    AlertLevel,
     ContentType,
     TLSVersion,
 )
 from siotls.serial import SerializationError, TooMuchData, SerialIO
 from .contents import Content, ApplicationData, alerts
 from .states import ClientStart, ServerStart
+from .utils import try_cast
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,7 @@ class TLSConnection:
 
         while next_content := self._read_next_content():
             content_type, content_data = next_content
+            content_type = try_cast(ContentType, content_type)
             stream = SerialIO(content_data)
             try:
                 try:
@@ -65,10 +68,26 @@ class TLSConnection:
                     stream.assert_eof()
                 except SerializationError as exc:
                     raise alerts.DecodeError() from exc
-                self.state.process(content)
+                logger.info("receive %s", content.__class__.__name__)
+                match content:
+                    case alerts.Alert(level=AlertLevel.WARNING):
+                        logger.warning(content.description)
+                    case alerts.Alert(level=AlertLevel.FATAL):
+                        logger.error(content.description)
+                        break  # TODO: close
+                    case _:
+                        self.state.process(content)
             except alerts.Alert as alert:
+                if alert.level == AlertLevel.WARNING:
+                    logger.warning("while processing %s: %s", content_type, alert)
+                else:
+                    logger.exception("while processing %s", content_type)
                 self._send_content(alert)
-                break
+                break  # TODO: close
+            except Exception:
+                logger.exception("while processing %s", content_type)
+                self._send_content(alerts.InternalError())
+                break  # TODO: close
 
     def send_data(self, data: bytes):
         self._send_content(ApplicationData(data))
@@ -170,6 +189,7 @@ class TLSConnection:
         return content_type, content_data
 
     def _send_content(self, content: Content):
+        logger.info("will send %s", content.__class__.__name__)
         data = content.serialize()
         if self.is_encrypted:
             data = self.encrypt(data)
