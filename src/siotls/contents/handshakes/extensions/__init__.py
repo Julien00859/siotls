@@ -3,13 +3,15 @@ import textwrap
 from siotls.iana import HandshakeType, HandshakeType_, ExtensionType
 from siotls.serial import Serializable, SerializableBody
 from ... import alerts
+from siotls.utils import try_cast
 
 
 _extension_registry = {}
 
 @dataclasses.dataclass(init=False)
 class Extension(Serializable):
-    _handshake_types: set[HandshakeType | HandshakeType_]
+    # TODO: could be tuple[HandshakeType | HandshakeType_]
+    _handshake_types: set[HandshakeType] | list[HandshakeType | HandshakeType_]
     _struct = textwrap.dedent("""
         struct {
             ExtensionType extension_type;
@@ -46,20 +48,19 @@ class Extension(Serializable):
     def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and Extension in cls.__bases__:
+            registry = _extension_registry.setdefault(cls.extension_type, {})
             for handshake_type in cls._handshake_types:
                 htname = handshake_type.name
-                registry = _extension_registry.setdefault(cls.extension_type, {})
-                registry[handshake_type] = cls
-                if (existing_cls := registry.get(htname, None)) not in (cls, None):
+                existing_cls = registry.setdefault(htname, cls)
+                if existing_cls != cls:
                     etname = cls.extension_type.name
-                    msg = (f"Cannot register {cls} at pair ({htname}, {etname}), "
+                    msg = (f"Cannot register {cls} at pair ({etname}, {htname}), "
                            f"another exist already: {existing_cls}")
                     raise ValueError(msg)
-                registry[htname] = cls
 
     @classmethod
     def parse(abc, stream, *, handshake_type):
-        extension_type = stream.read_int(2)
+        extension_type = try_cast(ExtensionType, stream.read_int(2))
 
         if registry := _extension_registry.get(extension_type):
             try:

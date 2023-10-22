@@ -1,6 +1,11 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT, TLSVersion
+from siotls.iana import (
+    ExtensionType,
+    HandshakeType as HT,
+    HandshakeType_ as HT_,
+    TLSVersion,
+)
 from siotls.serial import SerializableBody, SerializationError
 from siotls.utils import try_cast
 from ... import alerts
@@ -40,7 +45,7 @@ class SupportedVersionsRequest(Extension, SerializableBody):
 @dataclasses.dataclass(init=False)
 class SupportedVersionsResponse(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_VERSIONS
-    _handshake_types = {HT.SERVER_HELLO}
+    _handshake_types = [HT.SERVER_HELLO, HT_.HELLO_RETRY_REQUEST]
 
     _struct = textwrap.dedent("""\
         struct {
