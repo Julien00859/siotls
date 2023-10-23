@@ -33,7 +33,7 @@ class ApplicationLayerProtocolNegotiation(Extension, SerializableBody):
 
     def serialize_body(self):
         protocol_name_list = b''.join([
-            len(proto).to_bytes(1, 'big') + proto.encode()
+            len(proto_bytes := proto.encode()).to_bytes(1, 'big') + proto_bytes
             for proto in self.protocol_name_list
         ])
 
