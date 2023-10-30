@@ -53,9 +53,9 @@ class TLSConnection:
             256 if self.is_encrypted else 0
         )
 
-    #-------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Public APIs
-    #-------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     def initiate_connection(self):
         self.state.initiate_connection()
@@ -110,9 +110,9 @@ class TLSConnection:
         self._output_data = bytearray()
         return output
 
-    #-------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Internal APIs
-    #-------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     def _move_to_state(self, state_type):
         self.state = state_type(self)
@@ -128,10 +128,9 @@ class TLSConnection:
             struct.unpack('!BHH', self._input_data[:5])
 
         if content_length > self.max_fragment_length:
-            msg = (f"The record is longer ({content_length} bytes) than "
-                   f"the allowed maximum ({self.max_fragment_length}"
-                   " bytes).")
-            raise alerts.RecordOverFlow(msg)
+            e =(f"The record is longer ({content_length} bytes) than the "
+                f"allowed maximum ({self.max_fragment_length} bytes).")
+            raise alerts.RecordOverFlow(e)
 
         if len(self._input_data) - 5 < content_length:
             return
@@ -145,14 +144,14 @@ class TLSConnection:
                 if innertext[i]:
                     break
             else:
-                msg = "missing content type in encrypted record"
-                raise alerts.UnexpectedMessage(msg)
+                e = "missing content type in encrypted record"
+                raise alerts.UnexpectedMessage(e)
             content_type = innertext[i]
             fragment = innertext[:i]
 
         if content_type == ContentType.CHANGE_CIPHER_SPEC:
-            msg = f"invalid {ContentType.CHANGE_CIPHER_SPEC} record"
-            raise alerts.UnexpectedMessage(msg)
+            e = f"invalid {ContentType.CHANGE_CIPHER_SPEC} record"
+            raise alerts.UnexpectedMessage(e)
 
         return content_type, fragment
 
@@ -171,11 +170,9 @@ class TLSConnection:
             else:
                 self._input_handshake = fragment
         elif content_type != ContentType.HANDSHAKE:
-            msg = (
-                f"Expected {ContentType.HANDSHAKE} continuation "
-                f"record but {content_type} found."
-            )
-            raise alerts.UnexpectedMessage(msg)
+            e =(f"Expected {ContentType.HANDSHAKE} continuation record "
+                f"but {content_type} found.")
+            raise alerts.UnexpectedMessage(e)
         else:
             self._input_handshake += fragment
 
@@ -188,14 +185,14 @@ class TLSConnection:
                 return
             content_type, fragment = record
             if content_type != ContentType.HANDSHAKE:
-                msg = (f"Expected {ContentType.HANDSHAKE} continuation "
-                       f"record but {content_type} found.")
-                raise alerts.UnexpectedMessage(msg)
+                e =(f"Expected {ContentType.HANDSHAKE} continuation record "
+                    f"but {content_type} found.")
+                raise alerts.UnexpectedMessage(e)
             self._input_handshake += fragment
         if len(self._input_handshake) - 4 > handshake_length:
-            msg = (f"Expected {handshake_length + 4} bytes but "
-                   f"{len(self._input_handshake)} read.")
-            raise TooMuchData(msg)
+            e = (f"Expected {handshake_length + 4} bytes but "
+                 f"{len(self._input_handshake)} read.")
+            raise TooMuchData(e)
 
         content_data = self._input_handshake
         self._input_handshake = bytearray()
@@ -225,11 +222,10 @@ class TLSConnection:
                 for i in range(0, len(data), self.max_fragment_length)
             )
         else:
-            msg = (f"Serialized content ({len(data)} bytes) cannot fit "
-                   f"in a single record (max {self.max_fragment_length}"
-                   " bytes) and cannot be fragmented over multiple TLS"
-                   " 1.2 records.")
-            raise ValueError(msg)
+            e =(f"Serialized content ({len(data)} bytes) cannot fit in a "
+                f"single record (max {self.max_fragment_length} bytes) and"
+                " cannot be fragmented over multiple TLS  1.2 records.")
+            raise ValueError(e)
 
         self._output_data += b''.join((
             b''.join([

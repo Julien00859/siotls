@@ -17,12 +17,22 @@ class ClientWaitServerHello(State):
 
     def process(self, content):
         if content.content_type != ContentType.HANDSHAKE:
-            raise alerts.UnexpectedMessage()
-        if content.msg_type != HandshakeType.SERVER_HELLO:
-            raise alerts.UnexpectedMessage()
+            e = "Can only receive Handshake in this state."
+            raise alerts.UnexpectedMessage(e)
+        if self._is_first_server_hello:
+            if content.msg_type != HandshakeType.SERVER_HELLO:
+                e =("Can only receive ServerHello or HelloRetryRequest "
+                    "in this state.")
+                raise alerts.UnexpectedMessage(e)
+        else:
+            if content.msg_type is not HandshakeType.SERVER_HELLO:
+                e = "Can only receive ServerHello in this state."
+                raise alerts.UnexpectedMessage(e)
 
         if content.cipher_suite not in self.config.cipher_suites:
-            raise alerts.IllegalParameter()
+            e =(f"The server's selected {content.cipher_suite} wasn't offered "
+                f"in ClientHello: {self.config.cipher_suites}")
+            raise alerts.IllegalParameter(e)
 
         digestmod = content.cipher_suite.digestmod
         self._transcript_hash = digestmod(self._last_client_hello)
@@ -41,9 +51,12 @@ class ClientWaitServerHello(State):
 
         key_share = hello_retry_request.extensions.get(ExtensionType.KEY_SHARE)
         if not key_share:
-            raise alerts.MissingExtension()
+            e = "Missing Key Share in HelloRetryRequest"
+            raise alerts.MissingExtension(e)
         if key_share.selected_group not in self.config.key_exchanges:
-            raise alerts.IllegalParameter()
+            e =(f"The server's selected {key_share.selected_group} wasn't "
+                f"offered in ClientHello: {self.config.key_exchanges}")
+            raise alerts.IllegalParameter(e)
 
         # make sure we select the algorithms selected by the server
         self.config.cipher_suites = [hello_retry_request.cipher_suite]
