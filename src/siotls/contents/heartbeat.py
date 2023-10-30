@@ -1,7 +1,7 @@
 import dataclasses
 import textwrap
 from siotls.iana import ContentType, HeartbeatMessageType
-from siotls.serial import Serializable, SerialIO
+from siotls.serial import Serializable
 from . import Content, alerts
 
 
@@ -25,11 +25,11 @@ class Heartbeat(Content, Serializable):
     def __init__(self, heartbeat_type, payload, padding):
         # TODO: MaxFragmentLength
         if len(payload) > 2 ** 14 - 3:
-            msg = f"payload too long: {len(payload)} > {2 ** 14 - 3}"
-            raise ValueError(msg)
+            e = f"payload too long: {len(payload)} > {2 ** 14 - 3}"
+            raise ValueError(e)
         if len(padding) > 2 ** 14 - 3 - len(payload):
-            msg = f"padding too long: {len(padding)} > {2 ** 14 - 3 - len(payload)}"
-            raise ValueError(msg)
+            e = f"padding too long: {len(padding)} > {2 ** 14 - 3 - len(payload)}"
+            raise ValueError(e)
         self.heartbeat_type = heartbeat_type
         self.payload = payload
         self.padding = padding

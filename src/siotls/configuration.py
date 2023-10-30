@@ -42,8 +42,8 @@ class TLSConfiguration:
 
     def validate(self):
         if self.side == 'server' and self.max_fragment_length != 16384:
-            msg = "max fragment length is only configurable client side"
-            raise ValueError(msg)
+            e = "max fragment length is only configurable client side"
+            raise ValueError(e)
 
 
 @dataclasses.dataclass(frozen=True)

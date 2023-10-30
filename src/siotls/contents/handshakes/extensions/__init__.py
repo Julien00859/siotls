@@ -54,9 +54,9 @@ class Extension(Serializable):
                 existing_cls = registry.setdefault(htname, cls)
                 if existing_cls != cls:
                     etname = cls.extension_type.name
-                    msg = (f"Cannot register {cls} at pair ({etname}, {htname}), "
-                           f"another exist already: {existing_cls}")
-                    raise ValueError(msg)
+                    e =(f"Cannot register {cls} at pair ({etname}, {htname}), "
+                        f"another exist already: {existing_cls}")
+                    raise ValueError(e)
 
     @classmethod
     def parse(abc, stream, *, handshake_type):
@@ -66,9 +66,9 @@ class Extension(Serializable):
             try:
                 cls = registry.get(HandshakeType_.ANY.name) or registry[handshake_type.name]
             except KeyError:
-                msg = (f"cannot receive extension {extension_type!r} "
-                       f"with handshake {handshake_type.name}")
-                raise alerts.IllegalParameter(msg)
+                e = (f"cannot receive extension {extension_type!r} "
+                     f"with handshake {handshake_type.name}")
+                raise alerts.IllegalParameter(e)
 
         else:
             cls = type(

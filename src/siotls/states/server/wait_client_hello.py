@@ -34,9 +34,11 @@ class ServerWaitClientHello(State):
 
     def process(self, client_hello):
         if client_hello.content_type != ContentType.HANDSHAKE:
-            raise alerts.UnexpectedMessage()
+            e = "Can only receive Handshake in this state."
+            raise alerts.UnexpectedMessage(e)
         if client_hello.msg_type != HandshakeType.CLIENT_HELLO:
-            raise alerts.UnexpectedMessage()
+            e = "Can only receive ClientHello in this state."
+            raise alerts.UnexpectedMessage(e)
 
         if _ := client_hello.extensions.get(ExtensionType.PRE_SHARED_KEY):
             raise NotImplementedError("todo")
@@ -78,20 +80,20 @@ class ServerWaitClientHello(State):
     def _negociate_algorithms(self, client_hello, nconfig):
         nconfig.cipher_suite = self._find_common_cipher_suite(client_hello)
         if not nconfig.cipher_suite:
-            msg = "no common cipher suite found"
-            raise alerts.HandshakeFailure(msg)
+            e = "no common cipher suite found"
+            raise alerts.HandshakeFailure(e)
 
         nconfig.digital_signature = self._find_common_digital_signature(client_hello)
         if not nconfig.digital_signature:
-            msg = "no common digital signature found"
-            raise alerts.HandshakeFailure(msg)
+            e = "no common digital signature found"
+            raise alerts.HandshakeFailure(e)
 
         nconfig.key_exchange = (
             self._find_common_key_exchange_via_key_share(client_hello) or
             self._find_common_key_exchange_via_supported_groups(client_hello))
         if not nconfig.key_exchange:
-            msg = "no common key exchange found"
-            raise alerts.HandshakeFailure(msg)
+            e = "no common key exchange found"
+            raise alerts.HandshakeFailure(e)
 
     def _find_common_cipher_suite(self, client_hello):
         for cipher_suite in self.config.cipher_suites:
@@ -130,8 +132,8 @@ class ServerWaitClientHello(State):
 
     def _send_hello_retry_request(self, client_hello, nconfig):
         if not self._is_first_client_hello:
-            msg = "invalid KeyShare in second ClientHello"
-            raise alerts.IllegalParameter(msg)
+            e = "invalid KeyShare in second ClientHello"
+            raise alerts.IllegalParameter(e)
 
         # make sure the client doesn't change its algorithms in between flights
         self.config.cipher_suites = [nconfig.cipher_suite]
