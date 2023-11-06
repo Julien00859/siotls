@@ -31,7 +31,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "sslkeylog"
 ]
 
 [project.urls]
