@@ -203,7 +203,7 @@ class TLSConnection:
     def _send_content(self, content: Content):
         logger.info("will send %s", content.__class__.__name__)
         data = content.serialize()
-        if self._transcript_hash:
+        if self._transcript_hash and content.content_type == ContentType.HANDSHAKE:
             self._transcript_hash.update(data)
         match content:
             case ClientHello():
