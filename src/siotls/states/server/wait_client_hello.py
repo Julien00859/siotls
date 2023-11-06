@@ -19,6 +19,7 @@ from siotls.contents.handshakes import (
 from siotls.contents.handshakes.extensions import (
     SupportedVersionsResponse,
     KeyShareResponse, KeyShareRetry,
+    Heartbeat,
 )
 from siotls.crypto.key_share import resume as key_share_resume
 from .. import State
@@ -202,7 +203,7 @@ class ServerWaitClientHello(State):
                 client_hb.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
             )
             nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat
-            encrypted_extensions.append(type(client_hb)(
+            encrypted_extensions.append(Heartbeat(
                 HeartbeatMode.PEER_ALLOWED_TO_SEND
                 if self.config.can_echo_heartbeat else
                 HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND
