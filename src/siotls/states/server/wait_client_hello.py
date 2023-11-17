@@ -22,6 +22,7 @@ from siotls.contents.handshakes.extensions import (
     Heartbeat,
 )
 from siotls.crypto.key_share import resume as key_share_resume
+from siotls.secrets import TLSSecrets
 from .. import State
 from . import ServerWaitFlight2
 
@@ -57,8 +58,11 @@ class ServerWaitClientHello(State):
             self._move_to_state(ServerWaitClientHello)  # update _is_first_client_hello
             return
 
-        clear_extensions, encrypted_extensions = (
+        clear_extensions, encrypted_extensions, shared_key = (
             self._negociate_extensions(client_hello.extensions, nconfig))
+
+        self.secrets = TLSSecrets(nconfig.cipher_suite.digestmod)
+        self.secrets.skip_early_secrets()
 
         self._send_content(ServerHello(
             self._nonce,
@@ -71,6 +75,8 @@ class ServerWaitClientHello(State):
             self._send_content(ChangeCipherSpec())
 
         self.nconfig = TLSNegociatedConfiguration(**vars(nconfig))
+        self.secrets.compute_handshake_secrets(
+            shared_key, self._transcript_hash.digest())
 
         self._send_content(EncryptedExtensions(encrypted_extensions))
         self._send_content(Certificate(...))
@@ -212,4 +218,4 @@ class ServerWaitClientHello(State):
             nconfig.can_send_heartbeat = False
             nconfig.can_echo_heartbeat = False
 
-        return clear_extensions, encrypted_extensions
+        return clear_extensions, encrypted_extensions, shared_key

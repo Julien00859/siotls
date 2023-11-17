@@ -28,6 +28,7 @@ class TLSConnection:
 
         self.config = config
         self.nconfig = None
+        self._secrets = None
         self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
 
         self._input_data = bytearray()
