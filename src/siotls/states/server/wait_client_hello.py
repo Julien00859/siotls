@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from siotls import key_logger
 from siotls.iana import (
     ContentType,
     HandshakeType,
@@ -52,6 +53,11 @@ class ServerWaitClientHello(State):
             digestmod = nconfig.cipher_suite.digestmod
             self._transcript_hash = digestmod(self._last_client_hello)
             self._last_client_hello = None
+            self._client_nonce = client_hello.random
+        else:
+            if client_hello.random != self._client_nonce:
+                e = "Client's random cannot change in between Hellos"
+                raise alerts.IllegalParameter(e)
 
         if not self._can_resume_key_share(client_hello, nconfig.key_exchange):
             self._send_hello_retry_request(client_hello, nconfig)
@@ -65,7 +71,7 @@ class ServerWaitClientHello(State):
         self.secrets.skip_early_secrets()
 
         self._send_content(ServerHello(
-            self._nonce,
+            self._server_nonce,
             client_hello.legacy_session_id,
             nconfig.cipher_suite,
             clear_extensions,
@@ -77,6 +83,11 @@ class ServerWaitClientHello(State):
         self.nconfig = TLSNegociatedConfiguration(**vars(nconfig))
         self.secrets.compute_handshake_secrets(
             shared_key, self._transcript_hash.digest())
+        if self.config.log_keys:
+            key_logger.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
+                self._client_nonce.hex(), self.secrets.client_handshake_traffic.hex())
+            key_logger.info("SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s",
+                self._client_nonce.hex(), self.secrets.server_handshake_traffic.hex())
 
         self._send_content(EncryptedExtensions(encrypted_extensions))
         self._send_content(Certificate(...))

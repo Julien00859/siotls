@@ -79,6 +79,8 @@ class ClientWaitServerHello(State):
         self.connection.initiate_connection()
 
     def _process_server_hello(self, server_hello):
+        self._server_nonce = server_hello.random
+
         self._transcript_hash.update(self._last_server_hello)
         self._last_server_hello = None
         raise NotImplementedError("todo")

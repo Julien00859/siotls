@@ -56,6 +56,9 @@ def main():
     parser.add_argument('--tlskey', '--sslkey', action='store', type=pathlib.Path,
         default=importlib.resources.path('siotls.data', 'self-signed-key.pem'),
         help="Path to the SSL/TLS private key file")
+    parser.add_argument('--keylogfile', action='store', type=pathlib.Path,
+        help="Export TLS secrets to the specificed file for network analyzing "
+             "tools such as wireshark, use - to log on stderr.")
 
     try:
         options = parser.parse_args()
@@ -66,6 +69,14 @@ def main():
     # Configure logging
     verbosity = logging.INFO - options.verbose * 10 + options.silent * 10
     setup_logging(verbosity)
+
+    # Setup SSLKEYLOGFILE
+    if not options.keylogfile:
+        pass
+    elif options.keylogfile.name == '-':
+        siotls.key_logger.addHandler(logging.StreamHandler())
+    else:
+        siotls.key_logger.addHandler(logging.FileHandler(options.keylogfile, 'w'))
 
     # Check TLS cert/key
     if not os.access(options.tlscert, os.R_OK):

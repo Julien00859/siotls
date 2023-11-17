@@ -46,7 +46,7 @@ class ClientStart(State):
         extensions.append(KeyShareRequest(self._init_key_share()))
 
         self._send_content(ClientHello(
-            self._nonce, self.config.cipher_suites, extensions,
+            self._client_nonce, self.config.cipher_suites, extensions,
         ))
         self._move_to_state(ClientWaitServerHello)
 
