@@ -3,6 +3,7 @@ import logging
 import secrets
 import struct
 
+from siotls import key_logger
 from siotls.iana import (
     AlertLevel,
     ContentType,
@@ -35,7 +36,13 @@ class TLSConnection:
         self._input_handshake = bytearray()
         self._output_data = bytearray()
 
-        self._nonce = secrets.token_bytes(32)
+        if config.side == 'client':
+            self._client_nonce = secrets.token_bytes(32)
+            self._server_nonce = None
+        else:
+            self._client_nonce = None
+            self._server_nonce = secrets.token_bytes(32)
+
         self._key_exchange_privkeys = {}
         self._cookie = None
 
@@ -43,6 +50,21 @@ class TLSConnection:
         # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
         self._last_client_hello = None
         self._last_server_hello = None
+
+        if config.log_keys:
+            is_key_logger_enabled = any((
+                not isinstance(handler, logging.NullHandler)
+                for handler in key_logger.handlers
+            ))
+            if is_key_logger_enabled:
+                logger.info("Key log enabled for current connection.")
+            else:
+                logger.warning(
+                    "Key log was requested for current connection but no "
+                    "logging.Handler seems setup on the %r logger. You "
+                    "must setup one.\n"
+                    "logging.getLogger(%r).addHandler(logging.FileHandler(path_to_keylogfile))",
+                    self, key_logger.name, key_logger.name)
 
     @property
     def is_encrypted(self):
