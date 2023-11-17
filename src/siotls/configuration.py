@@ -40,6 +40,9 @@ class TLSConfiguration:
     alpn: list[ALPNProtocol] = dataclasses.field(default_factory=list)
     hostnames: list[str] = dataclasses.field(default_factory=list)
 
+    # extra
+    log_keys: bool = False
+
     def validate(self):
         if self.side == 'server' and self.max_fragment_length != 16384:
             e = "max fragment length is only configurable client side"
