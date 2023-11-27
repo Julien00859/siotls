@@ -5,6 +5,11 @@ except ImportError:
     class StrEnum(str, enum.Enum):
         pass
 import hashlib
+from cryptography.hazmat.primitives.ciphers.aead import (
+    AESCCM,
+    AESGCM,
+    ChaCha20Poly1305,
+)
 
 
 class Hex1Enum(enum.IntEnum):
@@ -65,15 +70,44 @@ class CipherSuites(Hex2Enum):
     TLS_AES_128_CCM_8_SHA256 = 0x1305
 
     @property
-    def digestmod(self):
-        return _cipher_digest_map[self]
+    def aeadmod(self):
+        return _cipher_suite_aead_map[self]
 
-_cipher_digest_map = {
+    @property
+    def digestmod(self):
+        return _cipher_suite_digest_map[self]
+
+    @property
+    def max_sequence(self):
+        return _cipher_suite_max_sequence_map[self.aead]
+
+    @property
+    def nonce_length(self):
+        return 12  # in bytes
+
+    @property
+    def tag_length(self):
+        return 16  # in bytes
+
+
+_cipher_suite_aead_map = {
+    CipherSuites.TLS_AES_128_GCM_SHA256: AESGCM,
+    CipherSuites.TLS_AES_256_GCM_SHA384: AESGCM,
+    CipherSuites.TLS_CHACHA20_POLY1305_SHA256: ChaCha20Poly1305,
+    CipherSuites.TLS_AES_128_CCM_SHA256: AESCCM,
+    CipherSuites.TLS_AES_128_CCM_8_SHA256: AESCCM,
+}
+_cipher_suite_digest_map = {
     CipherSuites.TLS_AES_128_GCM_SHA256: hashlib.sha256,
     CipherSuites.TLS_AES_256_GCM_SHA384: hashlib.sha384,
     CipherSuites.TLS_CHACHA20_POLY1305_SHA256: hashlib.sha256,
     CipherSuites.TLS_AES_128_CCM_SHA256: hashlib.sha256,
     CipherSuites.TLS_AES_128_CCM_8_SHA256: hashlib.sha256,
+}
+_cipher_suite_max_sequence_map = {
+    AESCCM: 0,  # not specified see #1332
+    AESGCM: (1 << 24) - (1 << 23),
+    ChaCha20Poly1305: 1 << 64,
 }
 
 

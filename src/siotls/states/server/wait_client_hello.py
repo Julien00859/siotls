@@ -67,7 +67,10 @@ class ServerWaitClientHello(State):
         clear_extensions, encrypted_extensions, shared_key = (
             self._negociate_extensions(client_hello.extensions, nconfig))
 
-        self.secrets = TLSSecrets(nconfig.cipher_suite.digestmod)
+        self.secrets = TLSSecrets(
+            nconfig.cipher_suite.digestmod,
+            max(nconfig.cipher_suite.nonce_length, 8),
+        )
         self.secrets.skip_early_secrets()
 
         self._send_content(ServerHello(
@@ -81,8 +84,15 @@ class ServerWaitClientHello(State):
             self._send_content(ChangeCipherSpec())
 
         self.nconfig = TLSNegociatedConfiguration(**vars(nconfig))
-        self.secrets.compute_handshake_secrets(
-            shared_key, self._transcript_hash.digest())
+
+        (client_handshake_traffic_key, client_handshake_traffic_iv,
+         server_handshake_traffic_key, server_handshake_traffic_iv,
+        ) = self.secrets.compute_handshake_secrets(shared_key, self._transcript_hash.digest())
+        self._read_cipher = self.nconfig.cipher_suite.aeadmod(client_handshake_traffic_key)
+        self._write_cipher = self.nconfig.cipher_suite.aeadmod(server_handshake_traffic_key)
+        self._reset_nonces(client_handshake_traffic_iv, server_handshake_traffic_iv)
+
+
         if self.config.log_keys:
             key_logger.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
                 self._client_nonce.hex(), self.secrets.client_handshake_traffic.hex())

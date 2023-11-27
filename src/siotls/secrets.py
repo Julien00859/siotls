@@ -1,22 +1,10 @@
-# TODO: store and manipulate those secrets more safely
-# https://keepassxc.org/blog/2019-02-21-memory-security/
-
-from siotls.crypto.hkdf import hkdf_extract, derive_secret
+from siotls.crypto.hkdf import hkdf_extract, hkdf_expand_label, derive_secret
 
 
 class TLSSecrets:
-    binder_key: bytes
-    client_early_traffic: bytes
-    early_exporter_master: bytes
-    client_handshake_traffic: bytes
-    server_handshake_traffic: bytes
-    client_application_traffic: bytes
-    server_application_traffic: bytes
-    exporter_master: bytes
-    resumption_master: bytes
-
-    def __init__(self, digestmod):
+    def __init__(self, digestmod, iv_length):
         self._digestmod = digestmod
+        self._iv_length = iv_length
         self._zeros = b'\x00' * digestmod().digest_size
         self._salt = self._zeros
         self._empty = digestmod(b'').digest()
@@ -34,6 +22,13 @@ class TLSSecrets:
             derive_secret(self._digestmod, secret, label, transcript_hash)
         )
 
+    def _derive_key_and_iv(self, secret):
+        dm = self._digestmod
+        return (
+            hkdf_expand_label(dm, secret, b'key', b'', dm.digest_size),
+            hkdf_expand_label(dm, secret, b'iv', b'', self._iv_length),
+        )
+
     def skip_early_secrets(self):
         psk = self._zeros
         self._make_deriver(psk, transcript_hash=None, update_salt=True)
@@ -41,26 +36,58 @@ class TLSSecrets:
     def compute_early_secrets(self, psk, psk_mode, client_hello_transcript_hash):
         assert psk_mode in ('external', 'resume')
         psk_label = f'{psk_mode[:3]} binder'.encode()
-
         derive_early_secret = self._make_deriver(
             psk, client_hello_transcript_hash, update_salt=True)
-        self.binder_key = derive_early_secret(psk_label, transcript_hash=self._empty)
-        self.client_early_traffic = derive_early_secret(b'c e traffic')
-        self.early_exporter_master = derive_early_secret(b'e exp master')
+
+        binder_key = derive_early_secret(psk_label, transcript_hash=self._empty)
+        early_exporter_master = derive_early_secret(b'e exp master')
+        client_early_traffic = derive_early_secret(b'c e traffic')
+        client_early_traffic_key, client_early_traffic_iv = (
+            self._derive_key_and_iv(client_early_traffic))
+        return (
+            binder_key,
+            early_exporter_master,
+            client_early_traffic_key,
+            client_early_traffic_iv,
+        )
 
     def compute_handshake_secrets(self, shared_key, server_hello_transcript_hash):
         derive_handshake_secret = self._make_deriver(
             shared_key, server_hello_transcript_hash, update_salt=True)
-        self.client_handshake_traffic = derive_handshake_secret(b'c hs traffic')
-        self.server_handshake_traffic = derive_handshake_secret(b's hs traffic')
+
+        client_handshake_traffic = derive_handshake_secret(b'c hs traffic')
+        client_handshake_traffic_key, client_handshake_traffic_iv = (
+            self._derive_key_and_iv(client_handshake_traffic))
+        server_handshake_traffic = derive_handshake_secret(b's hs traffic')
+        server_handshake_traffic_key, server_handshake_traffic_iv = (
+            self._derive_key_and_iv(server_handshake_traffic))
+        return (
+            client_handshake_traffic_key,
+            client_handshake_traffic_iv,
+            server_handshake_traffic_key,
+            server_handshake_traffic_iv,
+        )
 
     def compute_master_secrets(
         self, server_finished_transcript_hash, client_finished_transcript_hash
     ):
         derive_master_secret = self._make_deriver(
             self._zeros, server_finished_transcript_hash, update_salt=False)
-        self.client_application_traffic = derive_master_secret(b'c ap traffic')
-        self.server_application_traffic = derive_master_secret(b's ap traffic')
-        self.exporter_master = derive_master_secret(b'exp master')
-        self.resumption_master = derive_master_secret(
+
+        client_application_traffic = derive_master_secret(b'c ap traffic')
+        client_application_traffic_key, client_application_traffic_iv = (
+            self._derive_key_and_iv(client_application_traffic))
+        server_application_traffic = derive_master_secret(b's ap traffic')
+        server_application_traffic_key, server_application_traffic_iv = (
+            self._derive_key_and_iv(server_application_traffic))
+        exporter_master = derive_master_secret(b'exp master')
+        resumption_master = derive_master_secret(
             b'res master', transcript_hash=client_finished_transcript_hash)
+        return (
+            client_application_traffic_key,
+            client_application_traffic_iv,
+            server_application_traffic_key,
+            server_application_traffic_iv,
+            exporter_master,
+            resumption_master,
+        )

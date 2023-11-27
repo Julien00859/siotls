@@ -51,6 +51,12 @@ class TLSConnection:
         self._last_client_hello = None
         self._last_server_hello = None
 
+        self._read_cipher = None
+        self._read_nonce = None
+
+        self._write_cipher = None
+        self._write_nonce = None
+
         if config.log_keys:
             is_key_logger_enabled = any((
                 not isinstance(handler, logging.NullHandler)
@@ -65,16 +71,6 @@ class TLSConnection:
                     "must setup one.\n"
                     "logging.getLogger(%r).addHandler(logging.FileHandler(path_to_keylogfile))",
                     self, key_logger.name, key_logger.name)
-
-    @property
-    def is_encrypted(self):
-        return self.nconfig is not None
-
-    @property
-    def max_fragment_length(self):
-        return (self.nconfig or self.config).max_fragment_length + (
-            256 if self.is_encrypted else 0
-        )
 
     # ------------------------------------------------------------------
     # Public APIs
@@ -133,6 +129,9 @@ class TLSConnection:
         self._output_data = bytearray()
         return output
 
+    def rekey(self):
+        raise NotImplementedError("todo")
+
     # ------------------------------------------------------------------
     # Internal APIs
     # ------------------------------------------------------------------
@@ -150,19 +149,27 @@ class TLSConnection:
         content_type, _legacy_version, content_length = \
             struct.unpack('!BHH', self._input_data[:5])
 
-        if content_length > self.max_fragment_length:
-            e =(f"The record is longer ({content_length} bytes) than the "
-                f"allowed maximum ({self.max_fragment_length} bytes).")
+        max_fragment_length = (self.nconfig or self.config).max_fragment_length
+        if self._read_cipher:
+            max_fragment_length += 256
+        if content_length > max_fragment_length:
+            e =(f"The record is longer ({content_length} bytes) than "
+                f"the allowed maximum ({max_fragment_length} bytes).")
             raise alerts.RecordOverFlow(e)
 
         if len(self._input_data) - 5 < content_length:
             return
 
+        header = self._input_data[:5]
         fragment = self._input_data[5:content_length + 5]
         self._input_data = self._input_data[content_length + 5:]
 
-        if self.is_encrypted:
-            innertext = self.decrypt(fragment)
+        if self._read_cipher:
+            innertext = self._read_cipher.decrypt(
+                nonce=next(self._read_nonce),
+                data=fragment,
+                associated_data=header,
+            )
             for i in range(len(innertext) -1, -1, -1):
                 if innertext[i]:
                     break
@@ -223,9 +230,29 @@ class TLSConnection:
             self._transcript_hash.update(content_data)
         return content_type, content_data
 
+    def _reset_nonces(self, read_iv, write_iv):
+        read_iv = int.from_bytes(read_iv, 'big')
+        write_iv = int.from_bytes(write_iv, 'big')
+        max_sequence = self.nconfig.cipher_suite.max_sequence
+        nonce_length = self.nconfig.cipher_suite.nonce_length
+        rekey_threshold = max_sequence * .99
+
+        self._read_nonce = (
+            (read_iv ^ read_sequence).to_bytes(nonce_length, 'big')
+            for read_sequence in range(max_sequence)
+        )
+        self._write_nonce = (
+            (
+                (write_iv ^ write_sequence).to_bytes(nonce_length, 'big'),
+                write_sequence >= rekey_threshold,  # should_rekey
+            )
+            for write_sequence in range(max_sequence)
+        )
+
     def _send_content(self, content: Content):
         logger.info("will send %s", content.__class__.__name__)
         data = content.serialize()
+
         if self._transcript_hash and content.content_type == ContentType.HANDSHAKE:
             self._transcript_hash.update(data)
         match content:
@@ -234,32 +261,62 @@ class TLSConnection:
             case ServerHello():
                 self._last_server_hello = data
 
-        if self.is_encrypted:
-            data = self.encrypt(data)
+        fragment_length = (self.nconfig or self.config).max_fragment_length
+        if self._write_cipher:
+            fragment_length -= 1  # room for content_type, see _encrypt()
 
-        if len(data) < self.max_fragment_length:
-            iter_fragments = (data,)
+        if len(data) <= fragment_length:
+            fragments = (data,)
         elif content.can_fragment:
-            iter_fragments = (
-                data[i : i + self.max_fragment_length]
-                for i in range(0, len(data), self.max_fragment_length)
+            fragments = (
+                data[i : i + fragment_length]
+                for i in range(0, len(data), fragment_length)
             )
         else:
-            e =(f"Serialized content ({len(data)} bytes) cannot fit in a "
-                f"single record (max {self.max_fragment_length} bytes) and"
-                " cannot be fragmented over multiple TLS  1.2 records.")
+            e =(f"Serialized {content} ({len(data)} bytes) doesn't fit "
+                f"inside a single record (max {fragment_length} bytes) "
+                " and cannot be fragmented over multiple ones.")
             raise ValueError(e)
 
-        self._output_data += b''.join((
+        if self._write_cipher:
+            record_type = ContentType.APPLICATION_DATA
+            fragments = self._encrypt(content.content_type, fragments, fragment_length)
+        else:
+            record_type = ContentType.content_type
+
+        self._output_data += b''.join(
             b''.join([
-                (
-                    ContentType.APPLICATION_DATA
-                    if self.is_encrypted else
-                    content.content_type
-                ).to_bytes(1, 'big'),
+                record_type.to_bytes(1, 'big'),
                 TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
                 len(fragment).to_bytes(2, 'big'),
                 fragment,
             ])
-            for fragment in iter_fragments
-        ))
+            for fragment in fragments
+        )
+
+    def _encrypt(self, content_type, fragments, fragment_length):
+        tag_length = self.nconfig.cipher_suite.tag_length
+
+        # RFC-8446 doesn't specify anything regarding padding, it only
+        # says that it is a good idea. We add padding so that record
+        # sizes are a multiple of 4kib (or less if max_fragment_lenght)
+        chunk_size = min(fragment_length, 4096)
+        def padding(data):
+            return b'\x00' * (chunk_size - (len(data) - 1) % chunk_size)
+
+        for fragment in fragments:
+            encrypted_fragment = self._write_cipher.encrypt(
+                nonce=next(self._write_nonce),
+                data=b''.join([
+                    fragment,
+                    content_type.to_bytes(1, 'big'),
+                    padding(fragment),
+                ]),
+                associated_data=b''.join([
+                    ContentType.APPLICATION_DATA.to_bytes(1, 'big'),
+                    TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
+                    (len(fragment) + tag_length).to_bytes(2, 'big'),
+                ]),
+            )
+            assert len(encrypted_fragment) == len(fragment) + tag_length
+            yield encrypted_fragment

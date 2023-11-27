@@ -45,6 +45,24 @@ class ClientHello(Handshake, SerializableBody):
         self.legacy_compression_methods = type(self).legacy_compression_methods
         self.extensions = {ext.extension_type: ext for ext in extensions}
 
+        if len(self.extensions) != len(extensions):
+            for ext_no, ext1 in enumerate(extensions):
+                for ext2 in extensions[ext_no+1:]:
+                    if ext1.extension_type == ext2.extension_type:
+                        break
+            e = f"Duplicated {ext1.extension_type}: {ext1} vs {ext2}"
+            raise ValueError(e)
+
+        if ExtensionType.PRE_SHARED_KEY in self.extensions:
+            if extensions[-1].extension_type != ExtensionType.PRE_SHARED_KEY:
+                e =(f"{ExtensionType.PRE_SHARED_KEY} must be the last"
+                    " extension inside the list")
+                raise ValueError(e)
+            if ExtensionType.PSK_KEY_EXCHANGE_MODES not in self.extensions:
+                e = f"Missing mandatory {ExtensionType.PSK_KEY_EXCHANGE_MODES}"
+                raise ValueError(e)
+
+
     @classmethod
     def parse_body(cls, stream):
         legacy_version = stream.read_int(2)
@@ -73,7 +91,10 @@ class ClientHello(Handshake, SerializableBody):
             logger.debug("Found extension %s", extension)
             extensions.append(extension)
 
-        self = cls(random, cipher_suites, extensions)
+        try:
+            self = cls(random, cipher_suites, extensions)
+        except ValueError as exc:
+            raise alerts.IllegalParameter() from exc
         self.legacy_session_id = legacy_session_id
         return self
 
