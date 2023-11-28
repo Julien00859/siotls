@@ -4,12 +4,6 @@ try:
 except ImportError:
     class StrEnum(str, enum.Enum):
         pass
-import hashlib
-from cryptography.hazmat.primitives.ciphers.aead import (
-    AESCCM,
-    AESGCM,
-    ChaCha20Poly1305,
-)
 
 
 class Hex1Enum(enum.IntEnum):
@@ -68,47 +62,6 @@ class CipherSuites(Hex2Enum):
     TLS_CHACHA20_POLY1305_SHA256 = 0x1303
     TLS_AES_128_CCM_SHA256 = 0x1304
     TLS_AES_128_CCM_8_SHA256 = 0x1305
-
-    @property
-    def aeadmod(self):
-        return _cipher_suite_aead_map[self]
-
-    @property
-    def digestmod(self):
-        return _cipher_suite_digest_map[self]
-
-    @property
-    def max_sequence(self):
-        return _cipher_suite_max_sequence_map[self.aead]
-
-    @property
-    def nonce_length(self):
-        return 12  # in bytes
-
-    @property
-    def tag_length(self):
-        return 16  # in bytes
-
-
-_cipher_suite_aead_map = {
-    CipherSuites.TLS_AES_128_GCM_SHA256: AESGCM,
-    CipherSuites.TLS_AES_256_GCM_SHA384: AESGCM,
-    CipherSuites.TLS_CHACHA20_POLY1305_SHA256: ChaCha20Poly1305,
-    CipherSuites.TLS_AES_128_CCM_SHA256: AESCCM,
-    CipherSuites.TLS_AES_128_CCM_8_SHA256: AESCCM,
-}
-_cipher_suite_digest_map = {
-    CipherSuites.TLS_AES_128_GCM_SHA256: hashlib.sha256,
-    CipherSuites.TLS_AES_256_GCM_SHA384: hashlib.sha384,
-    CipherSuites.TLS_CHACHA20_POLY1305_SHA256: hashlib.sha256,
-    CipherSuites.TLS_AES_128_CCM_SHA256: hashlib.sha256,
-    CipherSuites.TLS_AES_128_CCM_8_SHA256: hashlib.sha256,
-}
-_cipher_suite_max_sequence_map = {
-    AESCCM: 0,  # not specified see #1332
-    AESGCM: (1 << 24) - (1 << 23),
-    ChaCha20Poly1305: 1 << 64,
-}
 
 
 class ContentType(Hex1Enum):
@@ -177,11 +130,24 @@ class NameType(Hex1Enum):
     HOST_NAME = 0
 
 
-class MaxFragmentLength(Hex1Enum):
+class MaxFragmentLengthOctets(enum.IntEnum):
+    MAX_512 = 512
+    MAX_1024 = 1024
+    MAX_2048 = 2048
+    MAX_4096 = 4096
+    MAX_16384 = 16384
+
+    def to_code(self):
+        return MaxFragmentLengthCode(self.name)
+
+class MaxFragmentLengthCode(Hex1Enum):
     MAX_512 = 1
     MAX_1024 = 2
     MAX_2048 = 3
     MAX_4096 = 4
+
+    def to_octets(self):
+        return MaxFragmentLengthOctets(self.name)
 
 
 class CertificateStatusType(Hex1Enum):

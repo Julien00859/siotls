@@ -1,13 +1,14 @@
-from types import SimpleNamespace
 from siotls.secrets import TLSSecrets
 from siotls.crypto.key_share import resume as key_share_resume
+from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import alerts, ChangeCipherSpec
 from siotls.iana import (
     ContentType,
     HandshakeType,
     HandshakeType_,
     HeartbeatMode,
-    ExtensionType
+    ExtensionType,
+    MaxFragmentLengthOctets,
 )
 from .. import State
 from . import ClientWaitEncryptedExtensions
@@ -39,11 +40,14 @@ class ClientWaitServerHello(State):
                 f"in ClientHello: {self.config.cipher_suites}")
             raise alerts.IllegalParameter(e)
 
-        digestmod = content.cipher_suite.digestmod
-        self._transcript_hash = digestmod(self._last_client_hello)
-        self._last_client_hello = None
-
         if self._is_first_server_hello:
+            self.nconfig = TLSNegociatedConfiguration(content.cipher_suite)
+            self._secrets = TLSSecrets(
+                self.nconfig.digestmod,
+                max(8, self.nconfig.ciphermod.nonce_length_min),
+            )
+            self._transcript_hash = self.nconfig.digestmod(self._last_client_hello)
+            self._last_client_hello = None
             self._send_content(ChangeCipherSpec())
 
         if content.msg_type is HandshakeType_.HELLO_RETRY_REQUEST:
@@ -71,10 +75,9 @@ class ClientWaitServerHello(State):
             self._cookie = cookie.cookie
 
         # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
-        digestmod = hello_retry_request.cipher_suite.digestmod
-        self._transcript_hash = digestmod(b''.join([
+        self._transcript_hash = self.nconfig.digestmod(b''.join([
             HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
-            digestmod().digest_size.to_bytes(3, 'big'),
+            self.nconfig.digestmod().digest_size.to_bytes(3, 'big'),
             self._transcript_hash.digest(),
             self._last_server_hello,
         ]))
@@ -84,77 +87,79 @@ class ClientWaitServerHello(State):
         self.connection.initiate_connection()
 
     def _process_server_hello(self, server_hello):
-        self._server_nonce = server_hello.random
+        self._server_unique = server_hello.random
+        shared_key = self._negociate_extensions(server_hello.extensions)
 
-        nconfig = SimpleNamespace()
-        nconfig.cipher_suite = server_hello.cipher_suite
-        nconfig.secrets = TLSSecrets(nconfig.cipher_suite.digestmod)
-        nconfig.secrets.skip_early_secrets()
-
-        self._transcript_hash.update(self._last_server_hello)
-        self._last_server_hello = None
-        shared_key = self._negociate_extensions(server_hello.extensions, nconfig)
-        nconfig.secrets.compute_handshake_secrets(
-            shared_key, self._transcript_hash.digest())
-
-        # save the simple namespace on the connection as we don't know
-        # the negociated digital signature yet, delegate instantiating
-        # the final NegociatedConfiguration object to WaitCertificate
-        self.nconfig = nconfig
+        self._secrets.skip_early_secrets()
+        (cli_hs_key, cli_hs_iv, srv_hs_key, srv_hs_iv) = \
+            self.secrets.compute_handshake_secrets(shared_key, self._transcript_hash.digest())
+        self._read_cipher = self.nconfig.cipher(cli_hs_key)
+        self._write_cipher = self.nconfig.cipher(srv_hs_key)
+        self._reset_nonces(cli_hs_iv, srv_hs_iv)
 
         self._move_to_state(ClientWaitEncryptedExtensions)
 
-    def _negociate_extensions(self, server_extensions, nconfig):
-        # Key Share
+    def _negociate_extensions(self, server_extensions):
+        ET = ExtensionType
         try:
-            key_share = server_extensions[ExtensionType.KEY_SHARE]
-        except KeyError as exc:
-            raise alerts.MissingExtension() from exc
-        if key_share.group not in self._key_exchange_privkeys:
-            e =(f"The server's selected {key_share.selected_group} wasn't "
-                f"offered in ClientHello: {self.config.key_exchanges}")
+            key_share_ext = server_extensions[ET.KEY_SHARE]
+        except KeyError as ext:
+            raise alerts.MissingExtension() from ext
+        shared_key = self._negociate_key_share(key_share_ext, self._key_exchange_privkeys)
+        self._negociate_mfl(server_extensions.get(ET.MAX_FRAGMENT_LENGTH))
+        self._negociate_alpn(server_extensions.get(ET.APPLICATION_LAYER_PROTOCOL_NEGOTIATION))
+        self._negociate_heartbeat(server_extensions.get(ET.HEARTBEAT))
+
+    def _negociate_key_share(self, key_share_ext, my_private_keys):
+        if not key_share_ext:
+        elif key_share_ext.group not in self._key_exchange_privkeys:
+            e =(f"The server's selected {key_share_ext.selected_group} was "
+                f"not offered in ClientHello: {self.config.key_exchanges}")
             raise alerts.IllegalParameter(e)
         shared_key, _ = key_share_resume(
-            nconfig.key_exchange,
-            self._key_exchange_privkeys[nconfig.key_exchange],
-            key_share.client_shares[nconfig.key_exchange],
+            key_share_ext,
+            my_private_keys[key_share_ext],
+            key_share_ext.client_shares[key_share_ext],
         )
-        nconfig.key_exchange = key_share.group
-
-        # Max Fragment Length
-        mfl = server_extensions.get(ExtensionType.MAX_FRAGMENT_LENGTH)
-        if self.config.max_fragment_length != 16384 and mfl:
-            if mfl.max_fragment_length != self.config.max_fragment_length:
-                e =(f"The server's selected {mfl.max_fragment_length} max "
-                    f"fragment length wasn't offered in ClientHello:"
-                    f"{self.config.key_exchanges}")
-                raise alerts.IllegalParameter(e)
-            nconfig.max_fragment_length = mfl.max_fragment_length
-
-        # ALPN
-        alpn = server_extensions.get(
-            ExtensionType.APPLICATION_LAYER_PROTOCOL_NEGOTIATION)
-        if alpn:
-            if length := len(alpn.protocol_name_list) != 1:
-                e =("Invalid Application Layer Protocol Negociation (ALPN) "
-                    f"response. 1 protocol expected, {length} found.")
-                raise alerts.IllegalParameter(e)
-            if alpn.protocol_name_list[0] not in self.config.alpn:
-                e =(f"The server's selected application layer protocol (ALPN) "
-                    f"{alpn.protocol_name_list[0]!r} wasn't offered via "
-                    f"in ClientHello: {self.config.alpn}")
-                raise alerts.IllegalParameter(e)
-
-        # Heartbeat
-        server_hb = server_extensions.get(ExtensionType.HEARTBEAT)
-        if server_hb:
-            nconfig.can_send_heartbeat = (
-                self.config.can_send_heartbeat and
-                server_hb.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
-            )
-            nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat
-        else:
-            nconfig.can_send_heartbeat = False
-            nconfig.can_echo_heartbeat = False
-
+        self.nconfig.key_exchange = key_share_ext.group
         return shared_key
+
+    def _negociate_mfl(self, mfl_ext):
+        if not mfl_ext:
+            self.nconfig.max_fragment_length = MaxFragmentLengthOctets.MAX_16384
+        elif mfl_ext.octets != self.config.max_fragment_length:
+            try:
+                code = self.config.max_fragment_length.to_code()
+            except ValueError:
+                code = None
+            e =(f"The server's selected {mfl_ext.code} wasn't offered "
+                f"in ClientHello: {code}")
+            raise alerts.IllegalParameter(e)
+        else:
+            self.nconfig.max_fragment_length = mfl_ext.octets
+
+    def _negociate_alpn(self, alpn_ext):
+        if not alpn_ext:
+            self.nconfig.alpn = None
+        elif length := len(alpn_ext.protocol_name_list) != 1:
+            e =("Invalid Application Layer Protocol Negociation (ALPN) "
+                f"response. Expected 1 protocol, {length} found.")
+            raise alerts.IllegalParameter(e)
+        elif alpn_ext.protocol_name_list[0] not in self.config.alpn:
+            e =("The server's selected Application Layer Protocol (ALPN) "
+                f"{alpn_ext.protocol_name_list[0]!r} wasn't offered in "
+                f"ClientHello: {self.config.alpn}")
+            raise alerts.IllegalParameter(e)
+        else:
+            self.nconfig.alpn = alpn_ext.protocol_name_list[0]
+
+    def _negociate_heartbeat(self, heartbeat_ext):
+        if not heartbeat_ext:
+            self.nconfig.can_send_heartbeat = False
+            self.nconfig.can_echo_heartbeat = False
+        else:
+            self.nconfig.can_send_heartbeat = (
+                self.config.can_send_heartbeat and
+                heartbeat_ext.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
+            )
+            self.nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat

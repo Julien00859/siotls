@@ -22,6 +22,7 @@ from siotls.contents.handshakes.extensions import (
     KeyShareResponse, KeyShareRetry,
     Heartbeat,
 )
+from siotls.ciphers import digest_map
 from siotls.crypto.key_share import resume as key_share_resume
 from siotls.secrets import TLSSecrets
 from .. import State
@@ -46,16 +47,16 @@ class ServerWaitClientHello(State):
         if _ := client_hello.extensions.get(ExtensionType.PRE_SHARED_KEY):
             raise NotImplementedError("todo")
 
-        nconfig = SimpleNamespace()
+        nconfig = SimpleNamespace()  # TODO: scrap SN
         self._negociate_algorithms(client_hello, nconfig)
 
         if self._is_first_client_hello:
-            digestmod = nconfig.cipher_suite.digestmod
+            digestmod = digest_map[nconfig.cipher_suite]
             self._transcript_hash = digestmod(self._last_client_hello)
             self._last_client_hello = None
-            self._client_nonce = client_hello.random
+            self._client_unique = client_hello.random
         else:
-            if client_hello.random != self._client_nonce:
+            if client_hello.random != self._client_unique:
                 e = "Client's random cannot change in between Hellos"
                 raise alerts.IllegalParameter(e)
 
@@ -67,14 +68,15 @@ class ServerWaitClientHello(State):
         clear_extensions, encrypted_extensions, shared_key = (
             self._negociate_extensions(client_hello.extensions, nconfig))
 
+        self.nconfig = TLSNegociatedConfiguration(**vars(nconfig))
         self.secrets = TLSSecrets(
-            nconfig.cipher_suite.digestmod,
-            max(nconfig.cipher_suite.nonce_length, 8),
+            self.nconfig.digestmod,
+            max(8, self.nconfig.ciphermod.nonce_length_min),
         )
         self.secrets.skip_early_secrets()
 
         self._send_content(ServerHello(
-            self._server_nonce,
+            self._server_unique,
             client_hello.legacy_session_id,
             nconfig.cipher_suite,
             clear_extensions,
@@ -83,21 +85,19 @@ class ServerWaitClientHello(State):
         if self._is_first_client_hello:
             self._send_content(ChangeCipherSpec())
 
-        self.nconfig = TLSNegociatedConfiguration(**vars(nconfig))
 
-        (client_handshake_traffic_key, client_handshake_traffic_iv,
-         server_handshake_traffic_key, server_handshake_traffic_iv,
-        ) = self.secrets.compute_handshake_secrets(shared_key, self._transcript_hash.digest())
-        self._read_cipher = self.nconfig.cipher_suite.aeadmod(client_handshake_traffic_key)
-        self._write_cipher = self.nconfig.cipher_suite.aeadmod(server_handshake_traffic_key)
-        self._reset_nonces(client_handshake_traffic_iv, server_handshake_traffic_iv)
+        (cli_hs_key, cli_hs_iv, srv_hs_key, srv_hs_iv) = \
+            self.secrets.compute_handshake_secrets(shared_key, self._transcript_hash.digest())
+        self._read_cipher = self.nconfig.cipher(cli_hs_key)
+        self._write_cipher = self.nconfig.cipher(srv_hs_key)
+        self._reset_nonces(cli_hs_iv, srv_hs_iv)
 
 
         if self.config.log_keys:
             key_logger.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
-                self._client_nonce.hex(), self.secrets.client_handshake_traffic.hex())
+                self._client_unique.hex(), self.secrets.client_handshake_traffic.hex())
             key_logger.info("SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s",
-                self._client_nonce.hex(), self.secrets.server_handshake_traffic.hex())
+                self._client_unique.hex(), self.secrets.server_handshake_traffic.hex())
 
         self._send_content(EncryptedExtensions(encrypted_extensions))
         self._send_content(Certificate(...))
@@ -105,28 +105,17 @@ class ServerWaitClientHello(State):
         self._send_content(Finished(...))
         self._move_to_state(ServerWaitFlight2)
 
-    def _negociate_algorithms(self, client_hello, nconfig):
-        nconfig.cipher_suite = self._find_common_cipher_suite(client_hello)
-        if not nconfig.cipher_suite:
-            e = "no common cipher suite found"
-            raise alerts.HandshakeFailure(e)
-
-        nconfig.digital_signature = self._find_common_digital_signature(client_hello)
-        if not nconfig.digital_signature:
-            e = "no common digital signature found"
-            raise alerts.HandshakeFailure(e)
-
-        nconfig.key_exchange = (
-            self._find_common_key_exchange_via_key_share(client_hello) or
-            self._find_common_key_exchange_via_supported_groups(client_hello))
-        if not nconfig.key_exchange:
-            e = "no common key exchange found"
-            raise alerts.HandshakeFailure(e)
+    def _negociate_algorithms(self, client_hello):
+        self.nconfig.cipher_suite = self._find_common_cipher_suite(client_hello)
+        self.nconfig.digital_signature = self._find_common_digital_signature(client_hello)
+        self.nconfig.key_exchange = self._find_common_key_exchange(client_hello)
 
     def _find_common_cipher_suite(self, client_hello):
         for cipher_suite in self.config.cipher_suites:
             if cipher_suite in client_hello.cipher_suites:
                 return cipher_suite
+        e = "no common cipher suite found"
+        raise alerts.HandshakeFailure(e)
 
     def _find_common_digital_signature(self, client_hello):
         try:
@@ -136,16 +125,10 @@ class ServerWaitClientHello(State):
         for digital_signatures in self.config.digital_signatures:
             if digital_signatures in ext.supported_signature_algorithms:
                 return digital_signatures
+        e = "no common digital signature found"
+        raise alerts.HandshakeFailure(e)
 
-    def _find_common_key_exchange_via_key_share(self, client_hello):
-        key_share = client_hello.extensions.get(ExtensionType.KEY_SHARE)
-        if not key_share:
-            return
-        for group in self.config.key_exchanges:
-            if group in key_share.client_shares:
-                return group
-
-    def _find_common_key_exchange_via_supported_groups(self, client_hello):
+    def _find_common_key_exchange(self, client_hello):
         try:
             supported_groups = client_hello.extensions[ExtensionType.SUPPORTED_GROUPS]
         except KeyError as exc:
@@ -153,10 +136,12 @@ class ServerWaitClientHello(State):
         for group in self.config.key_exchanges:
             if group in supported_groups.named_group_list:
                 return group
+        e = "no common key exchange found"
+        raise alerts.HandshakeFailure(e)
 
-    def _can_resume_key_share(self, client_hello, key_exchange):
+    def _can_resume_key_share(self, client_hello):
         key_share = client_hello.extensions.get(ExtensionType.KEY_SHARE)
-        return key_share and key_exchange in key_share.client_shares
+        return key_share and self.nconfig.key_exchange in key_share.client_shares
 
     def _send_hello_retry_request(self, client_hello, nconfig):
         if not self._is_first_client_hello:
@@ -169,7 +154,7 @@ class ServerWaitClientHello(State):
         self.config.key_exchanges = [nconfig.key_exchange]
 
         # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
-        digestmod = nconfig.cipher_suite.digestmod
+        digestmod = digest_map[nconfig.cipher_suite]
         self._transcript_hash = digestmod(b''.join([
             HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
             digestmod().digest_size.to_bytes(3, 'big'),
@@ -202,7 +187,7 @@ class ServerWaitClientHello(State):
         # Max Fragment Length
         client_mfl = client_extensions.get(ExtensionType.MAX_FRAGMENT_LENGTH)
         if client_mfl:
-            nconfig.max_fragment_length = client_mfl.max_fragment_length
+            nconfig.max_fragment_length = client_mfl.octets
             encrypted_extensions.append(client_mfl)
         else:
             nconfig.max_fragment_length = self.config.max_fragment_length
