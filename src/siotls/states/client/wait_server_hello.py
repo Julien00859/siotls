@@ -100,47 +100,52 @@ class ClientWaitServerHello(State):
         self._move_to_state(ClientWaitEncryptedExtensions)
 
     def _negociate_extensions(self, server_extensions):
-        ET = ExtensionType
-        try:
-            key_share_ext = server_extensions[ET.KEY_SHARE]
-        except KeyError as ext:
-            raise alerts.MissingExtension() from ext
-        shared_key = self._negociate_key_share(key_share_ext, self._key_exchange_privkeys)
-        self._negociate_mfl(server_extensions.get(ET.MAX_FRAGMENT_LENGTH))
-        self._negociate_alpn(server_extensions.get(ET.APPLICATION_LAYER_PROTOCOL_NEGOTIATION))
-        self._negociate_heartbeat(server_extensions.get(ET.HEARTBEAT))
+        def negociate(ext_name, *args):
+            ext_type = getattr(ExtensionType, ext_name.upper())
+            ext = server_extensions.get(ext_type)
+            meth = getattr(self, f'_negociate_{ext_name}')
+            return meth(ext, *args)
+
+        nc = self.nconfig
+        nc.key_exchange, shared_key = negociate('key_share', self._key_exchange_privkeys)
+        nc.max_fragment_length = negociate('max_fragment_length')
+        nc.alpn = negociate('application_layer_protocol_negotiation')
+        nc.can_send_heartbeat, nc.can_echo_heartbeat = negociate('heartbeat')
+
+        return shared_key
 
     def _negociate_key_share(self, key_share_ext, my_private_keys):
         if not key_share_ext:
-        elif key_share_ext.group not in self._key_exchange_privkeys:
+            raise alerts.MissingExtension(ExtensionType.KEY_SHARE)
+        elif key_share_ext.group not in my_private_keys:
             e =(f"The server's selected {key_share_ext.selected_group} was "
                 f"not offered in ClientHello: {self.config.key_exchanges}")
             raise alerts.IllegalParameter(e)
-        shared_key, _ = key_share_resume(
-            key_share_ext,
-            my_private_keys[key_share_ext],
-            key_share_ext.client_shares[key_share_ext],
-        )
-        self.nconfig.key_exchange = key_share_ext.group
-        return shared_key
+        else:
+            shared_key, _ = key_share_resume(
+                key_share_ext,
+                my_private_keys[key_share_ext.group],
+                key_share_ext.client_shares[key_share_ext.group],
+            )
+            return key_share_ext.group, shared_key
 
-    def _negociate_mfl(self, mfl_ext):
-        if not mfl_ext:
-            self.nconfig.max_fragment_length = MaxFragmentLengthOctets.MAX_16384
-        elif mfl_ext.octets != self.config.max_fragment_length:
+    def _negociate_max_fragment_length(self, mlf_ext):
+        if not mlf_ext:
+            return MaxFragmentLengthOctets.MAX_16384
+        elif mlf_ext.octets != self.config.max_fragment_length:
             try:
                 code = self.config.max_fragment_length.to_code()
             except ValueError:
                 code = None
-            e =(f"The server's selected {mfl_ext.code} wasn't offered "
-                f"in ClientHello: {code}")
+            e =(f"The server's selected {mlf_ext.code} "
+                f"wasn't offered in ClientHello: {code}")
             raise alerts.IllegalParameter(e)
         else:
-            self.nconfig.max_fragment_length = mfl_ext.octets
+            return mlf_ext.octets
 
-    def _negociate_alpn(self, alpn_ext):
+    def _negociate_application_layer_protocol_negotiation(self, alpn_ext):
         if not alpn_ext:
-            self.nconfig.alpn = None
+            return None
         elif length := len(alpn_ext.protocol_name_list) != 1:
             e =("Invalid Application Layer Protocol Negociation (ALPN) "
                 f"response. Expected 1 protocol, {length} found.")
@@ -151,15 +156,16 @@ class ClientWaitServerHello(State):
                 f"ClientHello: {self.config.alpn}")
             raise alerts.IllegalParameter(e)
         else:
-            self.nconfig.alpn = alpn_ext.protocol_name_list[0]
+            return alpn_ext.protocol_name_list[0]
 
     def _negociate_heartbeat(self, heartbeat_ext):
         if not heartbeat_ext:
-            self.nconfig.can_send_heartbeat = False
-            self.nconfig.can_echo_heartbeat = False
+            can_send_heartbeat = False
+            can_echo_heartbeat = False
         else:
-            self.nconfig.can_send_heartbeat = (
+            can_send_heartbeat = (
                 self.config.can_send_heartbeat and
                 heartbeat_ext.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
             )
-            self.nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat
+            can_echo_heartbeat = self.config.can_echo_heartbeat
+        return can_send_heartbeat, can_echo_heartbeat
