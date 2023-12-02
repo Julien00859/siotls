@@ -43,6 +43,10 @@ class TLSConfiguration:
     # extra
     log_keys: bool = False
 
+    @property
+    def other_side(self):
+        return 'server' if self.side == 'client' else 'client'
+
     def validate(self):
         if self.side == 'server':
             if self.max_fragment_length != MLFOctets.MAX_16384:
