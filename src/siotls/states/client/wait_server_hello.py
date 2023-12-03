@@ -107,7 +107,7 @@ class ClientWaitServerHello(State):
             return meth(ext, *args)
 
         nc = self.nconfig
-        nc.key_exchange, shared_key = negociate('key_share', self._key_exchange_privkeys)
+        nc.key_exchange, shared_key = negociate('key_share', self._key_shares)
         nc.max_fragment_length = negociate('max_fragment_length')
         nc.alpn = negociate('application_layer_protocol_negotiation')
         nc.can_send_heartbeat, nc.can_echo_heartbeat = negociate('heartbeat')

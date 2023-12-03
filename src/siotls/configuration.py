@@ -1,6 +1,5 @@
 import dataclasses
 import typing
-from siotls.ciphers import cipher_map, digest_map
 from siotls.iana import (
     CipherSuites,
     SignatureScheme,
@@ -61,8 +60,6 @@ class TLSNegociatedConfiguration:
     # cannot build the entire object at once and ellipsis is the least
     # annoying solution we found to still use what have been negociated.
     cipher_suite: CipherSuites
-    ciphermod: typing.Any  # cryptography.hazmat.primitives.ciphers.aead
-    digestmod: typing.Any  # hashlib
     digital_signature: SignatureScheme | Ellipsis
     key_exchange: NamedGroup | Ellipsis
     alpn: ALPNProtocol | None
@@ -72,8 +69,6 @@ class TLSNegociatedConfiguration:
 
     def __init__(self, cipher_suite):
         self.cipher_suite = cipher_suite
-        self.ciphermod = cipher_map[cipher_suite]
-        self.digestmod = digest_map[cipher_suite]
         self.digital_signature = ...
         self.key_exchange = ...
         self.alpn = ...

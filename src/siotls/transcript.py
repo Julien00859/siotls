@@ -44,8 +44,6 @@ TLS 1.3 claims that it is possible to do a stateless HelloRetryRequest
 using a clever (but not smart) hack. We still don't know how to do a
 stateless HelloRetryRequest but we still have to implement the hack
 otherwise the transcript wouldn't be right.
-
-
 """
 
 from siotls.iana import HandshakeType, HandshakeType_
@@ -66,7 +64,6 @@ ORDER = [
     ('client', HandshakeType.CERTIFICATE),
     ('client', HandshakeType.CERTIFICATE_VERIFY),
     ('client', HandshakeType.FINISHED),
-    None
 ]
 
 
@@ -75,48 +72,44 @@ class Transcript:
         if not digestmods:
             e = "empty digestmods"
             raise ValueError(e)
-        if len(digestmods) == 1:
-            self._hash = next(iter(digestmods))()
-        else:
-            self._hash = None
-            self._hashes = [dm() for dm in digestmods]
+        self._hashes = [dm() for dm in digestmods]
         self._order_i = 2  # expect ClientHello
 
     def post_init(self, digestmod):
         assert self._order_i == 3
-        if digestmod == type(self._hash):
-            return
         for hash_ in self._hashes:
             if type(hash_) is digestmod:
-                self._hash = hash_
-                return
-        e = f"{digestmod} not found inside {self._hashes}"
-        raise ValueError(e)
+                break
+        else:
+            e = f"{digestmod} not found inside {self._hashes}"
+            raise ValueError(e)
+        self._hashes.clear()
+        self._hashes.append(hash_)
 
     def do_hrr_dance(self):
-        assert self._hash and self._order_i == 3
-        self._hash = type(self._hash)(b''.join([
+        assert self._order_i == 3
+        self._hashes[0] = type(self._hashes[0])(b''.join([
             HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
             b'\x00\x00',
             self.digest(),
         ]))
         self._order_i = 1  # expect HelloRetryRequest
 
-    def update(self, side, handshake_type, handshake_data):
-        if self._order_i == ORDER:
+    def update(self, handshake_data, side, handshake_type):
+        if self._order_i == len(ORDER):
             return
         if (side, handshake_type) != ORDER[self._order_i]:
             e =(f"Was expecting {ORDER[self._order_i]} but found "
                 f"{(side, handshake_type)} instead.")
             raise alerts.UnexpectedMessage(e)
-        if self._hash:
-            self._hash.update(handshake_data)
-        else:
-            self._sha256.update(handshake_data)
-            self._sha384.update(handshake_data)
+        for hash_ in self._hashes:
+            hash_.update(handshake_data)
 
     def digest(self):
-        return self._hash.digest()
+        return self._hashes[0].digest()
 
     def hexdigest(self):
-        return self._hash.hexdigest()
+        return self._hashes[0].hexdigest()
+
+    def clone(self):
+        return self._hashes[0].close()

@@ -10,10 +10,10 @@ from siotls.iana import (
     TLSVersion,
 )
 from siotls.serial import SerializationError, TooMuchData, SerialIO
-from .contents import Content, ApplicationData, alerts
-from .contents.handshakes import ClientHello, ServerHello
+from .contents import Content, ApplicationData, alerts, Handshake
 from .states import ClientStart, ServerStart
 from .utils import try_cast
+from .transcript import Transcript
 
 
 logger = logging.getLogger(__name__)
@@ -29,8 +29,9 @@ class TLSConnection:
 
         self.config = config
         self.nconfig = None
-        self._secrets = None
         self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
+        self._cipher = None
+        self._transcript = Transcript()
 
         self._input_data = bytearray()
         self._input_handshake = bytearray()
@@ -43,21 +44,15 @@ class TLSConnection:
             self._client_unique = None
             self._server_unique = secrets.token_bytes(32)
 
-        self._key_exchange_privkeys = {}
+        self._key_shares = {}
         self._cookie = None
 
-        self._transcript_hash = None
-        # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
-        self._last_client_hello = None
-        self._last_server_hello = None
+    # ------------------------------------------------------------------
+    # Public APIs
+    # ------------------------------------------------------------------
 
-        self._read_cipher = None
-        self._read_nonce = None
-
-        self._write_cipher = None
-        self._write_nonce = None
-
-        if config.log_keys:
+    def initiate_connection(self):
+        if self.config.log_keys:
             is_key_logger_enabled = any((
                 not isinstance(handler, logging.NullHandler)
                 for handler in key_logger.handlers
@@ -67,16 +62,10 @@ class TLSConnection:
             else:
                 logger.warning(
                     "Key log was requested for current connection but no "
-                    "logging.Handler seems setup on the %r logger. You "
-                    "must setup one.\n"
-                    "logging.getLogger(%r).addHandler(logging.FileHandler(path_to_keylogfile))",
+                    "logging.Handler seems setup on the %r logger. You must "
+                    "setup one.\nlogging.getLogger(%r).addHandler(logging."
+                    "FileHandler(path_to_keylogfile))",
                     self, key_logger.name, key_logger.name)
-
-    # ------------------------------------------------------------------
-    # Public APIs
-    # ------------------------------------------------------------------
-
-    def initiate_connection(self):
         self.state.initiate_connection()
 
     def receive_data(self, data):
@@ -101,11 +90,12 @@ class TLSConnection:
                     case alerts.Alert(level=AlertLevel.FATAL):
                         logger.error(content.description)
                         break  # TODO: close
-                    case ClientHello():
-                        self._last_client_hello = content_data
-                        self.state.process(content)
-                    case ServerHello():
-                        self._last_server_hello = content_data
+                    case Handshake():
+                        self.transcript.update(
+                            content_data,
+                            self.config.side,
+                            content.msg_type
+                        )
                         self.state.process(content)
                     case _:
                         self.state.process(content)
@@ -131,6 +121,9 @@ class TLSConnection:
 
     def rekey(self):
         raise NotImplementedError("todo")
+
+    def __hash__(self):
+        return getattr(self, f'_{self.config.side}_unique')
 
     # ------------------------------------------------------------------
     # Internal APIs
@@ -226,40 +219,14 @@ class TLSConnection:
 
         content_data = self._input_handshake
         self._input_handshake = bytearray()
-        if self._transcript_hash:
-            self._transcript_hash.update(content_data)
         return content_type, content_data
-
-    def _reset_nonces(self, read_iv, write_iv):
-        read_iv = int.from_bytes(read_iv, 'big')
-        write_iv = int.from_bytes(write_iv, 'big')
-        max_sequence = self.nconfig.cipher_suite.max_sequence
-        nonce_length = self.nconfig.cipher_suite.nonce_length
-        rekey_threshold = max_sequence * .99
-
-        self._read_nonce = (
-            (read_iv ^ read_sequence).to_bytes(nonce_length, 'big')
-            for read_sequence in range(max_sequence)
-        )
-        self._write_nonce = (
-            (
-                (write_iv ^ write_sequence).to_bytes(nonce_length, 'big'),
-                write_sequence >= rekey_threshold,  # should_rekey
-            )
-            for write_sequence in range(max_sequence)
-        )
 
     def _send_content(self, content: Content):
         logger.info("will send %s", content.__class__.__name__)
         data = content.serialize()
 
-        if self._transcript_hash and content.content_type == ContentType.HANDSHAKE:
-            self._transcript_hash.update(data)
-        match content:
-            case ClientHello():
-                self._last_client_hello = data
-            case ServerHello():
-                self._last_server_hello = data
+        if content.content_type == ContentType.HANDSHAKE:
+            self.transcript.update(data, self.config.side, content.msg_type)
 
         fragment_length = (self.nconfig or self.config).max_fragment_length
         if self._write_cipher:

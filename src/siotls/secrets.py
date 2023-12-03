@@ -8,6 +8,7 @@ class TLSSecrets:
         self._zeros = b'\x00' * digestmod().digest_size
         self._salt = self._zeros
         self._empty = digestmod(b'').digest()
+        self._state = 0
 
     def _make_deriver(self, input_keying_material, transcript_hash, *, update_salt):
         secret = hkdf_extract(
@@ -16,6 +17,7 @@ class TLSSecrets:
             input_keying_material=input_keying_material
         )
         if update_salt:
+            self._state += 1
             self._salt = derive_secret(
                 self._digestmod, secret, b'derived', self._empty)
         return lambda label, *, transcript_hash=transcript_hash: (
@@ -30,10 +32,12 @@ class TLSSecrets:
         )
 
     def skip_early_secrets(self):
+        assert self._state == 0
         psk = self._zeros
         self._make_deriver(psk, transcript_hash=None, update_salt=True)
 
-    def compute_early_secrets(self, psk, psk_mode, client_hello_transcript_hash):
+    def derive_early_secrets(self, psk, psk_mode, client_hello_transcript_hash):
+        assert self._state == 0
         assert psk_mode in ('external', 'resume')
         psk_label = f'{psk_mode[:3]} binder'.encode()
         derive_early_secret = self._make_deriver(
@@ -51,7 +55,8 @@ class TLSSecrets:
             client_early_traffic_iv,
         )
 
-    def compute_handshake_secrets(self, shared_key, server_hello_transcript_hash):
+    def derive_handshake_secrets(self, shared_key, server_hello_transcript_hash):
+        assert self._state == 1
         derive_handshake_secret = self._make_deriver(
             shared_key, server_hello_transcript_hash, update_salt=True)
 
@@ -68,9 +73,10 @@ class TLSSecrets:
             server_handshake_traffic_iv,
         )
 
-    def compute_master_secrets(
+    def derive_master_secrets(
         self, server_finished_transcript_hash, client_finished_transcript_hash
     ):
+        assert self._state == 2
         derive_master_secret = self._make_deriver(
             self._zeros, server_finished_transcript_hash, update_salt=False)
 

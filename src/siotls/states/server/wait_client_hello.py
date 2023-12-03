@@ -86,8 +86,12 @@ class ServerWaitClientHello(State):
             self._send_content(ChangeCipherSpec())
 
 
+        cipher_map[self.nconfig.cipher_suite](
+            *self.secrets.compute_handshake_secrets(shared_key, self._transcript_hash.digest())
+        )
+
         (cli_hs_key, cli_hs_iv, srv_hs_key, srv_hs_iv) = \
-            self.secrets.compute_handshake_secrets(shared_key, self._transcript_hash.digest())
+
         self._read_cipher = self.nconfig.cipher(cli_hs_key)
         self._write_cipher = self.nconfig.cipher(srv_hs_key)
         self._reset_nonces(cli_hs_iv, srv_hs_iv)
