@@ -1,4 +1,4 @@
-from siotls.secrets import TLSSecrets
+from siotls.transcript import Transcript
 from siotls.crypto.key_share import resume as key_share_resume
 from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import alerts, ChangeCipherSpec
@@ -10,6 +10,7 @@ from siotls.iana import (
     ExtensionType,
     MaxFragmentLengthOctets,
 )
+from siotls.ciphers import cipher_suite_registry
 from .. import State
 from . import ClientWaitEncryptedExtensions
 
@@ -19,7 +20,7 @@ class ClientWaitServerHello(State):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._is_first_server_hello = not bool(self._transcript_hash)
+        self._is_first_server_hello = self._cipher is None
 
     def process(self, content):
         if content.content_type != ContentType.HANDSHAKE:
@@ -42,12 +43,8 @@ class ClientWaitServerHello(State):
 
         if self._is_first_server_hello:
             self.nconfig = TLSNegociatedConfiguration(content.cipher_suite)
-            self._secrets = TLSSecrets(
-                self.nconfig.digestmod,
-                max(8, self.nconfig.ciphermod.nonce_length_min),
-            )
-            self._transcript_hash = self.nconfig.digestmod(self._last_client_hello)
-            self._last_client_hello = None
+            self._cipher = cipher_suite_registry[content.cipher_suite]('client')
+            self._transcript.post_init(self._cipher.digestmod)
             self._send_content(ChangeCipherSpec())
 
         if content.msg_type is HandshakeType_.HELLO_RETRY_REQUEST:
@@ -74,14 +71,7 @@ class ClientWaitServerHello(State):
         if cookie := hello_retry_request.extensions.get(ExtensionType.COOKIE):
             self._cookie = cookie.cookie
 
-        # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
-        self._transcript_hash = self.nconfig.digestmod(b''.join([
-            HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
-            self.nconfig.digestmod().digest_size.to_bytes(3, 'big'),
-            self._transcript_hash.digest(),
-            self._last_server_hello,
-        ]))
-        self._last_server_hello = None
+        self._transcript.do_hrr_dance()
 
         self._move_to_state(ClientStart)
         self.connection.initiate_connection()
@@ -89,14 +79,8 @@ class ClientWaitServerHello(State):
     def _process_server_hello(self, server_hello):
         self._server_unique = server_hello.random
         shared_key = self._negociate_extensions(server_hello.extensions)
-
-        self._secrets.skip_early_secrets()
-        (cli_hs_key, cli_hs_iv, srv_hs_key, srv_hs_iv) = \
-            self.secrets.compute_handshake_secrets(shared_key, self._transcript_hash.digest())
-        self._read_cipher = self.nconfig.cipher(cli_hs_key)
-        self._write_cipher = self.nconfig.cipher(srv_hs_key)
-        self._reset_nonces(cli_hs_iv, srv_hs_iv)
-
+        self._cipher.skip_early_secrets()
+        self._cipher.derive_handshake_secrets(shared_key, self._transcript.digest())
         self._move_to_state(ClientWaitEncryptedExtensions)
 
     def _negociate_extensions(self, server_extensions):

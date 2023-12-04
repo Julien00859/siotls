@@ -1,5 +1,6 @@
 import hashlib
 from cryptography.hazmat.primitives.ciphers import aead
+from siotls import key_logger
 from siotls.iana import CipherSuites
 from siotls.utils import peekable
 from siotls.secrets import TLSSecrets
@@ -14,6 +15,15 @@ class _TLSCipher:
         if _TLSCipher in cls.__bases__:
             cipher_suite_registry[cls.iana_id] = cls
 
+    iana_id: CipherSuites
+    #_ciphermod: aead.AESGCM
+    #digestmod: hashlib.sha256
+    block_size: int
+    key_length: int
+    tag_length: int
+    nonce_length: int
+    usage_limit: int
+
     @property
     def nonce_length_min(self):
         return self.nonce_length
@@ -23,9 +33,10 @@ class _TLSCipher:
         return self.nonce_length
 
 
-    def __init__(self, side):
-        self.side = side
-        self._secrets = TLSSecrets(self._digestmod, max(8, self.nonce_length_min))
+    def __init__(self, side, log_keys):
+        self._side = side
+        self._log_keys = log_keys
+        self._secrets = TLSSecrets(self.digestmod, max(8, self.nonce_length_min))
         self._read_cipher, self._read_iv, self._read_seq = None
         self._write_cipher, self._write_iv, self._write_seq = None
 
@@ -63,7 +74,7 @@ class _TLSCipher:
             psk_mode,
             client_hello_transcript_hash,
         )
-        if self.side == 'client':
+        if self._side == 'client':
             self._write_cipher = self.ciphermod(client_early_traffic_key)
             self._write_iv = int.from_bytes(client_early_traffic_iv, 'big')
             self._write_seq = peekable(iter(range(self.usage_limit)))
@@ -83,7 +94,7 @@ class _TLSCipher:
             shared_key,
             server_hello_transcript_hash,
         )
-        if self.side == 'client':
+        if self._side == 'client':
             self._write_cipher = self.ciphermod(client_handshake_traffic_key)
             self._write_iv = int.from_bytes(client_handshake_traffic_iv, 'big')
             self._write_seq = peekable(iter(range(self.usage_limit)))
@@ -112,7 +123,7 @@ class _TLSCipher:
             server_finished_transcript_hash,
             client_finished_transcript_hash,
         )
-        if self.side == 'client':
+        if self._side == 'client':
             self._write_cipher = self.ciphermod(client_application_traffic_key)
             self._write_iv = int.from_bytes(client_application_traffic_iv, 'big')
             self._write_seq = peekable(iter(range(self.usage_limit)))
@@ -133,7 +144,7 @@ class _TLSCipher:
 class TLS_AES_128_GCM_SHA256(_TLSCipher):
     iana_id = CipherSuites.TLS_AES_128_GCM_SHA256
     _ciphermod = aead.AESGCM
-    _digestmod = hashlib.sha256
+    digestmod = hashlib.sha256
     block_size = 16
     key_length = 16
     tag_length = 12
@@ -143,7 +154,7 @@ class TLS_AES_128_GCM_SHA256(_TLSCipher):
 class TLS_AES_256_GCM_SHA384(_TLSCipher):
     iana_id = CipherSuites.TLS_AES_256_GCM_SHA384
     _ciphermod = aead.AESGCM
-    _digestmod = hashlib.sha384
+    digestmod = hashlib.sha384
     block_size = 16
     key_length = 32
     tag_length = 12
@@ -153,7 +164,7 @@ class TLS_AES_256_GCM_SHA384(_TLSCipher):
 class TLS_CHACHA20_POLY1305_SHA256(_TLSCipher):
     iana_id = CipherSuites.TLS_CHACHA20_POLY1305_SHA256
     _ciphermod = aead.ChaCha20Poly1305
-    _digestmod = hashlib.sha256
+    digestmod = hashlib.sha256
     block_size = 16
     key_length = 16
     tag_length = 12
@@ -163,7 +174,7 @@ class TLS_CHACHA20_POLY1305_SHA256(_TLSCipher):
 class TLS_AES_128_CCM_SHA256(_TLSCipher):
     iana_id = CipherSuites.TLS_AES_128_CCM_SHA256
     _ciphermod = aead.AESCCM
-    _digestmod = hashlib.sha256
+    digestmod = hashlib.sha256
     cipher_block_size = 16
     key_length = 16
     tag_length = 12
@@ -177,7 +188,7 @@ class AESCCM8(aead.AESCCM):
 class TLS_AES_128_CCM_8_SHA256(_TLSCipher):
     iana_id = CipherSuites.TLS_AES_128_CCM_8_SHA256
     _ciphermod = AESCCM8
-    _digestmod = hashlib.sha256
+    digestmod = hashlib.sha256
     block_size = 16
     key_length = 16
     tag_length = 12

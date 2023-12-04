@@ -1,10 +1,11 @@
+from siotls import key_logger
 from siotls.crypto.hkdf import hkdf_extract, hkdf_expand_label, derive_secret
 
-
 class TLSSecrets:
-    def __init__(self, digestmod, iv_length):
+    def __init__(self, digestmod, iv_length, log_keys_client_unique):
         self._digestmod = digestmod
         self._iv_length = iv_length
+        self._log_keys_client_unique = log_keys_client_unique
         self._zeros = b'\x00' * digestmod().digest_size
         self._salt = self._zeros
         self._empty = digestmod(b'').digest()
@@ -66,6 +67,15 @@ class TLSSecrets:
         server_handshake_traffic = derive_handshake_secret(b's hs traffic')
         server_handshake_traffic_key, server_handshake_traffic_iv = (
             self._derive_key_and_iv(server_handshake_traffic))
+        if self.log_keys_client_unique:
+            key_logger.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
+                self.log_keys_client_unique.hex(),
+                client_handshake_traffic.hex()
+            )
+            key_logger.info("SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s",
+                self.log_keys_client_unique.hex(),
+                server_handshake_traffic.hex()
+            )
         return (
             client_handshake_traffic_key,
             client_handshake_traffic_iv,

@@ -86,22 +86,8 @@ class ServerWaitClientHello(State):
             self._send_content(ChangeCipherSpec())
 
 
-        cipher_map[self.nconfig.cipher_suite](
-            *self.secrets.compute_handshake_secrets(shared_key, self._transcript_hash.digest())
-        )
-
-        (cli_hs_key, cli_hs_iv, srv_hs_key, srv_hs_iv) = \
-
-        self._read_cipher = self.nconfig.cipher(cli_hs_key)
-        self._write_cipher = self.nconfig.cipher(srv_hs_key)
-        self._reset_nonces(cli_hs_iv, srv_hs_iv)
-
-
-        if self.config.log_keys:
-            key_logger.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
-                self._client_unique.hex(), self.secrets.client_handshake_traffic.hex())
-            key_logger.info("SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s",
-                self._client_unique.hex(), self.secrets.server_handshake_traffic.hex())
+        self._cipher.skip_early_secrets()
+        self._client.derive_handshake_secrets(shared_key, self._transcript.digest())
 
         self._send_content(EncryptedExtensions(encrypted_extensions))
         self._send_content(Certificate(...))

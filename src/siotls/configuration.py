@@ -60,12 +60,12 @@ class TLSNegociatedConfiguration:
     # cannot build the entire object at once and ellipsis is the least
     # annoying solution we found to still use what have been negociated.
     cipher_suite: CipherSuites
-    digital_signature: SignatureScheme | Ellipsis
-    key_exchange: NamedGroup | Ellipsis
+    digital_signature: SignatureScheme | type(...)
+    key_exchange: NamedGroup | type(...)
     alpn: ALPNProtocol | None
-    can_send_heartbeat: bool | Ellipsis
-    can_echo_heartbeat: bool | Ellipsis
-    max_fragment_length: MLFOctets | Ellipsis
+    can_send_heartbeat: bool | type(...)
+    can_echo_heartbeat: bool | type(...)
+    max_fragment_length: MLFOctets | type(...)
 
     def __init__(self, cipher_suite):
         self.cipher_suite = cipher_suite

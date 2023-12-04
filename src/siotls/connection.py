@@ -14,6 +14,7 @@ from .contents import Content, ApplicationData, alerts, Handshake
 from .states import ClientStart, ServerStart
 from .utils import try_cast
 from .transcript import Transcript
+from siotls.ciphers import cipher_suite_registry
 
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,10 @@ class TLSConnection:
         self.nconfig = None
         self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
         self._cipher = None
-        self._transcript = Transcript()
+        self._transcript = Transcript({
+            cipher_suite_registry[cipher_suite].digestmod
+            for cipher_suite in config.cipher_suites
+        })
 
         self._input_data = bytearray()
         self._input_handshake = bytearray()
