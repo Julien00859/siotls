@@ -39,7 +39,7 @@ class TestCURL(unittest.TestCase):
                 raise
         self.socket.settimeout(1)
 
-        os.truncate(self.keylogfile_fd, 0)
+        self.addCleanup(os.truncate, self.keylogfile_fd, 0)
 
     def curl(
         self,
@@ -49,7 +49,7 @@ class TestCURL(unittest.TestCase):
         tls_max='1.3',
         options={},
     ):
-        args = [CURL_PATH, 'https://localhost:8446']
+        args = [CURL_PATH, f'https://{HOST}:{PORT}']
         if version:
             args.append(f'--tlsv{version}')
         if max_time is not None:
@@ -60,7 +60,7 @@ class TestCURL(unittest.TestCase):
         if tls_max is not None:
             args.append('--tls-max')
             args.append(tls_max)
-        for option, value in options:
+        for option, value in options.items():
             args.append(f'--{option}')
             args.append(value)
         env = {'SSLKEYLOGFILE': self.keylogfile_path}
@@ -118,12 +118,12 @@ class TestCURL(unittest.TestCase):
         self.assertEqual(
             [log.client_random for log in siotls_keylog],
             [conn._client_unique.hex()] * len(siotls_keylog),
-            "All key logs are for the same client",
+            "All key logs are for the same client siotls side",
         )
         self.assertEqual(
             [log.client_random for log in curl_keylog],
             [conn._client_unique.hex()] * len(curl_keylog),
-            "All key logs are for the same client",
+            "All key logs are for the same client curl side",
         )
 
         # Validate secret values

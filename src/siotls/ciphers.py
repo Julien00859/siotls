@@ -8,6 +8,10 @@ from siotls.secrets import TLSSecrets
 REKEY_THRESHOLD = 1024  # arbitrary
 cipher_suite_registry = {}
 
+SHA256_EMPTY = hashlib.sha256(b'').digest()
+SHA256_ZEROS = ...
+SHA384_EMPTY = hashlib.sha384(b'').digest()
+
 
 class _TLSCipher:
     def __init_subclass__(cls, **kwargs):
@@ -23,20 +27,11 @@ class _TLSCipher:
     tag_length: int
     nonce_length: int
     usage_limit: int
-
-    @property
-    def nonce_length_min(self):
-        return self.nonce_length
-
-    @property
-    def nonce_length_max(self):
-        return self.nonce_length
+    hashempty: bytes
 
 
-    def __init__(self, side, log_keys):
-        self._side = side
-        self._log_keys = log_keys
-        self._secrets = TLSSecrets(self.digestmod, max(8, self.nonce_length_min))
+    def __init__(self, ):
+        self._salt = self.hashempty
         self._read_cipher, self._read_iv, self._read_seq = None
         self._write_cipher, self._write_iv, self._write_seq = None
 
@@ -150,6 +145,7 @@ class TLS_AES_128_GCM_SHA256(_TLSCipher):
     tag_length = 12
     nonce_length = 12
     usage_limit = int(2 ** 23.5)
+    hashempty = SHA256_EMPTY
 
 class TLS_AES_256_GCM_SHA384(_TLSCipher):
     iana_id = CipherSuites.TLS_AES_256_GCM_SHA384
@@ -160,6 +156,7 @@ class TLS_AES_256_GCM_SHA384(_TLSCipher):
     tag_length = 12
     nonce_length = 12
     usage_limit = int(2 ** 23.5)
+    hashempty = SHA384_EMPTY
 
 class TLS_CHACHA20_POLY1305_SHA256(_TLSCipher):
     iana_id = CipherSuites.TLS_CHACHA20_POLY1305_SHA256
@@ -170,6 +167,7 @@ class TLS_CHACHA20_POLY1305_SHA256(_TLSCipher):
     tag_length = 12
     nonce_length = 12
     usage_limit = 1 << 64
+    hashempty = SHA256_EMPTY
 
 class TLS_AES_128_CCM_SHA256(_TLSCipher):
     iana_id = CipherSuites.TLS_AES_128_CCM_SHA256
@@ -180,6 +178,7 @@ class TLS_AES_128_CCM_SHA256(_TLSCipher):
     tag_length = 12
     nonce_length = 12
     usage_limit = ...
+    hashempty = SHA256_EMPTY
 
 class AESCCM8(aead.AESCCM):
     def __init__(self, key):
@@ -194,3 +193,4 @@ class TLS_AES_128_CCM_8_SHA256(_TLSCipher):
     tag_length = 12
     nonce_length = 12
     usage_limit = ...
+    hashempty = SHA256_EMPTY
