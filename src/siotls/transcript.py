@@ -46,13 +46,11 @@ stateless HelloRetryRequest but we still have to implement the hack
 otherwise the transcript wouldn't be right.
 """
 
-from siotls.iana import HandshakeType, HandshakeType_
+from siotls.iana import HandshakeType
 from siotls.contents import alerts
 
 
 ORDER = [
-    ('client', HandshakeType.CLIENT_HELLO),
-    ('server', HandshakeType_.HELLO_RETRY_REQUEST),
     ('client', HandshakeType.CLIENT_HELLO),
     ('server', HandshakeType.SERVER_HELLO),
     ('server', HandshakeType.ENCRYPTED_EXTENSIONS),
@@ -73,12 +71,12 @@ class Transcript:
             e = "empty digestmods"
             raise ValueError(e)
         self._hashes = [dm() for dm in digestmods]
-        self._order_i = 2  # expect ClientHello
+        self._order_i = 0
 
     def post_init(self, digestmod):
-        assert self._order_i == 3
+        name = digestmod().name
         for hash_ in self._hashes:
-            if type(hash_) is digestmod:
+            if hash_.name == name:
                 break
         else:
             e = f"{digestmod} not found inside {self._hashes}"
@@ -87,13 +85,14 @@ class Transcript:
         self._hashes.append(hash_)
 
     def do_hrr_dance(self):
-        assert self._order_i == 3
+        assert self._order_i == 2, \
+            "can only dance after receiving/sending HelloRetryRequest"
         self._hashes[0] = type(self._hashes[0])(b''.join([
             HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
             b'\x00\x00',
             self.digest(),
         ]))
-        self._order_i = 1  # expect HelloRetryRequest
+        self._order_i = 0  # expect ClientHello
 
     def update(self, handshake_data, side, handshake_type):
         if self._order_i == len(ORDER):
@@ -104,6 +103,7 @@ class Transcript:
             raise alerts.UnexpectedMessage(e)
         for hash_ in self._hashes:
             hash_.update(handshake_data)
+        self._order_i += 1
 
     def digest(self):
         return self._hashes[0].digest()

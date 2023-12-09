@@ -20,7 +20,7 @@ class TestCURL(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.socket = socket.socket()
-        cls.socket.bind(('localhost', 8446))
+        cls.socket.bind((HOST, PORT))
         cls.socket.listen(1)
         cls.socket.settimeout(1)
         cls.addClassCleanup(cls.socket.close)
@@ -65,6 +65,7 @@ class TestCURL(unittest.TestCase):
             args.append(value)
         env = {'SSLKEYLOGFILE': self.keylogfile_path}
         proc = sp.Popen(args, env=env)
+        self.addCleanup(proc.wait, timeout=1)
         self.addCleanup(proc.terminate)
 
         client, client_info = self.socket.accept()

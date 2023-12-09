@@ -1,5 +1,4 @@
 from types import SimpleNamespace
-from siotls import key_logger
 from siotls.iana import (
     ContentType,
     HandshakeType,
@@ -22,9 +21,8 @@ from siotls.contents.handshakes.extensions import (
     KeyShareResponse, KeyShareRetry,
     Heartbeat,
 )
-from siotls.ciphers import digest_map
 from siotls.crypto.key_share import resume as key_share_resume
-from siotls.secrets import TLSSecrets
+from siotls.ciphers import cipher_suite_registry
 from .. import State
 from . import ServerWaitFlight2
 
@@ -34,7 +32,7 @@ class ServerWaitClientHello(State):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._is_first_client_hello = not bool(self._transcript_hash)
+        self._is_first_client_hello = self.nconfig is None
 
     def process(self, client_hello):
         if client_hello.content_type != ContentType.HANDSHAKE:
@@ -44,41 +42,37 @@ class ServerWaitClientHello(State):
             e = "Can only receive ClientHello in this state."
             raise alerts.UnexpectedMessage(e)
 
-        if _ := client_hello.extensions.get(ExtensionType.PRE_SHARED_KEY):
-            raise NotImplementedError("todo")
-
-        nconfig = SimpleNamespace()  # TODO: scrap SN
-        self._negociate_algorithms(client_hello, nconfig)
-
         if self._is_first_client_hello:
-            digestmod = digest_map[nconfig.cipher_suite]
-            self._transcript_hash = digestmod(self._last_client_hello)
-            self._last_client_hello = None
+            cipher_suite = self._find_common_cipher_suite(client_hello)
+            self.nconfig = TLSNegociatedConfiguration(cipher_suite)
             self._client_unique = client_hello.random
+            self._cipher = cipher_suite_registry[cipher_suite](
+                'server', self.config.log_keys, self._client_unique)
+            self._transcript.post_init(self._cipher.digestmod)
         else:
+            if cipher_suite != self.nconfig.cipher_suite:
+                e = "Client's cipher suite cannot change in between Hellos"
+                raise alerts.IllegalParameter(e)
             if client_hello.random != self._client_unique:
                 e = "Client's random cannot change in between Hellos"
                 raise alerts.IllegalParameter(e)
 
-        if not self._can_resume_key_share(client_hello, nconfig.key_exchange):
-            self._send_hello_retry_request(client_hello, nconfig)
+        clear_extensions, encrypted_extensions, shared_key = (
+            self._negociate_extensions(client_hello.extensions))
+
+        if not shared_key:
+            if not self._is_first_client_hello:
+                e = "invalid KeyShare in second ClientHello"
+                raise alerts.IllegalParameter(e)
+            self._send_hello_retry_request(client_hello)
             self._move_to_state(ServerWaitClientHello)  # update _is_first_client_hello
             return
 
-        clear_extensions, encrypted_extensions, shared_key = (
-            self._negociate_extensions(client_hello.extensions, nconfig))
-
-        self.nconfig = TLSNegociatedConfiguration(**vars(nconfig))
-        self.secrets = TLSSecrets(
-            self.nconfig.digestmod,
-            max(8, self.nconfig.ciphermod.nonce_length_min),
-        )
-        self.secrets.skip_early_secrets()
-
+        self._cipher.skip_early_secrets()
         self._send_content(ServerHello(
             self._server_unique,
             client_hello.legacy_session_id,
-            nconfig.cipher_suite,
+            self.nconfig.cipher_suite,
             clear_extensions,
         ))
 
@@ -134,23 +128,9 @@ class ServerWaitClientHello(State):
         return key_share and self.nconfig.key_exchange in key_share.client_shares
 
     def _send_hello_retry_request(self, client_hello, nconfig):
-        if not self._is_first_client_hello:
-            e = "invalid KeyShare in second ClientHello"
-            raise alerts.IllegalParameter(e)
-
         # make sure the client doesn't change its algorithms in between flights
         self.config.cipher_suites = [nconfig.cipher_suite]
-        self.config.digital_signatures = [nconfig.digital_signature]
         self.config.key_exchanges = [nconfig.key_exchange]
-
-        # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
-        digestmod = digest_map[nconfig.cipher_suite]
-        self._transcript_hash = digestmod(b''.join([
-            HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
-            digestmod().digest_size.to_bytes(3, 'big'),
-            self._transcript_hash.digest(),
-        ]))
-
         self._send_content(HelloRetryRequest(
             HelloRetryRequest.random,
             client_hello.legacy_session_id,
@@ -160,6 +140,7 @@ class ServerWaitClientHello(State):
                 KeyShareRetry(nconfig.key_exchange),
             ]
         ))
+        self._transcript.do_hrr_dance()
         self._send_content(ChangeCipherSpec())
 
     def _negociate_extensions(self, client_extensions, nconfig):

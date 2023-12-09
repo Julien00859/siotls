@@ -20,7 +20,7 @@ class ClientWaitServerHello(State):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._is_first_server_hello = self._cipher is None
+        self._is_first_server_hello = self.nconfig is None
 
     def process(self, content):
         if content.content_type != ContentType.HANDSHAKE:
@@ -43,7 +43,8 @@ class ClientWaitServerHello(State):
 
         if self._is_first_server_hello:
             self.nconfig = TLSNegociatedConfiguration(content.cipher_suite)
-            self._cipher = cipher_suite_registry[content.cipher_suite]('client')
+            self._cipher = cipher_suite_registry[content.cipher_suite](
+                'client', self.config.log_keys, self._client_unique)
             self._transcript.post_init(self._cipher.digestmod)
             self._send_content(ChangeCipherSpec())
 

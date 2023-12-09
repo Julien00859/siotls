@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import secrets
 import struct
+import types
 
 from siotls import key_logger
 from siotls.iana import (
@@ -18,6 +19,11 @@ from siotls.ciphers import cipher_suite_registry
 
 
 logger = logging.getLogger(__name__)
+cipher_plaintext = types.SimpleNamespace(
+    must_encrypt=False,
+    must_decrypt=False,
+    should_rekey=False,
+)
 
 def starswith_change_cipher_spec(data):
     return data[0:1] == b'\x14' and data[3:6] == b'\x00\x01\x01'
@@ -31,7 +37,7 @@ class TLSConnection:
         self.config = config
         self.nconfig = None
         self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
-        self._cipher = None
+        self._cipher = cipher_plaintext
         self._transcript = Transcript({
             cipher_suite_registry[cipher_suite].digestmod
             for cipher_suite in config.cipher_suites
@@ -95,9 +101,9 @@ class TLSConnection:
                         logger.error(content.description)
                         break  # TODO: close
                     case Handshake():
-                        self.transcript.update(
+                        self._transcript.update(
                             content_data,
-                            self.config.side,
+                            self.config.other_side,
                             content.msg_type
                         )
                         self.state.process(content)
@@ -114,6 +120,9 @@ class TLSConnection:
                 logger.exception("while processing %s", content_type)
                 self._send_content(alerts.InternalError())
                 break  # TODO: close
+
+        if self._cipher.should_rekey:
+            self.rekey()
 
     def send_data(self, data: bytes):
         self._send_content(ApplicationData(data))
@@ -136,6 +145,13 @@ class TLSConnection:
     def _move_to_state(self, state_type):
         self.state = state_type(self)
 
+    @property
+    def _max_fragment_length(self):
+        if self.nconfig:
+            if (mfl := self.nconfig.max_fragment_length) is not ...:
+                return mfl
+        return self.config.max_fragment_length
+
     def _read_next_record(self):
         while starswith_change_cipher_spec(self._input_data):
             self._input_data = self._input_data[6:]
@@ -146,8 +162,8 @@ class TLSConnection:
         content_type, _legacy_version, content_length = \
             struct.unpack('!BHH', self._input_data[:5])
 
-        max_fragment_length = (self.nconfig or self.config).max_fragment_length
-        if self._read_cipher:
+        max_fragment_length = self._max_fragment_length
+        if self._cipher.must_decrypt:
             max_fragment_length += 256
         if content_length > max_fragment_length:
             e =(f"The record is longer ({content_length} bytes) than "
@@ -160,27 +176,24 @@ class TLSConnection:
         header = self._input_data[:5]
         fragment = self._input_data[5:content_length + 5]
         self._input_data = self._input_data[content_length + 5:]
-
-        if self._read_cipher:
-            innertext = self._read_cipher.decrypt(
-                nonce=next(self._read_nonce),
-                data=fragment,
-                associated_data=header,
-            )
-            for i in range(len(innertext) -1, -1, -1):
-                if innertext[i]:
-                    break
-            else:
-                e = "missing content type in encrypted record"
-                raise alerts.UnexpectedMessage(e)
-            content_type = innertext[i]
-            fragment = innertext[:i]
+        if self._cipher.must_decrypt:
+            content_type, fragment = self._decrypt(header, fragment)
 
         if content_type == ContentType.CHANGE_CIPHER_SPEC:
             e = f"invalid {ContentType.CHANGE_CIPHER_SPEC} record"
             raise alerts.UnexpectedMessage(e)
 
         return content_type, fragment
+
+    def _decrypt(self, header, fragment):
+        innertext = self._cipher.decrypt(fragment, header)
+        for i in range(len(innertext) -1, -1, -1):
+            if innertext[i]:
+                break
+        else:
+            e = "missing content type in encrypted record"
+            raise alerts.UnexpectedMessage(e)
+        return innertext[i], innertext[:i]
 
     def _read_next_content(self):
         # handshakes can be fragmented over multiple following records,
@@ -230,10 +243,10 @@ class TLSConnection:
         data = content.serialize()
 
         if content.content_type == ContentType.HANDSHAKE:
-            self.transcript.update(data, self.config.side, content.msg_type)
+            self._transcript.update(data, self.config.side, content.msg_type)
 
-        fragment_length = (self.nconfig or self.config).max_fragment_length
-        if self._write_cipher:
+        fragment_length = self._max_fragment_length
+        if self._cipher.must_encrypt:
             fragment_length -= 1  # room for content_type, see _encrypt()
 
         if len(data) <= fragment_length:
@@ -249,11 +262,11 @@ class TLSConnection:
                 " and cannot be fragmented over multiple ones.")
             raise ValueError(e)
 
-        if self._write_cipher:
+        if self._cipher.must_encrypt:
             record_type = ContentType.APPLICATION_DATA
             fragments = self._encrypt(content.content_type, fragments, fragment_length)
         else:
-            record_type = ContentType.content_type
+            record_type = content.content_type
 
         self._output_data += b''.join(
             b''.join([
@@ -266,8 +279,6 @@ class TLSConnection:
         )
 
     def _encrypt(self, content_type, fragments, fragment_length):
-        tag_length = self.nconfig.cipher_suite.tag_length
-
         # RFC-8446 doesn't specify anything regarding padding, it only
         # says that it is a good idea. We add padding so that record
         # sizes are a multiple of 4kib (or less if max_fragment_lenght)
@@ -276,18 +287,16 @@ class TLSConnection:
             return b'\x00' * (chunk_size - (len(data) - 1) % chunk_size)
 
         for fragment in fragments:
-            encrypted_fragment = self._write_cipher.encrypt(
-                nonce=next(self._write_nonce),
-                data=b''.join([
-                    fragment,
-                    content_type.to_bytes(1, 'big'),
-                    padding(fragment),
-                ]),
-                associated_data=b''.join([
-                    ContentType.APPLICATION_DATA.to_bytes(1, 'big'),
-                    TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
-                    (len(fragment) + tag_length).to_bytes(2, 'big'),
-                ]),
-            )
-            assert len(encrypted_fragment) == len(fragment) + tag_length
+            data = b''.join([
+                fragment,
+                content_type.to_bytes(1, 'big'),
+                padding(fragment),
+            ])
+            header = b''.join([
+                ContentType.APPLICATION_DATA.to_bytes(1, 'big'),
+                TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
+                (len(fragment) + self._cipher.tag_length).to_bytes(2, 'big'),
+            ])
+            encrypted_fragment = self._cipher.encrypt(data, header)
+            assert len(encrypted_fragment) == len(fragment) + self._cipher.tag_length
             yield encrypted_fragment
