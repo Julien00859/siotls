@@ -158,7 +158,7 @@ class _TLSCipher:
     def _derive_key_and_iv(self, secret):
         dm = self.digestmod
         return (
-            hkdf_expand_label(dm, secret, b'key', b'', dm.digest_size),
+            hkdf_expand_label(dm, secret, b'key', b'', dm().digest_size),
             hkdf_expand_label(dm, secret, b'iv', b'', self.iv_length),
         )
 
@@ -172,11 +172,11 @@ class _TLSCipher:
 
         client_key, client_iv = (self._derive_key_and_iv(client_early_traffic))
         if self._side == 'client':
-            self._write_cipher = self.ciphermod(client_key)
+            self._write_cipher = self._ciphermod(client_key)
             self._write_iv = int.from_bytes(client_iv, 'big')
             self._write_seq = peekable(iter(range(self.usage_limit)))
         else:
-            self._read_cipher = self.ciphermod(client_key)
+            self._read_cipher = self._ciphermod(client_key)
             self._read_iv = int.from_bytes(client_iv, 'big')
             self._read_seq = peekable(iter(range(self.usage_limit)))
 
@@ -194,17 +194,17 @@ class _TLSCipher:
         client_key, client_iv = self._derive_key_and_iv(client_handshake_traffic)
         server_key, server_iv = self._derive_key_and_iv(server_handshake_traffic)
         if self._side == 'client':
-            self._write_cipher = self.ciphermod(client_key)
+            self._write_cipher = self._ciphermod(client_key)
             self._write_iv = int.from_bytes(client_iv, 'big')
             self._write_seq = peekable(iter(range(self.usage_limit)))
-            self._read_cipher = self.ciphermod(server_key)
+            self._read_cipher = self._ciphermod(server_key)
             self._read_iv = int.from_bytes(server_iv, 'big')
             self._read_seq = peekable(iter(range(self.usage_limit)))
         else:
-            self._write_cipher = self.ciphermod(server_key)
+            self._write_cipher = self._ciphermod(server_key)
             self._write_iv = int.from_bytes(server_iv, 'big')
             self._write_seq = peekable(iter(range(self.usage_limit)))
-            self._read_cipher = self.ciphermod(client_key)
+            self._read_cipher = self._ciphermod(client_key)
             self._read_iv = int.from_bytes(client_iv, 'big')
             self._read_seq = peekable(iter(range(self.usage_limit)))
 
@@ -230,17 +230,17 @@ class _TLSCipher:
         client_key, client_iv = self._derive_key_and_iv(client_application_traffic)
         server_key, server_iv = self._derive_key_and_iv(server_application_traffic)
         if self._side == 'client':
-            self._write_cipher = self.ciphermod(client_key)
+            self._write_cipher = self._ciphermod(client_key)
             self._write_iv = int.from_bytes(client_iv, 'big')
             self._write_seq = peekable(iter(range(self.usage_limit)))
-            self._read_cipher = self.ciphermod(server_key)
+            self._read_cipher = self._ciphermod(server_key)
             self._read_iv = int.from_bytes(server_iv, 'big')
             self._read_seq = peekable(iter(range(self.usage_limit)))
         else:
-            self._write_cipher = self.ciphermod(server_key)
+            self._write_cipher = self._ciphermod(server_key)
             self._write_iv = int.from_bytes(server_iv, 'big')
             self._write_seq = peekable(iter(range(self.usage_limit)))
-            self._read_cipher = self.ciphermod(client_key)
+            self._read_cipher = self._ciphermod(client_key)
             self._read_iv = int.from_bytes(client_iv, 'big')
             self._read_seq = peekable(iter(range(self.usage_limit)))
 
@@ -259,7 +259,7 @@ class TLS_AES_128_GCM_SHA256(_TLSCipher):
     digestmod = hashlib.sha256
     block_size = 16
     key_length = 16
-    tag_length = 12
+    tag_length = 16
     nonce_length = 12
     usage_limit = int(2 ** 23.5)
     hashempty = SHA256_EMPTY
@@ -271,7 +271,7 @@ class TLS_AES_256_GCM_SHA384(_TLSCipher):
     digestmod = hashlib.sha384
     block_size = 16
     key_length = 32
-    tag_length = 12
+    tag_length = 16
     nonce_length = 12
     usage_limit = int(2 ** 23.5)
     hashempty = SHA384_EMPTY
@@ -283,7 +283,7 @@ class TLS_CHACHA20_POLY1305_SHA256(_TLSCipher):
     digestmod = hashlib.sha256
     block_size = 16
     key_length = 16
-    tag_length = 12
+    tag_length = 16
     nonce_length = 12
     usage_limit = 1 << 64
     hashempty = SHA256_EMPTY
@@ -295,7 +295,7 @@ class TLS_AES_128_CCM_SHA256(_TLSCipher):
     digestmod = hashlib.sha256
     cipher_block_size = 16
     key_length = 16
-    tag_length = 12
+    tag_length = 16
     nonce_length = 12
     usage_limit = ...
     hashempty = SHA256_EMPTY
@@ -311,7 +311,7 @@ class TLS_AES_128_CCM_8_SHA256(_TLSCipher):
     digestmod = hashlib.sha256
     block_size = 16
     key_length = 16
-    tag_length = 12
+    tag_length = 8
     nonce_length = 12
     usage_limit = ...
     hashempty = SHA256_EMPTY

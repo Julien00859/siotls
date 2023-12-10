@@ -20,14 +20,17 @@ class TestCURL(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.socket = socket.socket()
+        cls.addClassCleanup(cls.socket.close)
+        cls.addClassCleanup(cls.socket.shutdown, socket.SHUT_RDWR)
         cls.socket.bind((HOST, PORT))
         cls.socket.listen(1)
         cls.socket.settimeout(1)
-        cls.addClassCleanup(cls.socket.close)
 
-        cls.keylogfile_fd, cls.keylogfile_path = tempfile.mkstemp(
-            prefix="siotls-keylogfile-")
-        cls.addClassCleanup(os.remove, cls.keylogfile_path)
+        #cls.keylogfile_fd, cls.keylogfile_path = tempfile.mkstemp(
+        #    prefix="siotls-keylogfile-")
+        cls.keylogfile_path = "/home/julien/.tlskeylogfile"
+        cls.keylogfile_fd = os.open(cls.keylogfile_path, os.O_CREAT | os.O_RDWR)
+        #cls.addClassCleanup(os.remove, cls.keylogfile_path)
 
     def setUp(self):
         # make sure no request is pending
@@ -39,7 +42,7 @@ class TestCURL(unittest.TestCase):
                 raise
         self.socket.settimeout(1)
 
-        self.addCleanup(os.truncate, self.keylogfile_fd, 0)
+        os.truncate(self.keylogfile_fd, 0)
 
     def curl(
         self,

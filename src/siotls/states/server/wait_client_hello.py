@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 from siotls.iana import (
     ContentType,
     HandshakeType,
@@ -69,6 +68,7 @@ class ServerWaitClientHello(State):
             return
 
         self._cipher.skip_early_secrets()
+
         self._send_content(ServerHello(
             self._server_unique,
             client_hello.legacy_session_id,
@@ -79,20 +79,14 @@ class ServerWaitClientHello(State):
         if self._is_first_client_hello:
             self._send_content(ChangeCipherSpec())
 
-
-        self._cipher.skip_early_secrets()
-        self._client.derive_handshake_secrets(shared_key, self._transcript.digest())
+        self._cipher.derive_handshake_secrets(shared_key, self._transcript.digest())
 
         self._send_content(EncryptedExtensions(encrypted_extensions))
+        return
         self._send_content(Certificate(...))
         self._send_content(CertificateVerify(...))
         self._send_content(Finished(...))
         self._move_to_state(ServerWaitFlight2)
-
-    def _negociate_algorithms(self, client_hello):
-        self.nconfig.cipher_suite = self._find_common_cipher_suite(client_hello)
-        self.nconfig.digital_signature = self._find_common_digital_signature(client_hello)
-        self.nconfig.key_exchange = self._find_common_key_exchange(client_hello)
 
     def _find_common_cipher_suite(self, client_hello):
         for cipher_suite in self.config.cipher_suites:
@@ -100,32 +94,6 @@ class ServerWaitClientHello(State):
                 return cipher_suite
         e = "no common cipher suite found"
         raise alerts.HandshakeFailure(e)
-
-    def _find_common_digital_signature(self, client_hello):
-        try:
-            ext = client_hello.extensions[ExtensionType.SIGNATURE_ALGORITHMS]
-        except KeyError as exc:
-            raise alerts.MissingExtension() from exc
-        for digital_signatures in self.config.digital_signatures:
-            if digital_signatures in ext.supported_signature_algorithms:
-                return digital_signatures
-        e = "no common digital signature found"
-        raise alerts.HandshakeFailure(e)
-
-    def _find_common_key_exchange(self, client_hello):
-        try:
-            supported_groups = client_hello.extensions[ExtensionType.SUPPORTED_GROUPS]
-        except KeyError as exc:
-            raise alerts.MissingExtension() from exc
-        for group in self.config.key_exchanges:
-            if group in supported_groups.named_group_list:
-                return group
-        e = "no common key exchange found"
-        raise alerts.HandshakeFailure(e)
-
-    def _can_resume_key_share(self, client_hello):
-        key_share = client_hello.extensions.get(ExtensionType.KEY_SHARE)
-        return key_share and self.nconfig.key_exchange in key_share.client_shares
 
     def _send_hello_retry_request(self, client_hello, nconfig):
         # make sure the client doesn't change its algorithms in between flights
@@ -143,25 +111,54 @@ class ServerWaitClientHello(State):
         self._transcript.do_hrr_dance()
         self._send_content(ChangeCipherSpec())
 
-    def _negociate_extensions(self, client_extensions, nconfig):
+    def _negociate_extensions(self, client_extensions):
         clear_extensions = [SupportedVersionsResponse(TLSVersion.TLS_1_3)]
         encrypted_extensions = []
 
+        # Supported groups
+        try:
+            supported_groups = client_extensions[ExtensionType.SUPPORTED_GROUPS]
+        except KeyError as exc:
+            raise alerts.MissingExtension() from exc
+        for group in self.config.key_exchanges:
+            if group in supported_groups.named_group_list:
+                self.nconfig.key_exchange = group
+                break
+        else:
+            e = "no common key exchange found"
+            raise alerts.HandshakeFailure(e)
+
+        key_share = client_extensions.get(ExtensionType.KEY_SHARE)
+        if not key_share or self.nconfig.key_exchange not in key_share.client_shares:
+            return clear_extensions, encrypted_extensions, None
+
+        # Signature algorithms
+        try:
+            ext = client_extensions[ExtensionType.SIGNATURE_ALGORITHMS]
+        except KeyError as exc:
+            raise alerts.MissingExtension() from exc
+        for digital_signatures in self.config.digital_signatures:
+            if digital_signatures in ext.supported_signature_algorithms:
+                self.nconfig.digital_signature = digital_signatures
+                break
+        else:
+            e = "no common digital signature found"
+            raise alerts.HandshakeFailure(e)
+
         # Key Share
-        key_share = client_extensions[ExtensionType.KEY_SHARE]
-        peer_exchange = key_share.client_shares[nconfig.key_exchange]
+        peer_exchange = key_share.client_shares[self.nconfig.key_exchange]
         shared_key, my_exchange = key_share_resume(
-            nconfig.key_exchange, None, peer_exchange)
+            self.nconfig.key_exchange, None, peer_exchange)
         clear_extensions.append(
-            KeyShareResponse(nconfig.key_exchange, my_exchange))
+            KeyShareResponse(self.nconfig.key_exchange, my_exchange))
 
         # Max Fragment Length
         client_mfl = client_extensions.get(ExtensionType.MAX_FRAGMENT_LENGTH)
         if client_mfl:
-            nconfig.max_fragment_length = client_mfl.octets
+            self.nconfig.max_fragment_length = client_mfl.octets
             encrypted_extensions.append(client_mfl)
         else:
-            nconfig.max_fragment_length = self.config.max_fragment_length
+            self.nconfig.max_fragment_length = self.config.max_fragment_length
 
         # ALPN
         client_alpn = client_extensions.get(
@@ -169,30 +166,30 @@ class ServerWaitClientHello(State):
         if self.config.alpn and client_alpn:
             for proto in self.config.alpn:
                 if proto in client_alpn.protocol_name_list:
-                    nconfig.alpn = proto
+                    self.nconfig.alpn = proto
                     encrypted_extensions.append(type(client_alpn)([proto]))
                     break
             else:
                 raise alerts.NO_APPLICATION_PROTOCOL()
         else:
-            nconfig.alpn = None
+            self.nconfig.alpn = None
 
         # Heartbeat
         client_hb = client_extensions.get(ExtensionType.HEARTBEAT)
         server_hb = self.config.can_send_heartbeat or self.config.can_echo_heartbeat
         if client_hb and server_hb:
-            nconfig.can_send_heartbeat = (
+            self.nconfig.can_send_heartbeat = (
                 self.config.can_send_heartbeat and
                 client_hb.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
             )
-            nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat
+            self.nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat
             encrypted_extensions.append(Heartbeat(
                 HeartbeatMode.PEER_ALLOWED_TO_SEND
                 if self.config.can_echo_heartbeat else
                 HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND
             ))
         else:
-            nconfig.can_send_heartbeat = False
-            nconfig.can_echo_heartbeat = False
+            self.nconfig.can_send_heartbeat = False
+            self.nconfig.can_echo_heartbeat = False
 
         return clear_extensions, encrypted_extensions, shared_key

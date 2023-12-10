@@ -247,7 +247,8 @@ class TLSConnection:
 
         fragment_length = self._max_fragment_length
         if self._cipher.must_encrypt:
-            fragment_length -= 1  # room for content_type, see _encrypt()
+            # room for content-type and aead's additionnal data
+            fragment_length -= 1 + self._cipher.tag_length
 
         if len(data) <= fragment_length:
             fragments = (data,)
@@ -264,7 +265,7 @@ class TLSConnection:
 
         if self._cipher.must_encrypt:
             record_type = ContentType.APPLICATION_DATA
-            fragments = self._encrypt(content.content_type, fragments, fragment_length)
+            fragments = self._encrypt(content.content_type, fragments, self._max_fragment_length)
         else:
             record_type = content.content_type
 
@@ -278,25 +279,28 @@ class TLSConnection:
             for fragment in fragments
         )
 
-    def _encrypt(self, content_type, fragments, fragment_length):
+    def _encrypt(self, content_type, fragments, max_fragment_length):
         # RFC-8446 doesn't specify anything regarding padding, it only
         # says that it is a good idea. We add padding so that record
         # sizes are a multiple of 4kib (or less if max_fragment_lenght)
-        chunk_size = min(fragment_length, 4096)
-        def padding(data):
-            return b'\x00' * (chunk_size - (len(data) - 1) % chunk_size)
+        chunk_size = min(max_fragment_length, 4096)
 
         for fragment in fragments:
+            fragment_length = len(fragment) + 1 + self._cipher.tag_length
+            padding = b'\x00' * (chunk_size - fragment_length % chunk_size)
             data = b''.join([
                 fragment,
                 content_type.to_bytes(1, 'big'),
-                padding(fragment),
+                padding,
             ])
             header = b''.join([
                 ContentType.APPLICATION_DATA.to_bytes(1, 'big'),
                 TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
-                (len(fragment) + self._cipher.tag_length).to_bytes(2, 'big'),
+                (len(data) + self._cipher.tag_length).to_bytes(2, 'big'),
             ])
             encrypted_fragment = self._cipher.encrypt(data, header)
-            assert len(encrypted_fragment) == len(fragment) + self._cipher.tag_length
+
+            assert len(encrypted_fragment) == len(data) + self._cipher.tag_length, \
+                (len(encrypted_fragment), len(data), self._cipher.tag_length)
+
             yield encrypted_fragment
