@@ -18,7 +18,7 @@ from .utils import try_cast
 
 logger = logging.getLogger(__name__)
 
-def starswith_change_cipher_spec(data):
+def startswith_change_cipher_spec(data):
     return data[0:1] == b'\x14' and data[3:6] == b'\x00\x01\x01'
 
 
@@ -141,7 +141,7 @@ class TLSConnection:
         self.state = state_type(self)
 
     def _read_next_record(self):
-        while starswith_change_cipher_spec(self._input_data):
+        while startswith_change_cipher_spec(self._input_data):
             self._input_data = self._input_data[6:]
 
         if len(self._input_data) < 5:
