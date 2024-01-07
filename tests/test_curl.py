@@ -117,12 +117,12 @@ class TestCURL(unittest.TestCase):
         # Validate client randoms
         self.assertEqual(
             [log.client_random for log in siotls_keylog],
-            [conn._client_nonce.hex()] * len(siotls_keylog),
+            [conn._client_unique.hex()] * len(siotls_keylog),
             "All key logs are for the same client",
         )
         self.assertEqual(
             [log.client_random for log in curl_keylog],
-            [conn._client_nonce.hex()] * len(curl_keylog),
+            [conn._client_unique.hex()] * len(curl_keylog),
             "All key logs are for the same client",
         )
 

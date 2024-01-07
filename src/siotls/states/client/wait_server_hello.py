@@ -84,7 +84,7 @@ class ClientWaitServerHello(State):
         self.connection.initiate_connection()
 
     def _process_server_hello(self, server_hello):
-        self._server_nonce = server_hello.random
+        self._server_unique = server_hello.random
 
         nconfig = SimpleNamespace()
         nconfig.cipher_suite = server_hello.cipher_suite
