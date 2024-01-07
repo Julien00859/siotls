@@ -51,21 +51,6 @@ class TLSConnection:
         self._last_client_hello = None
         self._last_server_hello = None
 
-        if config.log_keys:
-            is_key_logger_enabled = any((
-                not isinstance(handler, logging.NullHandler)
-                for handler in key_logger.handlers
-            ))
-            if is_key_logger_enabled:
-                logger.info("Key log enabled for current connection.")
-            else:
-                logger.warning(
-                    "Key log was requested for current connection but no "
-                    "logging.Handler seems setup on the %r logger. You "
-                    "must setup one.\n"
-                    "logging.getLogger(%r).addHandler(logging.FileHandler(path_to_keylogfile))",
-                    self, key_logger.name, key_logger.name)
-
     @property
     def is_encrypted(self):
         return self.nconfig is not None
@@ -81,6 +66,21 @@ class TLSConnection:
     # ------------------------------------------------------------------
 
     def initiate_connection(self):
+        if self.config.log_keys:
+            is_key_logger_enabled = any((
+                not isinstance(handler, logging.NullHandler)
+                for handler in key_logger.handlers
+            ))
+            if is_key_logger_enabled:
+                logger.info("Key log enabled for current connection.")
+            else:
+                logger.warning(
+                    "Key log was requested for current connection but no "
+                    "logging.Handler seems setup on the %r logger. You must "
+                    "setup one.\nlogging.getLogger(%r).addHandler(logging."
+                    "FileHandler(path_to_keylogfile, %r))",
+                    self, key_logger.name, key_logger.name, "w")
+
         self.state.initiate_connection()
 
     def receive_data(self, data):
