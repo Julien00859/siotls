@@ -110,13 +110,13 @@ class ClientWaitServerHello(State):
             key_share = server_extensions[ExtensionType.KEY_SHARE]
         except KeyError as exc:
             raise alerts.MissingExtension() from exc
-        if key_share.group not in self._key_exchange_privkeys:
+        if key_share.group not in self._key_shares:
             e =(f"The server's selected {key_share.selected_group} wasn't "
                 f"offered in ClientHello: {self.config.key_exchanges}")
             raise alerts.IllegalParameter(e)
         shared_key, _ = key_share_resume(
             nconfig.key_exchange,
-            self._key_exchange_privkeys[nconfig.key_exchange],
+            self._key_shares[nconfig.key_exchange],
             key_share.client_shares[nconfig.key_exchange],
         )
         nconfig.key_exchange = key_share.group
