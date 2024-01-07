@@ -43,7 +43,7 @@ class TLSConnection:
             self._client_unique = None
             self._server_unique = secrets.token_bytes(32)
 
-        self._key_exchange_privkeys = {}
+        self._key_shares = {}
         self._cookie = None
 
         self._transcript_hash = None
