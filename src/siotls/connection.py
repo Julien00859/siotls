@@ -37,11 +37,11 @@ class TLSConnection:
         self._output_data = bytearray()
 
         if config.side == 'client':
-            self._client_nonce = secrets.token_bytes(32)
-            self._server_nonce = None
+            self._client_unique = secrets.token_bytes(32)
+            self._server_unique = None
         else:
-            self._client_nonce = None
-            self._server_nonce = secrets.token_bytes(32)
+            self._client_unique = None
+            self._server_unique = secrets.token_bytes(32)
 
         self._key_exchange_privkeys = {}
         self._cookie = None
@@ -75,6 +75,9 @@ class TLSConnection:
         return (self.nconfig or self.config).max_fragment_length + (
             256 if self.is_encrypted else 0
         )
+
+    def __hash__(self):
+        return getattr(self, f'_{self.config.side}_unique')
 
     # ------------------------------------------------------------------
     # Public APIs
