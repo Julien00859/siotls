@@ -33,7 +33,7 @@ class ServerWaitClientHello(State):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._is_first_client_hello = not bool(self._transcript_hash)
+        self._is_first_client_hello = self.nconfig is None
 
     def process(self, client_hello):
         if client_hello.content_type != ContentType.HANDSHAKE:
@@ -50,10 +50,8 @@ class ServerWaitClientHello(State):
         self._negociate_algorithms(client_hello, nconfig)
 
         if self._is_first_client_hello:
-            digestmod = nconfig.cipher_suite.digestmod
-            self._transcript_hash = digestmod(self._last_client_hello)
-            self._last_client_hello = None
             self._client_unique = client_hello.random
+            self._transcript.post_init(nconfig.cipher_suite.digestmod)
         else:
             if client_hello.random != self._client_unique:
                 e = "Client's random cannot change in between Hellos"
@@ -82,7 +80,7 @@ class ServerWaitClientHello(State):
 
         self.nconfig = TLSNegociatedConfiguration(**vars(nconfig))
         self.secrets.compute_handshake_secrets(
-            shared_key, self._transcript_hash.digest())
+            shared_key, self._transcript.digest())
         if self.config.log_keys:
             key_logger.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
                 self._client_unique.hex(), self.secrets.client_handshake_traffic.hex())
@@ -155,16 +153,7 @@ class ServerWaitClientHello(State):
 
         # make sure the client doesn't change its algorithms in between flights
         self.config.cipher_suites = [nconfig.cipher_suite]
-        self.config.digital_signatures = [nconfig.digital_signature]
         self.config.key_exchanges = [nconfig.key_exchange]
-
-        # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
-        digestmod = nconfig.cipher_suite.digestmod
-        self._transcript_hash = digestmod(b''.join([
-            HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
-            digestmod().digest_size.to_bytes(3, 'big'),
-            self._transcript_hash.digest(),
-        ]))
 
         self._send_content(HelloRetryRequest(
             HelloRetryRequest.random,
@@ -175,6 +164,7 @@ class ServerWaitClientHello(State):
                 KeyShareRetry(nconfig.key_exchange),
             ]
         ))
+        self._transcript.do_hrr_dance()
         self._send_content(ChangeCipherSpec())
 
     def _negociate_extensions(self, client_extensions, nconfig):
