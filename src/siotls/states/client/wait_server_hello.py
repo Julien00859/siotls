@@ -18,7 +18,7 @@ class ClientWaitServerHello(State):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._is_first_server_hello = not bool(self._transcript_hash)
+        self._is_first_server_hello = self.nconfig is None
 
     def process(self, content):
         if content.content_type != ContentType.HANDSHAKE:
@@ -39,11 +39,8 @@ class ClientWaitServerHello(State):
                 f"in ClientHello: {self.config.cipher_suites}")
             raise alerts.IllegalParameter(e)
 
-        digestmod = content.cipher_suite.digestmod
-        self._transcript_hash = digestmod(self._last_client_hello)
-        self._last_client_hello = None
-
         if self._is_first_server_hello:
+            self._transcript.post_init(content.cipher_suite.digestmod)
             self._send_content(ChangeCipherSpec())
 
         if content.msg_type is HandshakeType_.HELLO_RETRY_REQUEST:
@@ -70,15 +67,7 @@ class ClientWaitServerHello(State):
         if cookie := hello_retry_request.extensions.get(ExtensionType.COOKIE):
             self._cookie = cookie.cookie
 
-        # RFC 8446 4.4.1 shenanigans regarding HelloRetryRequest
-        digestmod = hello_retry_request.cipher_suite.digestmod
-        self._transcript_hash = digestmod(b''.join([
-            HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
-            digestmod().digest_size.to_bytes(3, 'big'),
-            self._transcript_hash.digest(),
-            self._last_server_hello,
-        ]))
-        self._last_server_hello = None
+        self._transcript.do_hrr_dance()
 
         self._move_to_state(ClientStart)
         self.connection.initiate_connection()
@@ -91,11 +80,9 @@ class ClientWaitServerHello(State):
         nconfig.secrets = TLSSecrets(nconfig.cipher_suite.digestmod)
         nconfig.secrets.skip_early_secrets()
 
-        self._transcript_hash.update(self._last_server_hello)
-        self._last_server_hello = None
         shared_key = self._negociate_extensions(server_hello.extensions, nconfig)
         nconfig.secrets.compute_handshake_secrets(
-            shared_key, self._transcript_hash.digest())
+            shared_key, self._transcript.digest())
 
         # save the simple namespace on the connection as we don't know
         # the negociated digital signature yet, delegate instantiating
