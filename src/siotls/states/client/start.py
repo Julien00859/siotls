@@ -73,7 +73,7 @@ class ClientStart(State):
                 continue
 
             private_key, my_key_share = key_share_init(key_exchange)
-            self._key_exchange_privkeys[key_exchange] = private_key
+            self._key_shares[key_exchange] = private_key
             entries[key_exchange] = my_key_share
 
         return entries
