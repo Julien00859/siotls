@@ -43,6 +43,10 @@ class TLSConfiguration:
     # extra
     log_keys: bool = False
 
+    @property
+    def other_side(self):
+        return 'server' if self.side == 'client' else 'client'
+
     def validate(self):
         if self.side == 'server' and self.max_fragment_length != 16384:
             e = "max fragment length is only configurable client side"
