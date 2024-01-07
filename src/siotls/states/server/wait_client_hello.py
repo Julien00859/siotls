@@ -99,8 +99,8 @@ class ServerWaitClientHello(State):
             e = "no common cipher suite found"
             raise alerts.HandshakeFailure(e)
 
-        nconfig.digital_signature = self._find_common_digital_signature(client_hello)
-        if not nconfig.digital_signature:
+        nconfig.signature_algorithm = self._find_common_signature_algorithm(client_hello)
+        if not nconfig.signature_algorithm:
             e = "no common digital signature found"
             raise alerts.HandshakeFailure(e)
 
@@ -116,14 +116,14 @@ class ServerWaitClientHello(State):
             if cipher_suite in client_hello.cipher_suites:
                 return cipher_suite
 
-    def _find_common_digital_signature(self, client_hello):
+    def _find_common_signature_algorithm(self, client_hello):
         try:
             ext = client_hello.extensions[ExtensionType.SIGNATURE_ALGORITHMS]
         except KeyError as exc:
             raise alerts.MissingExtension() from exc
-        for digital_signatures in self.config.digital_signatures:
-            if digital_signatures in ext.supported_signature_algorithms:
-                return digital_signatures
+        for signature_algorithms in self.config.signature_algorithms:
+            if signature_algorithms in ext.supported_signature_algorithms:
+                return signature_algorithms
 
     def _find_common_key_exchange_via_key_share(self, client_hello):
         key_share = client_hello.extensions.get(ExtensionType.KEY_SHARE)

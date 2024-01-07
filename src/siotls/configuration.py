@@ -19,7 +19,7 @@ class TLSConfiguration:
             CipherSuites.TLS_AES_256_GCM_SHA384,
             CipherSuites.TLS_AES_128_GCM_SHA256,
         ].copy)
-    digital_signatures: list[SignatureScheme] = \
+    signature_algorithms: list[SignatureScheme] = \
         dataclasses.field(default_factory=[
             SignatureScheme.rsa_pkcs1_sha256,
             SignatureScheme.rsa_pss_rsae_sha256,
@@ -56,7 +56,7 @@ class TLSConfiguration:
 @dataclasses.dataclass(frozen=True)
 class TLSNegociatedConfiguration:
     cipher_suite: CipherSuites
-    digital_signature: SignatureScheme
+    signature_algorithm: SignatureScheme
     key_exchange: NamedGroup
     alpn: ALPNProtocol | None
     can_send_heartbeat: bool
