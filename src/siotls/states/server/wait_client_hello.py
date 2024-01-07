@@ -53,9 +53,9 @@ class ServerWaitClientHello(State):
             digestmod = nconfig.cipher_suite.digestmod
             self._transcript_hash = digestmod(self._last_client_hello)
             self._last_client_hello = None
-            self._client_nonce = client_hello.random
+            self._client_unique = client_hello.random
         else:
-            if client_hello.random != self._client_nonce:
+            if client_hello.random != self._client_unique:
                 e = "Client's random cannot change in between Hellos"
                 raise alerts.IllegalParameter(e)
 
@@ -71,7 +71,7 @@ class ServerWaitClientHello(State):
         self.secrets.skip_early_secrets()
 
         self._send_content(ServerHello(
-            self._server_nonce,
+            self._server_unique,
             client_hello.legacy_session_id,
             nconfig.cipher_suite,
             clear_extensions,
@@ -85,9 +85,9 @@ class ServerWaitClientHello(State):
             shared_key, self._transcript_hash.digest())
         if self.config.log_keys:
             key_logger.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
-                self._client_nonce.hex(), self.secrets.client_handshake_traffic.hex())
+                self._client_unique.hex(), self.secrets.client_handshake_traffic.hex())
             key_logger.info("SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s",
-                self._client_nonce.hex(), self.secrets.server_handshake_traffic.hex())
+                self._client_unique.hex(), self.secrets.server_handshake_traffic.hex())
 
         self._send_content(EncryptedExtensions(encrypted_extensions))
         self._send_content(Certificate(...))

@@ -37,11 +37,11 @@ class TLSConnection:
         self._output_data = bytearray()
 
         if config.side == 'client':
-            self._client_nonce = secrets.token_bytes(32)
-            self._server_nonce = None
+            self._client_unique = secrets.token_bytes(32)
+            self._server_unique = None
         else:
-            self._client_nonce = None
-            self._server_nonce = secrets.token_bytes(32)
+            self._client_unique = None
+            self._server_unique = secrets.token_bytes(32)
 
         self._key_exchange_privkeys = {}
         self._cookie = None
