@@ -25,7 +25,7 @@ class ClientStart(State):
     def initiate_connection(self):
         extensions = [
             SupportedVersionsRequest([TLSVersion.TLS_1_3]),
-            SignatureAlgorithms(self.config.digital_signatures),
+            SignatureAlgorithms(self.config.signature_algorithms),
             SupportedGroups(self.config.key_exchanges),
         ]
         if self.config.hostnames:
