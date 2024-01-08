@@ -56,9 +56,9 @@ class SupportedVersionsResponse(Extension, SerializableBody):
 
     def __init__(self, selected_version):
         if selected_version < TLSVersion.TLS_1_3:
-            msg = ("Versions prior to TLS 1.3 must set the version on "
-                   "the record (legacy_version) instead.")
-            raise ValueError(msg)
+            e =("Versions prior to TLS 1.3 must set the version on the record "
+                "(legacy_version) instead.")
+            raise ValueError(e)
         self.selected_version = selected_version
 
     @classmethod

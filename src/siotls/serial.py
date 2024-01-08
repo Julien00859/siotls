@@ -120,8 +120,8 @@ class SerialIO(io.BytesIO):
             if len(self._limits) > 1:
                 n = max_n
         elif n > max_n:
-            msg = f"Expected {n} bytes but can only read {max_n}."
-            raise TooMuchData(msg)
+            e = f"Expected {n} bytes but can only read {max_n}."
+            raise TooMuchData(e)
         return super().read(n)
 
     def read_exactly(self, n):
@@ -129,8 +129,8 @@ class SerialIO(io.BytesIO):
         while len(data) != n:
             read = self.read(n - len(data))
             if not read:
-                msg = f"Expected {n} bytes but could only read {len(data)}."
-                raise MissingData(msg)
+                e = f"Expected {n} bytes but could only read {len(data)}."
+                raise MissingData(e)
             data += read
         return data
 
@@ -151,9 +151,9 @@ class SerialIO(io.BytesIO):
     def read_listint(self, nlist, nitem):
         length = self.read_int(nlist)
         if length % nitem != 0:
-            msg = (f"Cannot read {length // nitem + 1} "
-                   f"uint{nitem * 8}_t out of {length} bytes.")
-            raise SerializationError(msg)
+            e =(f"Cannot read {length // nitem + 1} uint{nitem * 8}_t out of "
+                f"{length} bytes.")
+            raise SerializationError(e)
 
         it = iter(self.read_exactly(length))
         return [
@@ -204,15 +204,15 @@ class SerialIO(io.BytesIO):
         eof_pos = self.seek(0, 2)
         if remaining := eof_pos - current_pos:
             self.seek(current_pos, 0)
-            msg = f"Expected end of stream but {remaining} bytes remain."
-            raise TooMuchData(msg)
+            e = f"Expected end of stream but {remaining} bytes remain."
+            raise TooMuchData(e)
 
     @contextlib.contextmanager
     def limit(self, length):
         new_limit = self.tell() + length
         if new_limit > self._limits[-1]:
-            msg = "An more restrictive limit is present already"
-            raise ValueError(msg)
+            e = "An more restrictive limit is present already"
+            raise ValueError(e)
 
         self._limits.append(new_limit)
         try:
@@ -223,5 +223,5 @@ class SerialIO(io.BytesIO):
             assert self._limits.pop() == new_limit, "another limit was pop"
             assert self._limits, "+inf was pop"
             if (remaining := new_limit - self.tell()):
-                msg = f"Expected end of chunk but {remaining} bytes remain."
-                raise TooMuchData(msg)
+                e = f"Expected end of chunk but {remaining} bytes remain."
+                raise TooMuchData(e)

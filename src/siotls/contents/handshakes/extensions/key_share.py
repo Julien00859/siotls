@@ -40,7 +40,8 @@ class KeyShareRequest(Extension, SerializableBody):
             key_exchange = try_cast(NamedGroup, list_stream.read_int(2))
             key_share = list_stream.read_var(2)
             if key_exchange in client_shares:
-                raise alerts.IllegalParameter()
+                e = "Cannot share different keys for a same group"
+                raise alerts.IllegalParameter(e)
             client_shares[key_exchange] = key_share
         return cls(client_shares)
 

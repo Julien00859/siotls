@@ -51,7 +51,8 @@ class ServerHello(Handshake, SerializableBody):
     def parse_body(cls, stream):
         legacy_version = stream.read_int(2)
         if legacy_version != TLSVersion.TLS_1_2:
-            raise alerts.ProtocolVersion()
+            e = f"Expected {TLSVersion.TLS_1_2} but {legacy_version} found"
+            raise alerts.ProtocolVersion(e)
         legacy_version = TLSVersion(legacy_version)
 
         random = stream.read_exactly(32)
@@ -64,7 +65,8 @@ class ServerHello(Handshake, SerializableBody):
 
         legacy_compression_methods = stream.read_int(1)
         if legacy_compression_methods != 0:  # "null" compression method
-            raise alerts.IllegalParameter()
+            e = "Only the NULL compression method is supported in TLS 1.3"
+            raise alerts.IllegalParameter(e)
 
         extensions = []
         list_stream = SerialIO(stream.read_var(2))
