@@ -19,36 +19,6 @@ class TooMuchData(SerializationError):
     pass
 
 
-def parse_verbose(meth):
-    def wrapped(stream, **kwargs):
-        with stream.lookahead():
-            data = stream.read()
-        logger.debug(
-            "Parsing %s\nStruct:\n%s\nData:\n%s\n",
-            meth.__self__.__name__,
-            meth.__self__._struct,
-            hexdump(data),
-        )
-        return wrapped.meth.__func__(wrapped.cls, stream, **kwargs)
-    wrapped.meth = meth
-    wrapped.cls = None  # set by caller
-    return wrapped
-
-
-def serialize_verbose(func):
-    def wrapped(self):
-        data = func(self)
-        logger.debug(
-            "Serializing %s\nStruct:\n%s\nSelf:\n%s\nData:\n%s\n",
-            type(self).__name__,
-            self._struct,
-            self,
-            hexdump(data),
-        )
-        return data
-    return wrapped
-
-
 class Serializable(metaclass=abc.ABCMeta):
     _struct: str
 
@@ -59,24 +29,6 @@ class Serializable(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def serialize(self):
         raise NotImplementedError("abstract method")
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if logger.isEnabledFor(logging.DEBUG):
-            if getattr(cls.parse, '__isabstractmethod__', False):
-                pass
-            elif 'parse' in cls.__dict__:
-                if '_struct' not in cls.__dict__:
-                    logger.warning("%s is missing a _struct declaration", cls)
-                    cls._struct = ''
-                cls.parse = parse_verbose(cls.parse)
-                cls.parse.cls = cls
-            else:
-                cls.parse = parse_verbose(cls.parse.meth)
-                cls.parse.cls = cls
-
-            if 'serialize' in cls.__dict__:
-                cls.serialize = serialize_verbose(cls.serialize)
 
 
 class SerializableBody(metaclass=abc.ABCMeta):
@@ -89,24 +41,6 @@ class SerializableBody(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def serialize_body(self):
         raise NotImplementedError("abstract method")
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if logger.isEnabledFor(logging.DEBUG):
-            if getattr(cls.parse_body, '__isabstractmethod__', False):
-                pass
-            elif 'parse_body' in cls.__dict__:
-                if '_struct' not in cls.__dict__:
-                    logger.warning("%s is missing a _struct declaration", cls)
-                    cls._struct = ''
-                cls.parse_body = parse_verbose(cls.parse_body)
-                cls.parse_body.cls = cls
-            else:
-                cls.parse_body = parse_verbose(cls.parse_body.meth)
-                cls.parse_body.cls = cls
-
-            if 'serialize_body' in cls.__dict__:
-                cls.serialize_body = serialize_verbose(cls.serialize_body)
 
 
 class SerialIO(io.BytesIO):
