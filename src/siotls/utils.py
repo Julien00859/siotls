@@ -2,6 +2,8 @@ import binascii
 import itertools
 import math
 
+_sentinel = object()
+
 
 def hexdump(bytes_):
     """
@@ -55,3 +57,29 @@ def is_string(proto):
     except UnicodeDecodeError:
         return False
     return True
+
+
+class peekable:
+    def __init__(self, iterable):
+        self._it = iter(iterable)
+        self._peeked = _sentinel
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._peeked is not _sentinel:
+            peeked = self._peeked
+            self._peeked = _sentinel
+            return peeked
+        return next(self._it)
+
+    def peek(self, default=_sentinel):
+        if self._peeked is _sentinel:
+            try:
+                self._peeked = next(self._it)
+            except StopIteration:
+                if default is _sentinel:
+                    raise
+                return default
+        return self._peeked

@@ -1,4 +1,3 @@
-from siotls.secrets import TLSSecrets
 from siotls.crypto.key_share import resume as key_share_resume
 from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import alerts, ChangeCipherSpec
@@ -10,6 +9,7 @@ from siotls.iana import (
     ExtensionType,
     MaxFragmentLengthOctets,
 )
+from siotls.ciphers import cipher_suite_registry
 from .. import State
 from . import ClientWaitEncryptedExtensions
 
@@ -42,7 +42,9 @@ class ClientWaitServerHello(State):
 
         if self._is_first_server_hello:
             self.nconfig = TLSNegociatedConfiguration(content.cipher_suite)
-            self._transcript.post_init(content.cipher_suite.digestmod)
+            self._cipher = cipher_suite_registry[content.cipher_suite](
+                'client', self.config.log_keys, self._client_unique)
+            self._transcript.post_init(self._cipher.digestmod)
             self._send_content(ChangeCipherSpec())
 
         if content.msg_type is HandshakeType_.HELLO_RETRY_REQUEST:
@@ -77,10 +79,8 @@ class ClientWaitServerHello(State):
     def _process_server_hello(self, server_hello):
         self._server_unique = server_hello.random
         shared_key = self._negociate_extensions(server_hello.extensions)
-        self.secrets = TLSSecrets(self.nconfig.cipher_suite.digestmod)
-        self.secrets.skip_early_secrets()
-        self.secrets.compute_handshake_secrets(
-            shared_key, self._transcript.digest())
+        self._cipher.skip_early_secrets()
+        self._cipher.derive_handshake_secrets(shared_key, self._transcript.digest())
         self._move_to_state(ClientWaitEncryptedExtensions)
 
     def _negociate_extensions(self, server_extensions):

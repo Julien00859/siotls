@@ -1,4 +1,3 @@
-from siotls import key_logger
 from siotls.iana import (
     ContentType,
     HandshakeType,
@@ -23,7 +22,7 @@ from siotls.contents.handshakes.extensions import (
     ApplicationLayerProtocolNegotiation as ALPN,
 )
 from siotls.crypto.key_share import resume as key_share_resume
-from siotls.secrets import TLSSecrets
+from siotls.ciphers import cipher_suite_registry
 from .. import State
 from . import ServerWaitFlight2
 
@@ -47,7 +46,9 @@ class ServerWaitClientHello(State):
             cipher_suite = self._find_common_cipher_suite(client_hello)
             self.nconfig = TLSNegociatedConfiguration(cipher_suite)
             self._client_unique = client_hello.random
-            self._transcript.post_init(self.nconfig.cipher_suite.digestmod)
+            self._cipher = cipher_suite_registry[cipher_suite](
+                'server', self.config.log_keys, self._client_unique)
+            self._transcript.post_init(self._cipher.digestmod)
         else:
             if cipher_suite != self.nconfig.cipher_suite:
                 e = "Client's cipher suite cannot change in between Hellos"
@@ -67,8 +68,7 @@ class ServerWaitClientHello(State):
             self._move_to_state(ServerWaitClientHello)  # update _is_first_client_hello
             return
 
-        self.secrets = TLSSecrets(self.nconfig.cipher_suite.digestmod)
-        self.secrets.skip_early_secrets()
+        self._cipher.skip_early_secrets()
 
         self._send_content(ServerHello(
             self._server_unique,
@@ -80,13 +80,7 @@ class ServerWaitClientHello(State):
         if self._is_first_client_hello:
             self._send_content(ChangeCipherSpec())
 
-        self.secrets.compute_handshake_secrets(
-            shared_key, self._transcript.digest())
-        if self.config.log_keys:
-            key_logger.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
-                self._client_unique.hex(), self.secrets.client_handshake_traffic.hex())
-            key_logger.info("SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s",
-                self._client_unique.hex(), self.secrets.server_handshake_traffic.hex())
+        self._cipher.derive_handshake_secrets(shared_key, self._transcript.digest())
 
         self._send_content(EncryptedExtensions(encrypted_extensions))
         self._send_content(Certificate(...))
