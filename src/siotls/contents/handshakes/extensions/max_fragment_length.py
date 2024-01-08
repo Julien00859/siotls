@@ -1,23 +1,15 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT, MaxFragmentLength
+from siotls.iana import (
+    ExtensionType,
+    HandshakeType as HT,
+    MaxFragmentLengthOctets,
+    MaxFragmentLengthCode,
+)
 from siotls.serial import SerializableBody, SerializationError
 from ... import alerts
 from . import Extension
 
-
-to_int = {
-    MaxFragmentLength.MAX_512: 512,
-    MaxFragmentLength.MAX_1024: 1024,
-    MaxFragmentLength.MAX_2048: 2048,
-    MaxFragmentLength.MAX_4096: 4096,
-}.__getitem__
-to_enum = {
-    512: MaxFragmentLength.MAX_512,
-    1024: MaxFragmentLength.MAX_1024,
-    2048: MaxFragmentLength.MAX_2048,
-    4096: MaxFragmentLength.MAX_4096,
-}.__getitem__
 
 @dataclasses.dataclass(init=False)
 class MaxFragmentLength(Extension, SerializableBody):
@@ -29,15 +21,35 @@ class MaxFragmentLength(Extension, SerializableBody):
             2^9(0x01), 2^10(0x02), 2^11(0x03), 2^12(0x04), (0xff)
         } MaxFragmentLength;
     """).strip('\n')
-    max_fragment_length: int
+    _max_fragment_length: MaxFragmentLengthCode
 
-    def __init__(self, max_fragment_length: MaxFragmentLength):
-        self.max_fragment_length = to_int(max_fragment_length)
+    def __init__(
+        self,
+        code: MaxFragmentLengthCode | None = None,
+        octets: MaxFragmentLengthOctets | None = None,
+    ):
+        if octets and code:
+            e = "The code and octets arguments are mutualy exclusive."
+            raise ValueError(e)
+        elif octets:
+            code = MaxFragmentLengthOctets(octets).to_code()
+        elif not code:
+            e = "Missing code or octets arguments."
+            raise ValueError(e)
+        self._max_fragment_length = code
+
+    @property
+    def code(self):
+        return self._max_fragment_length
+
+    @property
+    def octets(self):
+        return self._max_fragment_length.to_octets()
 
     @classmethod
     def parse_body(cls, stream):
         try:
-            max_fragment_length = MaxFragmentLength(stream.read_int(1))
+            max_fragment_length = MaxFragmentLengthCode(stream.read_int(1))
         except SerializationError:
             raise
         except ValueError as exc:
@@ -45,4 +57,4 @@ class MaxFragmentLength(Extension, SerializableBody):
         return cls(max_fragment_length)
 
     def serialize_body(self):
-        return to_enum(self.max_fragment_length).to_bytes(1, 'big')
+        return self.code.to_bytes(1, 'big')

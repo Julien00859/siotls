@@ -5,6 +5,7 @@ from siotls.iana import (
     SignatureScheme,
     NamedGroup,
     ALPNProtocol,
+    MaxFragmentLengthOctets as MLFOctets,
 )
 
 
@@ -32,9 +33,7 @@ class TLSConfiguration:
         ].copy)
 
     # extensions
-    max_fragment_length: typing.Literal[
-        512, 1024, 2048, 4096, 16384,
-    ] = 16384
+    max_fragment_length: MLFOctets = MLFOctets.MAX_16384
     can_send_heartbeat: bool = False
     can_echo_heartbeat: bool = True
     alpn: list[ALPNProtocol] = dataclasses.field(default_factory=list)
@@ -48,17 +47,27 @@ class TLSConfiguration:
         return 'server' if self.side == 'client' else 'client'
 
     def validate(self):
-        if self.side == 'server' and self.max_fragment_length != 16384:
-            e = "max fragment length is only configurable client side"
-            raise ValueError(e)
+        if self.side == 'server':
+            if self.max_fragment_length != MLFOctets.MAX_16384:
+                e = "max fragment length is only configurable client side"
+                raise ValueError(e)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(init=False)
 class TLSNegociatedConfiguration:
     cipher_suite: CipherSuites
-    signature_algorithm: SignatureScheme
-    key_exchange: NamedGroup
-    alpn: ALPNProtocol | None
-    can_send_heartbeat: bool
-    can_echo_heartbeat: bool
-    max_fragment_length: int
+    signature_algorithm: SignatureScheme | None
+    key_exchange: NamedGroup | None
+    alpn: ALPNProtocol | None | type(...)
+    can_send_heartbeat: bool | None
+    can_echo_heartbeat: bool | None
+    max_fragment_length: MLFOctets | None
+
+    def __init__(self, cipher_suite):
+        self.cipher_suite = cipher_suite
+        self.signature_algorithm = None
+        self.key_exchange = None
+        self.alpn = ...  # None is part of the domain, using Ellipsis as "not set" value
+        self.can_send_heartbeat = None
+        self.can_echo_heartbeat = None
+        self.max_fragment_length = None
