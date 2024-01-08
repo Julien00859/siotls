@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import secrets
 import struct
+import types
 
 from siotls import key_logger
 from siotls.iana import (
@@ -14,9 +15,15 @@ from .contents import Content, ApplicationData, alerts, Handshake
 from .states import ClientStart, ServerStart
 from .transcript import Transcript
 from .utils import try_cast
+from siotls.ciphers import cipher_suite_registry
 
 
 logger = logging.getLogger(__name__)
+cipher_plaintext = types.SimpleNamespace(
+    must_encrypt=False,
+    must_decrypt=False,
+    should_rekey=False,
+)
 
 def startswith_change_cipher_spec(data):
     return data[0:1] == b'\x14' and data[3:6] == b'\x00\x01\x01'
@@ -29,10 +36,10 @@ class TLSConnection:
 
         self.config = config
         self.nconfig = None
-        self._secrets = None
         self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
+        self._cipher = cipher_plaintext
         self._transcript = Transcript({
-            cipher_suite.digestmod
+            cipher_suite_registry[cipher_suite].digestmod
             for cipher_suite in config.cipher_suites
         })
 
@@ -49,17 +56,6 @@ class TLSConnection:
 
         self._key_shares = {}
         self._cookie = None
-
-
-    @property
-    def is_encrypted(self):
-        return self._secrets is not None
-
-    @property
-    def max_fragment_length(self):
-        return (self.nconfig or self.config).max_fragment_length + (
-            256 if self.is_encrypted else 0
-        )
 
     # ------------------------------------------------------------------
     # Public APIs
@@ -126,6 +122,9 @@ class TLSConnection:
                 self._send_content(alerts.InternalError())
                 break  # TODO: close
 
+        if self._cipher.should_rekey:
+            self.rekey()
+
     def send_data(self, data: bytes):
         self._send_content(ApplicationData(data))
 
@@ -134,12 +133,21 @@ class TLSConnection:
         self._output_data = bytearray()
         return output
 
+    def rekey(self):
+        raise NotImplementedError("todo")
+
     # ------------------------------------------------------------------
     # Internal APIs
     # ------------------------------------------------------------------
 
     def _move_to_state(self, state_type):
         self.state = state_type(self)
+
+    @property
+    def _max_fragment_length(self):
+        if self.nconfig and self.nconfig.max_fragment_length is not None:
+            return self.nconfig.max_fragment_length
+        return self.config.max_fragment_length
 
     def _read_next_record(self):
         while startswith_change_cipher_spec(self._input_data):
@@ -151,33 +159,38 @@ class TLSConnection:
         content_type, _legacy_version, content_length = \
             struct.unpack('!BHH', self._input_data[:5])
 
-        if content_length > self.max_fragment_length:
-            e =(f"The record is longer ({content_length} bytes) than the "
-                f"allowed maximum ({self.max_fragment_length} bytes).")
+        max_fragment_length = self._max_fragment_length
+        if self._cipher.must_decrypt:
+            max_fragment_length += 256
+        if content_length > max_fragment_length:
+            e =(f"The record is longer ({content_length} bytes) than "
+                f"the allowed maximum ({max_fragment_length} bytes).")
             raise alerts.RecordOverFlow(e)
 
         if len(self._input_data) - 5 < content_length:
             return
 
+        header = self._input_data[:5]
         fragment = self._input_data[5:content_length + 5]
         self._input_data = self._input_data[content_length + 5:]
-
-        if self.is_encrypted:
-            innertext = self.decrypt(fragment)
-            for i in range(len(innertext) -1, -1, -1):
-                if innertext[i]:
-                    break
-            else:
-                e = "missing content type in encrypted record"
-                raise alerts.UnexpectedMessage(e)
-            content_type = innertext[i]
-            fragment = innertext[:i]
+        if self._cipher.must_decrypt:
+            content_type, fragment = self._decrypt(header, fragment)
 
         if content_type == ContentType.CHANGE_CIPHER_SPEC:
             e = f"invalid {ContentType.CHANGE_CIPHER_SPEC} record"
             raise alerts.UnexpectedMessage(e)
 
         return content_type, fragment
+
+    def _decrypt(self, header, fragment):
+        innertext = self._cipher.decrypt(fragment, header)
+        for i in range(len(innertext) -1, -1, -1):
+            if innertext[i]:
+                break
+        else:
+            e = "missing content type in encrypted record"
+            raise alerts.UnexpectedMessage(e)
+        return innertext[i], innertext[:i]
 
     def _read_next_content(self):
         # handshakes can be fragmented over multiple following records,
@@ -229,32 +242,62 @@ class TLSConnection:
         if content.content_type == ContentType.HANDSHAKE:
             self._transcript.update(data, self.config.side, content.msg_type)
 
-        if self.is_encrypted:
-            data = self.encrypt(data)
+        fragment_length = self._max_fragment_length
+        if self._cipher.must_encrypt:
+            # room for content-type and aead's additionnal data
+            fragment_length -= 1 + self._cipher.tag_length
 
-        if len(data) < self.max_fragment_length:
-            iter_fragments = (data,)
+        if len(data) <= fragment_length:
+            fragments = (data,)
         elif content.can_fragment:
-            iter_fragments = (
-                data[i : i + self.max_fragment_length]
-                for i in range(0, len(data), self.max_fragment_length)
+            fragments = (
+                data[i : i + fragment_length]
+                for i in range(0, len(data), fragment_length)
             )
         else:
-            e =(f"Serialized content ({len(data)} bytes) cannot fit in a "
-                f"single record (max {self.max_fragment_length} bytes) and"
-                " cannot be fragmented over multiple TLS  1.2 records.")
+            e =(f"Serialized {content} ({len(data)} bytes) doesn't fit "
+                f"inside a single record (max {fragment_length} bytes) "
+                " and cannot be fragmented over multiple ones.")
             raise ValueError(e)
 
-        self._output_data += b''.join((
+        if self._cipher.must_encrypt:
+            record_type = ContentType.APPLICATION_DATA
+            fragments = self._encrypt(content.content_type, fragments, self._max_fragment_length)
+        else:
+            record_type = content.content_type
+
+        self._output_data += b''.join(
             b''.join([
-                (
-                    ContentType.APPLICATION_DATA
-                    if self.is_encrypted else
-                    content.content_type
-                ).to_bytes(1, 'big'),
+                record_type.to_bytes(1, 'big'),
                 TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
                 len(fragment).to_bytes(2, 'big'),
                 fragment,
             ])
-            for fragment in iter_fragments
-        ))
+            for fragment in fragments
+        )
+
+    def _encrypt(self, content_type, fragments, max_fragment_length):
+        # RFC-8446 doesn't specify anything regarding padding, it only
+        # says that it is a good idea. We add padding so that record
+        # sizes are a multiple of 4kib (or less if max_fragment_length)
+        chunk_size = min(max_fragment_length, 4096)
+
+        for fragment in fragments:
+            fragment_length = len(fragment) + 1 + self._cipher.tag_length
+            padding = b'\x00' * (chunk_size - fragment_length % chunk_size)
+            data = b''.join([
+                fragment,
+                content_type.to_bytes(1, 'big'),
+                padding,
+            ])
+            header = b''.join([
+                ContentType.APPLICATION_DATA.to_bytes(1, 'big'),
+                TLSVersion.TLS_1_2.to_bytes(2, 'big'),  # legacy version
+                (len(data) + self._cipher.tag_length).to_bytes(2, 'big'),
+            ])
+            encrypted_fragment = self._cipher.encrypt(data, header)
+
+            assert len(encrypted_fragment) == len(data) + self._cipher.tag_length, \
+                (len(encrypted_fragment), len(data), self._cipher.tag_length)
+
+            yield encrypted_fragment

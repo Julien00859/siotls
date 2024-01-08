@@ -4,7 +4,6 @@ try:
 except ImportError:
     class StrEnum(str, enum.Enum):
         pass
-import hashlib
 
 
 class Hex1Enum(enum.IntEnum):
@@ -63,18 +62,6 @@ class CipherSuites(Hex2Enum):
     TLS_CHACHA20_POLY1305_SHA256 = 0x1303
     TLS_AES_128_CCM_SHA256 = 0x1304
     TLS_AES_128_CCM_8_SHA256 = 0x1305
-
-    @property
-    def digestmod(self):
-        return _cipher_digest_map[self]
-
-_cipher_digest_map = {
-    CipherSuites.TLS_AES_128_GCM_SHA256: hashlib.sha256,
-    CipherSuites.TLS_AES_256_GCM_SHA384: hashlib.sha384,
-    CipherSuites.TLS_CHACHA20_POLY1305_SHA256: hashlib.sha256,
-    CipherSuites.TLS_AES_128_CCM_SHA256: hashlib.sha256,
-    CipherSuites.TLS_AES_128_CCM_8_SHA256: hashlib.sha256,
-}
 
 
 class ContentType(Hex1Enum):
