@@ -53,7 +53,7 @@ class TLSConnection:
 
     @property
     def is_encrypted(self):
-        return self.nconfig is not None
+        return self._secrets is not None
 
     @property
     def max_fragment_length(self):

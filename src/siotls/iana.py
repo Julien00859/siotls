@@ -143,11 +143,24 @@ class NameType(Hex1Enum):
     HOST_NAME = 0
 
 
-class MaxFragmentLength(Hex1Enum):
+class MaxFragmentLengthOctets(enum.IntEnum):
+    MAX_512 = 512
+    MAX_1024 = 1024
+    MAX_2048 = 2048
+    MAX_4096 = 4096
+    MAX_16384 = 16384
+
+    def to_code(self):
+        return MaxFragmentLengthCode(self.name)
+
+class MaxFragmentLengthCode(Hex1Enum):
     MAX_512 = 1
     MAX_1024 = 2
     MAX_2048 = 3
     MAX_4096 = 4
+
+    def to_octets(self):
+        return MaxFragmentLengthOctets(self.name)
 
 
 class CertificateStatusType(Hex1Enum):
