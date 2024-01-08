@@ -6,14 +6,12 @@ from siotls.utils import try_cast
 from . import Extension
 
 
-@dataclasses.dataclass(init=False)
 class _SignAlgoMixin(SerializableBody):
     _struct = textwrap.dedent("""
         struct {
             SignatureScheme supported_signature_algorithms<2..2^16-2>;
         } SignatureSchemeList;
     """).strip()
-    supported_signature_algorithms: list[SignatureScheme | int]
 
     def __init__(self, supported_signature_algorithms):
         self.supported_signature_algorithms = supported_signature_algorithms
@@ -36,11 +34,15 @@ class _SignAlgoMixin(SerializableBody):
         ])
 
 
+@dataclasses.dataclass(init=False)
 class SignatureAlgorithms(Extension, _SignAlgoMixin):
     extension_type = ExtensionType.SIGNATURE_ALGORITHMS
     _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
+    supported_signature_algorithms: list[SignatureScheme | int]
 
 
+@dataclasses.dataclass(init=False)
 class SignatureAlgorithmsCert(Extension, _SignAlgoMixin):
     extension_type = ExtensionType.SIGNATURE_ALGORITHMS_CERT
     _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
+    supported_signature_algorithms: list[SignatureScheme | int]

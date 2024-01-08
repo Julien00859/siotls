@@ -11,7 +11,7 @@ _extension_registry = {}
 @dataclasses.dataclass(init=False)
 class Extension(Serializable):
     # TODO: could be tuple[HandshakeType | HandshakeType_]
-    _handshake_types: set[HandshakeType] | list[HandshakeType | HandshakeType_]
+    _handshake_types: set[HandshakeType] | list[HandshakeType | HandshakeType_] = dataclasses.field(repr=False)
     _struct = textwrap.dedent("""
         struct {
             ExtensionType extension_type;
@@ -43,7 +43,7 @@ class Extension(Serializable):
             }
         } Extension;
     """).strip('\n')
-    extension_type: ExtensionType | int
+    extension_type: ExtensionType | int = dataclasses.field(repr=False)
 
     def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)

@@ -30,11 +30,11 @@ class ClientHello(Handshake, SerializableBody):
         } ClientHello;
     """).strip('\n')
 
-    legacy_version: int = TLSVersion.TLS_1_2
+    legacy_version: int = dataclasses.field(default=TLSVersion.TLS_1_2, repr=False)
     random: bytes
-    legacy_session_id: bytes = b''
+    legacy_session_id: bytes = dataclasses.field(default=b'', repr=False)
     cipher_suites: list[CipherSuites | int]
-    legacy_compression_methods: bytes = b'\x00'  # "null" compression method
+    legacy_compression_methods: bytes = dataclasses.field(default=b'\x00', repr=False)
     extensions: dict[ExtensionType | int, Extension]
 
     def __init__(self, random, cipher_suites, extensions: list[Extension]):
@@ -88,7 +88,6 @@ class ClientHello(Handshake, SerializableBody):
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
             extension = Extension.parse(list_stream, handshake_type=cls.msg_type)
-            logger.debug("Found extension %s", extension)
             extensions.append(extension)
 
         try:

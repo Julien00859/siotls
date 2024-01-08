@@ -30,7 +30,6 @@ class EncryptedExtensions(Handshake, SerializableBody):
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
             extension = Extension.parse(list_stream, handshake_type=cls.msg_type)
-            logger.debug("Found extension %s", extension)
             extensions.append(extension)
 
         return cls(extensions)
