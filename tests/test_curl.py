@@ -1,18 +1,34 @@
 import errno
 import logging
 import os
+import re
 import shutil
 import socket
 import subprocess as sp
 import tempfile
 import unittest
 from collections import namedtuple
+from threading import Thread
 
 from siotls import TLSConfiguration, TLSConnection
 
 HOST = '127.0.0.2'
 PORT = 8446
 CURL_PATH = shutil.which('curl')
+
+logger = logging.getLogger(__name__)
+curl_logger = logger.getChild('curl')
+
+
+def fix_curl_log(message):
+    # might be a nice first contribution to cURL...
+    return message.replace(
+        "TLS header, Finished (20)", "TLS header, Change Cipher Spec (20)"
+    ).replace(
+        "TLS header, Unknown (21)", "TLS header, Alert (21)"
+    ).replace(
+        "TLS header, Certificate Status (22)", "TLS header, Handshake (22)"
+    )
 
 
 @unittest.skipUnless(CURL_PATH, "curl not found in path")
@@ -29,8 +45,28 @@ class TestCURL(unittest.TestCase):
         cls.socket.settimeout(1)
 
         cls.keylogfile = tempfile.NamedTemporaryFile(
-            prefix="siotls-keylogfile-")
+            mode='w+', prefix="siotls-keylogfile-")
         cls.addClassCleanup(cls.keylogfile.close)
+
+        cls.curl_pipe_r, cls.curl_pipe_w = os.pipe()
+        cls.addClassCleanup(os.close, cls.curl_pipe_r)
+        cls.addClassCleanup(os.close, cls.curl_pipe_w)
+        Thread(target=cls.run_curl_logging, args=(curl_logger,)).start()
+
+    @classmethod
+    def run_curl_logging(cls, curl_logger):
+        curl_log_re = re.compile(r'^(?:(\*)|== (\w+):) ', re.MULTILINE)
+        buffer = ""
+        while read := os.read(cls.curl_pipe_r, 1024).decode(errors='ignore'):
+            *messages, buffer = curl_log_re.split(buffer + read)
+            for message, group1, group2 in zip(it:=iter(messages), it, it):
+                if not message:
+                    continue
+                level_name = 'INFO' if group1 else group2.upper()
+                curl_logger.log(
+                    logging._nameToLevel[level_name],
+                    fix_curl_log(message.rstrip())
+                )
 
     def setUp(self):
         # make sure no request is pending
@@ -53,7 +89,20 @@ class TestCURL(unittest.TestCase):
         tls_max='1.3',
         options={},
     ):
-        args = [CURL_PATH, f'https://{HOST}:{PORT}']
+        args = [CURL_PATH, f'https://{HOST}:{PORT}', '--no-progress-meter']
+
+        loglevel = logger.getEffectiveLevel()
+        if loglevel <= logging.DEBUG:
+            args.extend(['--trace-ascii', '-'])
+        elif loglevel <= logging.INFO:
+            args.append('--verbose')
+        elif loglevel <= logging.WARNING:
+            pass
+        elif loglevel <= logging.ERROR:
+            args.append('--show-error')
+        else:
+            args.append('--silent')
+
         if version:
             args.append(f'--tlsv{version}')
         if max_time is not None:
@@ -68,12 +117,11 @@ class TestCURL(unittest.TestCase):
             args.append(f'--{option}')
             args.append(value)
         env = {'SSLKEYLOGFILE': self.keylogfile.name}
-        proc = sp.Popen(args, env=env)
+        proc = sp.Popen(args, stdout=self.curl_pipe_w, stderr=self.curl_pipe_w, env=env)
         self.addCleanup(proc.wait, timeout=1)
         self.addCleanup(proc.terminate)
 
         client, client_info = self.socket.accept()
-        self.addCleanup(client.shutdown, socket.SHUT_RDWR)
         self.addCleanup(client.close)
 
         return proc, client
@@ -90,7 +138,8 @@ class TestCURL(unittest.TestCase):
             client_hello = client.recv(16384)
             conn.receive_data(client_hello)
             server_hello = conn.data_to_send()
-            client.send(server_hello)
+            client.sendall(server_hello)
+            client.shutdown(socket.SHUT_RDWR)
 
         proc.terminate()
         proc.wait(timeout=1)
