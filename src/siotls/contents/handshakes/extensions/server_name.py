@@ -26,7 +26,7 @@ class ServerName(Serializable):
             host_name(0x00), (0xff)
         } NameType;
     """).strip('\n')
-    name_type: NameType
+    name_type: NameType = dataclasses.field(repr=False)
 
     def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)

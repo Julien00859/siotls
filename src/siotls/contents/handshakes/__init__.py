@@ -30,7 +30,7 @@ class Handshake(Content, Serializable):
             };
         } Handshake;
     """).strip('\n')
-    msg_type: HandshakeType
+    msg_type: HandshakeType = dataclasses.field(repr=False)
 
     def __init_subclass__(cls, register=True, **kwargs):
         super().__init_subclass__(**kwargs)

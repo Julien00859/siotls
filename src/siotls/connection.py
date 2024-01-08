@@ -94,7 +94,7 @@ class TLSConnection:
                     stream.assert_eof()
                 except SerializationError as exc:
                     raise alerts.DecodeError() from exc
-                logger.info("receive %s", content.__class__.__name__)
+                logger.info("received %s", type(content).__name__)
                 match content:
                     case alerts.Alert(level=AlertLevel.WARNING):
                         logger.warning(content.description)
@@ -236,7 +236,7 @@ class TLSConnection:
         return content_type, content_data
 
     def _send_content(self, content: Content):
-        logger.info("will send %s", content.__class__.__name__)
+        logger.info("will send %s", type(content).__name__)
         data = content.serialize()
 
         if content.content_type == ContentType.HANDSHAKE:
