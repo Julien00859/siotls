@@ -31,6 +31,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "coverage",
+  "isort",
+  "ruff",
 ]
 
 [project.urls]
@@ -51,3 +54,41 @@ where = ["src"]
 [tool.setuptools.package-data]
 "siotls.data" = ["*"]
 
+[tool.ruff]
+line-length = 98
+select = ["ALL"]
+ignore = [
+  "D",  # docstrings, for now
+  "ANN",  # annotation
+  "COM812",  # trailing comma, unusable for now
+  "DJ",  # django
+  "PT",  # pytest
+  "Q",  # quote, I like ' for technical strings and " for human text
+  "D212",  # docstrings
+  "ERA001",  # commented code
+  "PYI013",  # ellipsis
+  "PYI024",  # collections.namedtuple
+  "SIM102", "PLR5501", "RET505", "RET506",  # if/elif
+  "TD", "FIX002",  # todo
+]
+exclude = ["src/siotls/_vendor.py"]
+
+[tool.ruff.per-file-ignores]
+"**/__init__.py" = [
+  "F401", "E402",  # imports
+]
+"src/siotls/iana.py" = ["D"]
+"src/siotls/contents/**/*.py" = [
+  "D102", "D105", "D107", "D204", "D205",  # docstrings
+  "N804",  # abc instead of cls
+]
+"src/siotls/states/**/*.py" = [
+  "TID252",  # from .. import State
+]
+"tests/**/*.py" = [
+  "D",  # docstrings
+  "SLF001",  # access private members
+]
+
+[tool.ruff.isort]
+combine-as-imports = true

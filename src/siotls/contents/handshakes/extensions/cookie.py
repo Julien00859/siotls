@@ -1,18 +1,20 @@
 import dataclasses
 import textwrap
-from siotls.iana import (
-    ExtensionType,
-    HandshakeType as HT,
-    HandshakeType_ as HT_,
-)
+
+from siotls.iana import ExtensionType, HandshakeType, HandshakeType_
 from siotls.serial import SerializableBody
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class Cookie(Extension, SerializableBody):
     extension_type = ExtensionType.COOKIE
-    _handshake_types = [HT.CLIENT_HELLO, HT.SERVER_HELLO, HT_.HELLO_RETRY_REQUEST]
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.SERVER_HELLO,
+        HandshakeType_.HELLO_RETRY_REQUEST
+    )
 
     _struct = textwrap.dedent("""\
         struct {

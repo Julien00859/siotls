@@ -8,7 +8,7 @@ def hkdf_extract(digestmod, salt, input_keying_material):
     if not salt:
         salt = b'\x00' * digestmod().digest_size
     pseudorandom_key = hmac.digest(salt, input_keying_material, digestmod)
-    return pseudorandom_key
+    return pseudorandom_key  # noqa: RET504
 
 def hkdf_expand(digestmod, pseudorandom_key, info, okm_length):
     if okm_length == digestmod().digest_size:
@@ -22,7 +22,7 @@ def hkdf_expand(digestmod, pseudorandom_key, info, okm_length):
         t.append(hmac.digest(pseudorandom_key, msg, digestmod))
 
     output_keying_material = b''.join(t)[:okm_length]
-    return output_keying_material
+    return output_keying_material  # noqa: RET504
 
 def hkdf_expand_label(digestmod, secret, label, context, length):
     label = b'tls13 ' + label

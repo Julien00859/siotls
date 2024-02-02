@@ -1,9 +1,11 @@
 import dataclasses
 import textwrap
+
+from siotls.contents import alerts
 from siotls.iana import ContentType, HandshakeType
 from siotls.serial import Serializable
-from .. import Content, alerts
 
+from .. import Content  # noqa: TID252
 
 _handshake_registry = {}
 
@@ -32,7 +34,7 @@ class Handshake(Content, Serializable):
     """).strip('\n')
     msg_type: HandshakeType = dataclasses.field(repr=False)
 
-    def __init_subclass__(cls, register=True, **kwargs):
+    def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and Handshake in cls.__bases__:
             _handshake_registry[cls.msg_type] = cls
@@ -44,7 +46,7 @@ class Handshake(Content, Serializable):
         try:
             cls = _handshake_registry[HandshakeType(msg_type)]
         except ValueError as exc:
-            raise alerts.UnrecognizedName() from exc
+            raise alerts.UnrecognizedName from exc
         with stream.limit(length):
             return cls.parse_body(stream)
 
@@ -57,14 +59,13 @@ class Handshake(Content, Serializable):
         ])
 
 
-# ruff: noqa: F401, E402
-from .client_hello import ClientHello
-from .server_hello import ServerHello, HelloRetryRequest
-from .end_of_early_data import EndOfEarlyData
-from .encrypted_extensions import EncryptedExtensions
-from .certificate_request import CertificateRequest
 from .certificate import Certificate
+from .certificate_request import CertificateRequest
 from .certificate_verify import CertificateVerify
+from .client_hello import ClientHello
+from .encrypted_extensions import EncryptedExtensions
+from .end_of_early_data import EndOfEarlyData
 from .finished import Finished
-from .new_session_ticket import NewSessionTicket
 from .key_update import KeyUpdate
+from .new_session_ticket import NewSessionTicket
+from .server_hello import HelloRetryRequest, ServerHello

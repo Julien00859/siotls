@@ -1,14 +1,19 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT
+
+from siotls.iana import ExtensionType, HandshakeType
 from siotls.serial import SerializableBody
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class EarlyData(Extension, SerializableBody):
     extension_type = ExtensionType.EARLY_DATA
-    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.ENCRYPTED_EXTENSIONS
+    )
 
     # The mere presence of the extension is enough
     _struct = ""
@@ -17,7 +22,7 @@ class EarlyData(Extension, SerializableBody):
         pass
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream):  # noqa: ARG003
         return cls()
 
     def serialize_body(self):
@@ -27,7 +32,7 @@ class EarlyData(Extension, SerializableBody):
 @dataclasses.dataclass(init=False)
 class NewSessionEarlyData(Extension, SerializableBody):
     extension_type = ExtensionType.EARLY_DATA
-    _handshake_types = {HT.NEW_SESSION_TICKET}
+    _handshake_types = (HandshakeType.NEW_SESSION_TICKET,)
 
     _struct = textwrap.dedent("""\
         struct {

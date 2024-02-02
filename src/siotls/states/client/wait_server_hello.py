@@ -1,15 +1,16 @@
-from siotls.crypto.key_share import resume as key_share_resume
+from siotls.ciphers import cipher_suite_registry
 from siotls.configuration import TLSNegociatedConfiguration
-from siotls.contents import alerts, ChangeCipherSpec
+from siotls.contents import ChangeCipherSpec, alerts
+from siotls.crypto.key_share import resume as key_share_resume
 from siotls.iana import (
     ContentType,
+    ExtensionType,
     HandshakeType,
     HandshakeType_,
     HeartbeatMode,
-    ExtensionType,
     MaxFragmentLengthOctets,
 )
-from siotls.ciphers import cipher_suite_registry
+
 from .. import State
 from . import ClientWaitEncryptedExtensions
 
@@ -114,7 +115,7 @@ class ClientWaitServerHello(State):
 
     def _negociate_max_fragment_length(self, mfl_ext):
         if not mfl_ext:
-            return MaxFragmentLengthOctets.MAX_16384
+            self.nconfig.max_fragment_length = MaxFragmentLengthOctets.MAX_16384
         elif mfl_ext.octets != self.config.max_fragment_length:
             try:
                 code = self.config.max_fragment_length.to_code()
@@ -128,7 +129,7 @@ class ClientWaitServerHello(State):
 
     def _negociate_application_layer_protocol_negotiation(self, alpn_ext):
         if not alpn_ext:
-            return None
+            return
         elif length := len(alpn_ext.protocol_name_list) != 1:
             e =("Invalid Application Layer Protocol Negociation (ALPN) "
                 f"response. Expected 1 protocol, {length} found.")
@@ -147,7 +148,6 @@ class ClientWaitServerHello(State):
             self.nconfig.can_echo_heartbeat = False
         else:
             self.nconfig.can_send_heartbeat = (
-                self.config.can_send_heartbeat and
                 heartbeat_ext.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
             )
             self.nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat

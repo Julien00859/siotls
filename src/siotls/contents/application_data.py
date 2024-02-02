@@ -1,7 +1,9 @@
 import dataclasses
 import textwrap
+
 from siotls.iana import ContentType
 from siotls.serial import Serializable
+
 from . import Content
 
 

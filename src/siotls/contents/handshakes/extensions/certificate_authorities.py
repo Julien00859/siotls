@@ -1,14 +1,19 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT
+
+from siotls.iana import ExtensionType, HandshakeType
 from siotls.serial import SerializableBody
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class CertificateAuthorities(Extension, SerializableBody):
     extension_type = ExtensionType.CERTIFICATE_AUTHORITIES
-    _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE_REQUEST}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.CERTIFICATE_REQUEST
+    )
 
     _struct = textwrap.dedent("""\
         opaque DistinguishedName<1..2^16-1>;
