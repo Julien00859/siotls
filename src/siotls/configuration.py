@@ -34,7 +34,6 @@ class TLSConfiguration:
 
     # extensions
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384
-    can_send_heartbeat: bool = False
     can_echo_heartbeat: bool = True
     alpn: list[ALPNProtocol] = dataclasses.field(default_factory=list)
     hostnames: list[str] = dataclasses.field(default_factory=list)
