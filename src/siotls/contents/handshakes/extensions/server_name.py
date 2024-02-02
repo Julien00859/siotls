@@ -1,13 +1,15 @@
-import dataclasses
 import contextlib
+import dataclasses
 import logging
 import textwrap
-import idna
-from siotls.iana import ExtensionType, HandshakeType as HT, NameType
-from siotls.serial import Serializable, SerializableBody, SerialIO
-from ... import alerts
-from . import Extension
 
+import idna
+
+from siotls.contents import alerts
+from siotls.iana import ExtensionType, HandshakeType, NameType
+from siotls.serial import SerialIO, Serializable, SerializableBody
+
+from . import Extension
 
 logger = logging.getLogger(__name__)
 _server_name_registry = {}
@@ -28,7 +30,7 @@ class ServerName(Serializable):
     """).strip('\n')
     name_type: NameType = dataclasses.field(repr=False)
 
-    def __init_subclass__(cls, register=True, **kwargs):
+    def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and ServerName in cls.__bases__:
             _server_name_registry[cls.name_type] = cls
@@ -42,7 +44,7 @@ class ServerName(Serializable):
             # unknown type, can choice to either crash or ignore
             # this extension, crash for now.
             # should be configurable (should it?)
-            raise alerts.UnrecognizedName() from exc
+            raise alerts.UnrecognizedName from exc
 
         return cls.parse_body(stream)
 
@@ -82,7 +84,10 @@ class HostName(ServerName, SerializableBody):
 @dataclasses.dataclass(init=False)
 class ServerNameList(Extension, SerializableBody):
     extension_type = ExtensionType.SERVER_NAME
-    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.ENCRYPTED_EXTENSIONS
+    )
     _struct = textwrap.dedent("""
         struct {
             ServerName server_name_list<1..2^16-1>

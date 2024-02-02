@@ -1,15 +1,20 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT, NamedGroup
+
+from siotls.iana import ExtensionType, HandshakeType, NamedGroup
 from siotls.serial import SerializableBody
 from siotls.utils import try_cast
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class SupportedGroups(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_GROUPS
-    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.ENCRYPTED_EXTENSIONS
+    )
 
     _struct = textwrap.dedent("""
         struct {

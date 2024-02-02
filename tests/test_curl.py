@@ -1,3 +1,5 @@
+# ruff: noqa: S603
+
 import errno
 import logging
 import os
@@ -59,7 +61,7 @@ class TestCURL(unittest.TestCase):
         buffer = ""
         while read := os.read(cls.curl_pipe_r, 1024).decode(errors='ignore'):
             *messages, buffer = curl_log_re.split(buffer + read)
-            for message, group1, group2 in zip(it:=iter(messages), it, it):
+            for message, group1, group2 in zip(it:=iter(messages), it, it, strict=True):
                 if not message:
                     continue
                 level_name = 'INFO' if group1 else group2.upper()
@@ -73,7 +75,7 @@ class TestCURL(unittest.TestCase):
         self.socket.settimeout(0)
         try:
             self.socket.accept()
-        except socket.error as exc:
+        except OSError as exc:
             if exc.errno not in (errno.EAGAIN, errno.ECONNABORTED):
                 raise
         self.socket.settimeout(1)
@@ -81,13 +83,13 @@ class TestCURL(unittest.TestCase):
         self.keylogfile.seek(0)
         self.keylogfile.truncate()
 
-    def curl(
+    def curl(  # noqa: PLR0913
         self,
         version='1.3',
         max_time=1,
-        insecure=True,
+        insecure=True,  # noqa: FBT002
         tls_max='1.3',
-        options={},
+        options=None,
     ):
         args = [CURL_PATH, f'https://{HOST}:{PORT}', '--no-progress-meter']
 
@@ -113,7 +115,7 @@ class TestCURL(unittest.TestCase):
         if tls_max is not None:
             args.append('--tls-max')
             args.append(tls_max)
-        for option, value in options.items():
+        for option, value in (options or {}).items():
             args.append(f'--{option}')
             args.append(value)
         env = {'SSLKEYLOGFILE': self.keylogfile.name}
@@ -126,7 +128,7 @@ class TestCURL(unittest.TestCase):
 
         return proc, client
 
-    def test_keylogfile(self):
+    def test_curl_keylogfile(self):
         KeyLogFormat = namedtuple("KeyLogFormat", ["label", "client_random", "value"])
 
         config = TLSConfiguration('server')

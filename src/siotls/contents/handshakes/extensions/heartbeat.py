@@ -1,15 +1,20 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT, HeartbeatMode
+
+from siotls.contents import alerts
+from siotls.iana import ExtensionType, HandshakeType, HeartbeatMode
 from siotls.serial import SerializableBody, SerializationError
-from ... import alerts
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class Heartbeat(Extension, SerializableBody):
     extension_type = ExtensionType.HEARTBEAT
-    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.ENCRYPTED_EXTENSIONS
+    )
 
     _struct = textwrap.dedent("""
         struct {
@@ -28,7 +33,7 @@ class Heartbeat(Extension, SerializableBody):
         except SerializationError:
             raise
         except ValueError as exc:
-            raise alerts.IllegalParameter() from exc
+            raise alerts.IllegalParameter from exc
         return cls(mode)
 
     def serialize_body(self):

@@ -2,7 +2,6 @@ import abc
 import contextlib
 import io
 import logging
-from .utils import hexdump
 
 logger = logging.getLogger(__name__)
 
@@ -11,11 +10,11 @@ class SerializationError(ValueError):
     pass
 
 
-class MissingData(SerializationError):
+class MissingDataError(SerializationError):
     pass
 
 
-class TooMuchData(SerializationError):
+class TooMuchDataError(SerializationError):
     pass
 
 
@@ -24,11 +23,11 @@ class Serializable(metaclass=abc.ABCMeta):
 
     @abc.abstractclassmethod
     def parse(cls, stream):
-        raise NotImplementedError("abstract method")
+        pass
 
     @abc.abstractmethod
     def serialize(self):
-        raise NotImplementedError("abstract method")
+        pass
 
 
 class SerializableBody(metaclass=abc.ABCMeta):
@@ -36,11 +35,11 @@ class SerializableBody(metaclass=abc.ABCMeta):
 
     @abc.abstractclassmethod
     def parse_body(cls, stream):
-        raise NotImplementedError("abstract method")
+        pass
 
     @abc.abstractmethod
     def serialize_body(self):
-        raise NotImplementedError("abstract method")
+        pass
 
 
 class SerialIO(io.BytesIO):
@@ -55,7 +54,7 @@ class SerialIO(io.BytesIO):
                 n = max_n
         elif n > max_n:
             e = f"Expected {n} bytes but can only read {max_n}."
-            raise TooMuchData(e)
+            raise TooMuchDataError(e)
         return super().read(n)
 
     def read_exactly(self, n):
@@ -64,7 +63,7 @@ class SerialIO(io.BytesIO):
             read = self.read(n - len(data))
             if not read:
                 e = f"Expected {n} bytes but could only read {len(data)}."
-                raise MissingData(e)
+                raise MissingDataError(e)
             data += read
         return data
 
@@ -92,7 +91,7 @@ class SerialIO(io.BytesIO):
         it = iter(self.read_exactly(length))
         return [
             int.from_bytes(bytes(group), 'big')
-            for group in zip(*([it] * nitem))
+            for group in zip(*([it] * nitem), strict=True)
         ]
 
     def write_listin(self, nlist, nitem, items):
@@ -139,7 +138,7 @@ class SerialIO(io.BytesIO):
         if remaining := eof_pos - current_pos:
             self.seek(current_pos, 0)
             e = f"Expected end of stream but {remaining} bytes remain."
-            raise TooMuchData(e)
+            raise TooMuchDataError(e)
 
     @contextlib.contextmanager
     def limit(self, length):
@@ -149,13 +148,15 @@ class SerialIO(io.BytesIO):
             raise ValueError(e)
 
         self._limits.append(new_limit)
-        try:
-            yield
-        except:
-            raise
-        else:
-            assert self._limits.pop() == new_limit, "another limit was pop"
-            assert self._limits, "+inf was pop"
-            if (remaining := new_limit - self.tell()):
-                e = f"Expected end of chunk but {remaining} bytes remain."
-                raise TooMuchData(e)
+
+        yield
+
+        if self._limits.pop() != new_limit:
+            e = "another limit was pop"
+            raise RuntimeError(e)
+        if not self._limits:
+            e = "+inf was pop"
+            raise RuntimeError(e)
+        if (remaining := new_limit - self.tell()):
+            e = f"Expected end of chunk but {remaining} bytes remain."
+            raise TooMuchDataError(e)

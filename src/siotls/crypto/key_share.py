@@ -1,10 +1,8 @@
-from cryptography.hazmat.primitives.asymmetric import (
-    dh,
-    x25519,
-    x448,
-)
+from cryptography.hazmat.primitives.asymmetric import dh, x448, x25519
+
 from siotls.contents import alerts
 from siotls.iana import NamedGroup
+
 from . import ffdhe
 
 
@@ -15,7 +13,7 @@ def init(key_exchange):
         case NamedGroup.x448:
             return init_x448()
         case _ if key_exchange.is_sec():
-            raise NotImplementedError()
+            raise NotImplementedError("todo")  # noqa: EM101
         case _ if key_exchange.is_ff():
             return init_ff(key_exchange)
 
@@ -26,7 +24,7 @@ def resume(key_exchange, private_key, peer_key_share):
         case NamedGroup.x448:
             return resume_x448(private_key, peer_key_share)
         case _ if key_exchange.is_sec():
-            raise NotImplementedError()
+            raise NotImplementedError("todo")  # noqa: EM101
         case _ if key_exchange.is_ff():
             return resume_ff(key_exchange, private_key, peer_key_share)
 
@@ -54,13 +52,6 @@ def resume_x448(private_key, peer_key_share):
     peer_public_key = x448.X448PublicKey.from_public_bytes(peer_key_share)
     shared_key = private_key.exchange(peer_public_key)
     return shared_key, my_key_share
-
-
-def init_sec(key_exchange):
-    raise NotImplementedError("todo")
-
-def resume_sec(key_exchange, peer_key_share):
-    raise NotImplementedError("todo")
 
 
 def init_ff(key_exchange):

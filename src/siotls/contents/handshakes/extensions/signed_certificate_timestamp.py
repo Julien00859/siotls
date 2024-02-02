@@ -1,13 +1,19 @@
 import dataclasses
-from siotls.iana import ExtensionType, HandshakeType as HT
+
+from siotls.iana import ExtensionType, HandshakeType
 from siotls.serial import SerializableBody
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class SignedCertificateTimestamp(Extension, SerializableBody):
     extension_type = ExtensionType.SIGNED_CERTIFICATE_TIMESTAMP
-    _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.CERTIFICATE,
+        HandshakeType.CERTIFICATE_REQUEST
+    )
 
     # The mere presence of the extension is enough
     _struct = ""
@@ -16,7 +22,7 @@ class SignedCertificateTimestamp(Extension, SerializableBody):
         pass
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream):  # noqa: ARG003
         return cls()
 
     def serialize(self):
