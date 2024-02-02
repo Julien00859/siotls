@@ -27,6 +27,11 @@ class ClientStart(State):
             SupportedVersionsRequest([TLSVersion.TLS_1_3]),
             SignatureAlgorithms(self.config.signature_algorithms),
             SupportedGroups(self.config.key_exchanges),
+            Heartbeat(
+                HeartbeatMode.PEER_ALLOWED_TO_SEND
+                if self.config.can_echo_heartbeat else
+                HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND
+            ),
         ]
         if self.config.hostnames:
             extensions.append(ServerNameList([
