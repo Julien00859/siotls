@@ -1,26 +1,21 @@
 import enum
+
 try:
     from enum import StrEnum
 except ImportError:
-    class StrEnum(str, enum.Enum):
-        pass
+    from siotls._vendor import StrEnum
 
 
 class Hex1Enum(enum.IntEnum):
-    """ An integer on 1 byte with hexadecimal representation """
+    """ An integer on 1 byte with hexadecimal representation. """
     def __repr__(self):
         return f'<{type(self).__name__}.{self.name}: {self.value} (0x{self.value:02x})>'
 
 
 class Hex2Enum(enum.IntEnum):
-    """ An integer on 2 bytes with hexadecimal representation """
+    """ An integer on 2 bytes with hexadecimal representation. """
     def __repr__(self):
         return f'<{type(self).__name__}.{self.name}: {self.value} (0x{self.value:04x})>'
-
-
-class AlertLevel(Hex1Enum):
-    WARNING = 1
-    FATAL = 2
 
 
 class AlertDescription(Hex1Enum):
@@ -53,6 +48,58 @@ class AlertDescription(Hex1Enum):
     NO_APPLICATION_PROTOCOL = 120
 
 
+class AlertLevel(Hex1Enum):
+    WARNING = 1
+    FATAL = 2
+
+
+class ALPNProtocol(StrEnum):
+    HTTP_0_9 = "http/0.9"
+    HTTP_1_0 = "http/1.0"
+    HTTP_1_1 = "http/1.1"
+    SPDY_1 = "spdy/1"
+    SPDY_2 = "spdy/2"
+    SPDY_3 = "spdy/3"
+    TURN = "stun.turn"
+    STUN = "stun.nat-discovery"
+    HTTP_2 = "h2"
+    HTTP_2_TCP = "h2c"
+    WebRTC = "webrtc"
+    cWebRTC = "c-webrtc"  # noqa: N815
+    FTP = "ftp"
+    IMAP = "imap"
+    POP3 = "pop3"
+    ManageSieve = "managesieve"
+    CoAP = "coap"
+    XMPP_client = "xmpp-client"
+    XMPP_server = "xmpp-server"
+    acme_tls_1 = "acme-tls/1"
+    MQTT = "mqtt"
+    DNS_over_TLS = "dot"
+    NTSKE_1 = "ntske/1"
+    SunRPC = "sunrpc"
+    HTTP_3 = "h3"
+    SMB2 = "smb"
+    IRC = "irc"
+    NNTP_reading = "nntp"
+    NNTP_transit = "nnsp"
+    DoQ = "doq"
+    SIP = "sip/2"
+    TDS_8_0 = "tds/8.0"
+    DICOM = "dicom"
+
+
+class CertificateStatusType(Hex1Enum):
+    OCSP = 1
+
+
+class CertificateType(Hex1Enum):
+    X509 = 0
+    OPENPGP = 1
+    RAW_PUBLIC_KEY = 2
+    CT_1609DOT2 = 3
+
+
 class CipherSuites(Hex2Enum):
     # The actual type in uint8_t[2] and not uint16_t but we want to use
     # an IntEnum in Python to ease serialization
@@ -70,36 +117,8 @@ class ContentType(Hex1Enum):
     ALERT = 21
     HANDSHAKE = 22
     APPLICATION_DATA = 23
-
     HEARTBEAT = 24
 
-
-class HandshakeType(Hex1Enum):
-    CLIENT_HELLO = 1
-    SERVER_HELLO = 2
-    NEW_SESSION_TICKET = 4
-    END_OF_EARLY_DATA = 5
-    ENCRYPTED_EXTENSIONS = 8
-    CERTIFICATE = 11
-    CERTIFICATE_REQUEST = 13
-    CERTIFICATE_VERIFY = 15
-    FINISHED = 20
-    KEY_UPDATE = 24
-    MESSAGE_HASH = 254
-
-class HandshakeType_(Hex1Enum):
-    ANY = -1  # for when an extension can be present in any handshake
-    HELLO_RETRY_REQUEST = 2
-
-
-class HeartbeatMessageType(Hex1Enum):
-    heartbeat_request = 1
-    heartbeat_response = 2
-
-
-#-----------------------------------------------------------------------
-# Extension related types
-#-----------------------------------------------------------------------
 
 class ExtensionType(Hex2Enum):
     SERVER_NAME = 0
@@ -126,8 +145,41 @@ class ExtensionType(Hex2Enum):
     KEY_SHARE = 51
 
 
-class NameType(Hex1Enum):
-    HOST_NAME = 0
+class HandshakeType(Hex1Enum):
+    CLIENT_HELLO = 1
+    SERVER_HELLO = 2
+    NEW_SESSION_TICKET = 4
+    END_OF_EARLY_DATA = 5
+    ENCRYPTED_EXTENSIONS = 8
+    CERTIFICATE = 11
+    CERTIFICATE_REQUEST = 13
+    CERTIFICATE_VERIFY = 15
+    FINISHED = 20
+    KEY_UPDATE = 24
+    MESSAGE_HASH = 254
+
+class HandshakeType_(Hex1Enum):  # noqa: N801
+    ANY = -1  # for when an extension can be present in any handshake
+    HELLO_RETRY_REQUEST = 2
+
+
+class HeartbeatMessageType(Hex1Enum):
+    heartbeat_request = 1
+    heartbeat_response = 2
+
+
+class HeartbeatMode(Hex1Enum):
+    PEER_ALLOWED_TO_SEND = 1
+    PEER_NOT_ALLOWED_TO_SEND = 2
+
+class MaxFragmentLengthCode(Hex1Enum):
+    MAX_512 = 1
+    MAX_1024 = 2
+    MAX_2048 = 3
+    MAX_4096 = 4
+
+    def to_octets(self):
+        return MaxFragmentLengthOctets[self.name]
 
 
 class MaxFragmentLengthOctets(enum.IntEnum):
@@ -138,20 +190,7 @@ class MaxFragmentLengthOctets(enum.IntEnum):
     MAX_16384 = 16384
 
     def to_code(self):
-        return MaxFragmentLengthCode(self.name)
-
-class MaxFragmentLengthCode(Hex1Enum):
-    MAX_512 = 1
-    MAX_1024 = 2
-    MAX_2048 = 3
-    MAX_4096 = 4
-
-    def to_octets(self):
-        return MaxFragmentLengthOctets(self.name)
-
-
-class CertificateStatusType(Hex1Enum):
-    OCSP = 1
+        return MaxFragmentLengthCode[self.name]
 
 
 class NamedGroup(Hex2Enum):
@@ -177,6 +216,15 @@ class NamedGroup(Hex2Enum):
 
     def is_ff(self):
         return type(self).ffdhe2048 <= self <= type(self).ffdhe8192
+
+
+class NameType(Hex1Enum):
+    HOST_NAME = 0
+
+
+class PskKeyExchangeMode(Hex1Enum):
+    PSK_KE = 0
+    PSK_DHE_KE = 1
 
 
 class SignatureScheme(Hex2Enum):
@@ -208,63 +256,6 @@ class SignatureScheme(Hex2Enum):
     rsa_pkcs1_sha1 = 0x0201
     ecdsa_sha1 = 0x0203
 
-
-class HeartbeatMode(Hex1Enum):
-    PEER_ALLOWED_TO_SEND = 1
-    PEER_NOT_ALLOWED_TO_SEND = 2
-
-
-class ALPNProtocol(StrEnum):
-    HTTP_0_9 = "http/0.9"
-    HTTP_1_0 = "http/1.0"
-    HTTP_1_1 = "http/1.1"
-    SPDY_1 = "spdy/1"
-    SPDY_2 = "spdy/2"
-    SPDY_3 = "spdy/3"
-    TURN = "stun.turn"
-    STUN = "stun.nat-discovery"
-    HTTP_2 = "h2"
-    HTTP_2_TCP = "h2c"
-    WebRTC = "webrtc"
-    cWebRTC = "c-webrtc"
-    FTP = "ftp"
-    IMAP = "imap"
-    POP3 = "pop3"
-    ManageSieve = "managesieve"
-    CoAP = "coap"
-    XMPP_client = "xmpp-client"
-    XMPP_server = "xmpp-server"
-    acme_tls_1 = "acme-tls/1"
-    MQTT = "mqtt"
-    DNS_over_TLS = "dot"
-    NTSKE_1 = "ntske/1"
-    SunRPC = "sunrpc"
-    HTTP_3 = "h3"
-    SMB2 = "smb"
-    IRC = "irc"
-    NNTP_reading = "nntp"
-    NNTP_transit = "nnsp"
-    DoQ = "doq"
-    SIP = "sip/2"
-    TDS_8_0 = "tds/8.0"
-    DICOM = "dicom"
-
-
-class CertificateType(Hex1Enum):
-    X509 = 0
-    OPENPGP = 1
-    RAW_PUBLIC_KEY = 2
-    CT_1609DOT2 = 3
-
-
-class PskKeyExchangeMode(Hex1Enum):
-    PSK_KE = 0
-    PSK_DHE_KE = 1
-
-
-#-----------------------------------------------------------------------
-# Extra non-IANA types registered here for simplicity
-#-----------------------------------------------------------------------
 
 class TLSVersion(Hex2Enum):
     TLS_1_0 = 0x0301

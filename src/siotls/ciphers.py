@@ -1,8 +1,12 @@
+# class names, assert
+# ruff: noqa: N801, S101
 import enum
 import hashlib
+
 from cryptography.hazmat.primitives.ciphers import aead
+
 from siotls import key_logger
-from siotls.crypto.hkdf import hkdf_expand_label, hkdf_extract, derive_secret
+from siotls.crypto.hkdf import derive_secret, hkdf_expand_label, hkdf_extract
 from siotls.iana import CipherSuites
 from siotls.utils import peekable
 
@@ -108,7 +112,7 @@ class _TLSCipherSuite:
     hashempty: bytes
     hashzeros: bytes
 
-    def __init__(self, side: str, log_keys: bool, client_unique: bytes):
+    def __init__(self, side: str, client_unique: bytes, *, log_keys: bool):
         self._secrets = _TLSSecrets(self.digestmod, self.hashempty, self.hashzeros)
         self._side = side
         self._client_unique_hex = client_unique.hex() if log_keys else ''
@@ -167,7 +171,7 @@ class _TLSCipherSuite:
 
     def derive_early_secrets(self, psk, psk_mode, client_hello_transcript_hash):
         binder_key, early_exporter_master, client_early_traffic = (
-            self._secrets._derive_early_secrets(
+            self._secrets.derive_early_secrets(
                 psk, psk_mode, client_hello_transcript_hash))
 
         client_key, client_iv = (self._derive_key_and_iv(client_early_traffic))
@@ -301,13 +305,13 @@ class TLS_AES_128_CCM_SHA256(_TLSCipherSuite):
     hashempty = SHA256_EMPTY
     hashzeros = SHA256_ZEROS
 
-class AESCCM8(aead.AESCCM):
+class _AESCCM8(aead.AESCCM):
     def __init__(self, key):
         super().__init__(key, tag_length=8)
 
 class TLS_AES_128_CCM_8_SHA256(_TLSCipherSuite):
     iana_id = CipherSuites.TLS_AES_128_CCM_8_SHA256
-    _ciphermod = AESCCM8
+    _ciphermod = _AESCCM8
     digestmod = hashlib.sha256
     block_size = 16
     key_length = 16

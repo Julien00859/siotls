@@ -1,15 +1,20 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT, ALPNProtocol
+
+from siotls.iana import ALPNProtocol, ExtensionType, HandshakeType
 from siotls.serial import SerializableBody
-from siotls.utils import try_cast, is_string
+from siotls.utils import is_string, try_cast
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
-class ApplicationLayerProtocolNegotiation(Extension, SerializableBody):
+class ALPN(Extension, SerializableBody):
     extension_type = ExtensionType.APPLICATION_LAYER_PROTOCOL_NEGOTIATION
-    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.ENCRYPTED_EXTENSIONS
+    )
 
     _struct = textwrap.dedent("""
         opaque ProtocolName<1..2^8-1>;

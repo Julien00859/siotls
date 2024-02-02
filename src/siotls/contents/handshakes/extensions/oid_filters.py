@@ -1,8 +1,10 @@
 import dataclasses
 import textwrap
 from typing import NamedTuple
-from siotls.iana import ExtensionType, HandshakeType as HT
-from siotls.serial import SerializableBody, SerialIO
+
+from siotls.iana import ExtensionType, HandshakeType
+from siotls.serial import SerialIO, SerializableBody
+
 from . import Extension
 
 
@@ -14,7 +16,7 @@ class OIDFilter(NamedTuple):
 @dataclasses.dataclass(init=False)
 class OIDFilters(Extension, SerializableBody):
     extension_type = ExtensionType.OID_FILTERS
-    _handshake_types = {HT.CERTIFICATE_REQUEST}
+    _handshake_types = (HandshakeType.CERTIFICATE_REQUEST,)
 
     _struct = textwrap.dedent("""\
         struct {

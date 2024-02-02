@@ -5,6 +5,7 @@ import os
 import pathlib
 import sys
 import warnings
+
 import siotls
 
 logger = logging.getLogger(__name__)
@@ -12,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 # Color the LEVEL part of messages, need new terminal on Windows
 class ColoredFormatter(logging.Formatter):
-    colors = {
+    colors = {  # noqa: RUF012
         logging.DEBUG: (34, 49),  # blue
         logging.INFO: (32, 49),  # green
         logging.WARNING: (33, 49),  # yellow
         logging.ERROR: (31, 49),  # red
         logging.CRITICAL: (37, 41),  # white on red
     }
-    def format(self, record):
+    def format(self, record):  # noqa: A003
         fg, bg = type(self).colors.get(record.levelno, (32, 49))
         record.levelname = f'\033[1;{fg}m\033[1;{bg}m{record.levelname}\033[0m'
         record.name = f'\033[1;29m\033[1;49m{record.name}\033[0m'
@@ -31,7 +32,7 @@ def setup_logging(verbosity):
         logging.getLogger().handlers[0].formatter = ColoredFormatter(logging.BASIC_FORMAT)
     logging.getLogger().setLevel(max(verbosity, logging.DEBUG))
     if verbosity < logging.DEBUG:
-        logging.captureWarnings(True)
+        logging.captureWarnings(capture=True)
         warnings.filterwarnings("default")
 
 
@@ -60,11 +61,7 @@ def main():
         help="Export TLS secrets to the specificed file for network analyzing "
              "tools such as wireshark, use - to log on stderr.")
 
-    try:
-        options = parser.parse_args()
-    except Exception as exc:
-        logging.critical("Couldn't parse command line", exc_info=exc)
-        return 1
+    options = parser.parse_args()
 
     # Configure logging
     verbosity = logging.INFO - options.verbose * 10 + options.silent * 10
@@ -102,7 +99,7 @@ def main():
                 options.host,
                 options.port,
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.critical("Fatal exception", exc_info=exc)
         return 1
 

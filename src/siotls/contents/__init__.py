@@ -1,6 +1,5 @@
 from siotls.iana import ContentType
 
-
 _content_registry = {}
 
 class Content:
@@ -17,12 +16,11 @@ class Content:
         try:
             return _content_registry[ContentType(content_type)]
         except ValueError as exc:
-            raise DecodeError() from exc
+            raise DecodeError from exc
 
 
-# ruff: noqa: F401, E402
-from .change_cipher_spec import ChangeCipherSpec
 from .alerts import Alert, DecodeError
-from .handshakes import Handshake
 from .application_data import ApplicationData
+from .change_cipher_spec import ChangeCipherSpec
+from .handshakes import Handshake
 from .heartbeat import Heartbeat

@@ -1,12 +1,18 @@
 import dataclasses
 import logging
 import textwrap
+
+from siotls.contents import alerts
 from siotls.iana import (
-    CipherSuites, HandshakeType, HandshakeType_, ExtensionType, TLSVersion
+    CipherSuites,
+    ExtensionType,
+    HandshakeType,
+    HandshakeType_,
+    TLSVersion,
 )
 from siotls.serial import SerialIO, SerializableBody
 from siotls.utils import try_cast
-from .. import alerts
+
 from . import Handshake
 from .extensions import Extension
 
@@ -77,7 +83,7 @@ class ServerHello(Handshake, SerializableBody):
         return cls(random, legacy_session_id_echo, cipher_suite, extensions)
 
     def serialize_body(self):
-        extensions = b''.join((ext.serialize() for ext in self.extensions.values()))
+        extensions = b''.join(ext.serialize() for ext in self.extensions.values())
 
         return b''.join([
             self.legacy_version.to_bytes(2, 'big'),

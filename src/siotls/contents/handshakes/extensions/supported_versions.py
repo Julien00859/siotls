@@ -1,21 +1,23 @@
 import dataclasses
 import textwrap
+
+from siotls.contents import alerts
 from siotls.iana import (
     ExtensionType,
-    HandshakeType as HT,
-    HandshakeType_ as HT_,
+    HandshakeType,
+    HandshakeType_,
     TLSVersion,
 )
 from siotls.serial import SerializableBody, SerializationError
 from siotls.utils import try_cast
-from ... import alerts
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class SupportedVersionsRequest(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_VERSIONS
-    _handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = (HandshakeType.CLIENT_HELLO,)
 
     _struct = textwrap.dedent("""\
         struct {
@@ -45,7 +47,10 @@ class SupportedVersionsRequest(Extension, SerializableBody):
 @dataclasses.dataclass(init=False)
 class SupportedVersionsResponse(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_VERSIONS
-    _handshake_types = [HT.SERVER_HELLO, HT_.HELLO_RETRY_REQUEST]
+    _handshake_types = (
+        HandshakeType.SERVER_HELLO,
+        HandshakeType_.HELLO_RETRY_REQUEST
+    )
 
     _struct = textwrap.dedent("""\
         struct {
@@ -68,7 +73,7 @@ class SupportedVersionsResponse(Extension, SerializableBody):
         except SerializationError:
             raise
         except ValueError as exc:
-            raise alerts.IllegalParameter() from exc
+            raise alerts.IllegalParameter from exc
         return cls(selected_version)
 
     def serialize_body(self):

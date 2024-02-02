@@ -1,17 +1,22 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT, CertificateStatusType
-from siotls.serial import SerializableBody, SerialIO
-from ... import alerts
-from . import Extension
 
+from siotls.contents import alerts
+from siotls.iana import CertificateStatusType, ExtensionType, HandshakeType
+from siotls.serial import SerializableBody
+
+from . import Extension
 
 _status_request_registry = {}
 
 @dataclasses.dataclass(init=False)
 class CertificateStatusRequest(Extension, SerializableBody):
     extension_type = ExtensionType.STATUS_REQUEST
-    _handshake_types = {HT.CLIENT_HELLO, HT.CERTIFICATE, HT.CERTIFICATE_REQUEST}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.CERTIFICATE,
+        HandshakeType.CERTIFICATE_REQUEST
+    )
 
     _struct = textwrap.dedent("""
         struct {
@@ -23,7 +28,7 @@ class CertificateStatusRequest(Extension, SerializableBody):
     """).strip('\n')
     status_type: CertificateStatusType
 
-    def __init_subclass__(cls, register=True, **kwargs):
+    def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and CertificateStatusRequest in cls.__bases__:
             _status_request_registry[cls.extension_type] = cls
@@ -36,7 +41,7 @@ class CertificateStatusRequest(Extension, SerializableBody):
         except ValueError as exc:
             # Unlike for ServerName, nothing states how to process
             # unknown certificate status types, crash for now
-            raise alerts.UnrecognizedName() from exc
+            raise alerts.UnrecognizedName from exc
         return cls.parse_bodybody(stream)
 
     def serialize_body(self):

@@ -1,7 +1,9 @@
 import dataclasses
 import textwrap
+
 from siotls.iana import ContentType, HeartbeatMessageType
 from siotls.serial import Serializable
+
 from . import Content, alerts
 
 
@@ -39,7 +41,7 @@ class Heartbeat(Content, Serializable):
         try:
             heartbeat_type = HeartbeatMessageType(stream.read_int(1))
         except ValueError as exc:
-            raise alerts.IllegalParameter() from exc
+            raise alerts.IllegalParameter from exc
         payload = stream.read_var(2)
         padding = stream.read()
         return cls(heartbeat_type, payload, padding)

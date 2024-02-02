@@ -1,21 +1,23 @@
 import dataclasses
 import textwrap
+
+from siotls.contents import alerts
 from siotls.iana import (
     ExtensionType,
-    HandshakeType as HT,
-    HandshakeType_ as HT_,
+    HandshakeType,
+    HandshakeType_,
     NamedGroup,
 )
-from siotls.serial import SerializableBody, SerialIO, SerializationError
+from siotls.serial import SerialIO, SerializableBody, SerializationError
 from siotls.utils import try_cast
-from ... import alerts
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class KeyShareRequest(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
-    _handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = (HandshakeType.CLIENT_HELLO,)
 
     _struct = textwrap.dedent("""\
         struct {
@@ -63,7 +65,7 @@ class KeyShareRequest(Extension, SerializableBody):
 @dataclasses.dataclass(init=False)
 class KeyShareRetry(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
-    _handshake_types = [HT_.HELLO_RETRY_REQUEST]
+    _handshake_types = (HandshakeType_.HELLO_RETRY_REQUEST,)
 
     _struct = textwrap.dedent("""\
         struct {
@@ -82,7 +84,7 @@ class KeyShareRetry(Extension, SerializableBody):
         except SerializationError:
             raise
         except ValueError as exc:
-            raise alerts.IllegalParameter() from exc
+            raise alerts.IllegalParameter from exc
         return cls(selected_group)
 
     def serialize_body(self):
@@ -92,7 +94,7 @@ class KeyShareRetry(Extension, SerializableBody):
 @dataclasses.dataclass(init=False)
 class KeyShareResponse(Extension, SerializableBody):
     extension_type = ExtensionType.KEY_SHARE
-    _handshake_types = {HT.SERVER_HELLO}
+    _handshake_types = (HandshakeType.SERVER_HELLO,)
 
     _struct = textwrap.dedent("""\
         struct {

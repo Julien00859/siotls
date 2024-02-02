@@ -1,8 +1,10 @@
 import dataclasses
 import textwrap
 from typing import NamedTuple
-from siotls.iana import ExtensionType, HandshakeType as HT
-from siotls.serial import SerializableBody, SerialIO
+
+from siotls.iana import ExtensionType, HandshakeType
+from siotls.serial import SerialIO, SerializableBody
+
 from . import Extension
 
 
@@ -14,7 +16,7 @@ class PskIdentity(NamedTuple):
 @dataclasses.dataclass(init=False)
 class PreSharedKeyRequest(Extension, SerializableBody):
     extension_type = ExtensionType.PRE_SHARED_KEY
-    _handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = (HandshakeType.CLIENT_HELLO,)
 
     _struct = textwrap.dedent("""\
         struct {
@@ -69,7 +71,7 @@ class PreSharedKeyRequest(Extension, SerializableBody):
 @dataclasses.dataclass(init=False)
 class PreSharedKeyResponse(Extension, SerializableBody):
     extension_type = ExtensionType.PRE_SHARED_KEY
-    _handshake_types = {HT.SERVER_HELLO}
+    _handshake_types = (HandshakeType.SERVER_HELLO,)
 
     _struct = textwrap.dedent("""\
         struct {

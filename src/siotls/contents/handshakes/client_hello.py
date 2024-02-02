@@ -1,10 +1,12 @@
 import dataclasses
 import logging
 import textwrap
-from siotls.iana import CipherSuites, HandshakeType, ExtensionType, TLSVersion
-from siotls.serial import SerializableBody, SerialIO
+
+from siotls.contents import alerts
+from siotls.iana import CipherSuites, ExtensionType, HandshakeType, TLSVersion
+from siotls.serial import SerialIO, SerializableBody
 from siotls.utils import try_cast
-from .. import alerts
+
 from . import Handshake
 from .extensions import Extension
 
@@ -93,12 +95,12 @@ class ClientHello(Handshake, SerializableBody):
         try:
             self = cls(random, cipher_suites, extensions)
         except ValueError as exc:
-            raise alerts.IllegalParameter() from exc
+            raise alerts.IllegalParameter from exc
         self.legacy_session_id = legacy_session_id
         return self
 
     def serialize_body(self):
-        extensions = b''.join((ext.serialize() for ext in self.extensions.values()))
+        extensions = b''.join(ext.serialize() for ext in self.extensions.values())
 
         return b''.join([
             self.legacy_version.to_bytes(2, 'big'),
