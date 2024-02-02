@@ -1,15 +1,20 @@
 import dataclasses
 import itertools
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT
+
+from siotls.iana import ExtensionType, HandshakeType
 from siotls.serial import SerializableBody
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class UseSRTP(Extension, SerializableBody):
     extension_type = ExtensionType.USE_SRTP
-    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.ENCRYPTED_EXTENSIONS
+    )
 
     _struct = textwrap.dedent("""
         uint8 SRTPProtectionProfile[2];
@@ -32,7 +37,7 @@ class UseSRTP(Extension, SerializableBody):
     def parse_body(cls, stream):
         # cannot use read_listint as the type in uint8[2], not uint16
         it = iter(stream.read_var(2))
-        protection_profiles = list(zip(it, it))
+        protection_profiles = list(zip(it, it, strict=True))
         mki = stream.read_var(1)
 
         return cls(protection_profiles, mki)

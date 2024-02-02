@@ -1,13 +1,13 @@
 """
 RFC 7919 - Negotiated Finite Field Diffie-Hellman Ephemeral Parameters
-for Transport Layer Security (TLS)
+for Transport Layer Security (TLS).
 """
 
 
-import collections
 import functools
-from siotls.iana import NamedGroup
+import typing
 
+from siotls.iana import NamedGroup
 
 ffdhe2048_p = bytes.fromhex("""
     FFFFFFFF FFFFFFFF ADF85458 A2BB4A9A AFDC5620 273D3CF1
@@ -283,11 +283,14 @@ ffdhe8192_q = bytes.fromhex("""
 """)
 
 
-f = functools.partial(int.from_bytes, byteorder='big')
+class DHNumbers(typing.NamedTuple):
+    p: int
+    g: int
+    q: int
+    p_length: int
+    min_key_length: int
 
-DHNumbers = collections.namedtuple("DHNumbers", [
-    "p", "g", "q", "p_length", "min_key_length"
-])
+f = functools.partial(int.from_bytes, byteorder='big')
 ffdhe2048 = DHNumbers(f(ffdhe2048_p), 2, f(ffdhe2048_q), len(ffdhe2048_p), 225)
 ffdhe3072 = DHNumbers(f(ffdhe3072_p), 2, f(ffdhe3072_q), len(ffdhe3072_p), 275)
 ffdhe4096 = DHNumbers(f(ffdhe4096_p), 2, f(ffdhe4096_q), len(ffdhe4096_p), 325)
@@ -304,6 +307,7 @@ groups = {
 
 if __name__ == '__main__':
     # assert that the constants are what they claim to be: safe primes
+    # ruff: noqa: S101, T201
 
     from sympy import isprime  # pip install sympy
 

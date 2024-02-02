@@ -1,12 +1,12 @@
 import logging
 from socket import socket
+
 from siotls import TLSConfiguration, TLSConnection
 from siotls.utils import hexdump
 
-
 logger = logging.getLogger(__name__)
 
-def serve(host, port, tlscert, tlskey):
+def serve(host, port, tlscert, tlskey):  # noqa: ARG001
     server = socket()
     server.bind((host, port))
     server.listen(1)

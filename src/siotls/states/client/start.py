@@ -1,20 +1,18 @@
-from siotls.crypto.key_share import init as key_share_init
-from siotls.iana import (
-    TLSVersion,
-    HeartbeatMode,
-)
 from siotls.contents.handshakes import ClientHello
 from siotls.contents.handshakes.extensions import (
-    SupportedVersionsRequest,
-    SignatureAlgorithms,
-    #SignatureAlgorithmsCert,
-    SupportedGroups,
-    KeyShareRequest,
-    ServerNameList, HostName,
-    ApplicationLayerProtocolNegotiation as ALPN,
+    ALPN,
     Cookie,
     Heartbeat,
+    HostName,
+    KeyShareRequest,
+    ServerNameList,
+    SignatureAlgorithms,
+    SupportedGroups,
+    SupportedVersionsRequest,
 )
+from siotls.crypto.key_share import init as key_share_init
+from siotls.iana import HeartbeatMode, TLSVersion
+
 from .. import State
 from . import ClientWaitServerHello
 
@@ -42,12 +40,6 @@ class ClientStart(State):
         if self._cookie:
             extensions.append(Cookie(self._cookie))
             self._cookie = None
-        if self.config.can_send_heartbeat or self.config.can_send_heartbeat:
-            extensions.append(Heartbeat(
-                HeartbeatMode.PEER_ALLOWED_TO_SEND
-                if self.config.can_echo_heartbeat else
-                HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND
-            ))
         extensions.append(KeyShareRequest(self._init_key_share()))
 
         self._send_content(ClientHello(

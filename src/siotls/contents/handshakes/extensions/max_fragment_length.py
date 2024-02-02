@@ -1,20 +1,25 @@
 import dataclasses
 import textwrap
+
+from siotls.contents import alerts
 from siotls.iana import (
     ExtensionType,
-    HandshakeType as HT,
-    MaxFragmentLengthOctets,
+    HandshakeType,
     MaxFragmentLengthCode,
+    MaxFragmentLengthOctets,
 )
 from siotls.serial import SerializableBody, SerializationError
-from ... import alerts
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class MaxFragmentLength(Extension, SerializableBody):
     extension_type = ExtensionType.MAX_FRAGMENT_LENGTH
-    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = (
+        HandshakeType.CLIENT_HELLO,
+        HandshakeType.ENCRYPTED_EXTENSIONS
+    )
 
     _struct = textwrap.dedent("""
         enum {
@@ -53,7 +58,7 @@ class MaxFragmentLength(Extension, SerializableBody):
         except SerializationError:
             raise
         except ValueError as exc:
-            raise alerts.IllegalParameter() from exc
+            raise alerts.IllegalParameter from exc
         return cls(max_fragment_length)
 
     def serialize_body(self):

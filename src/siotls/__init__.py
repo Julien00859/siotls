@@ -19,6 +19,7 @@ def __getattr__(attr):
     elif attr == 'TLSConfiguration':
         from .configuration import TLSConfiguration
         return TLSConfiguration
+    raise AttributeError
 
 # don't bloat dir(siotls) with useless stuff
 del importlib.metadata
