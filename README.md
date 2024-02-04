@@ -19,6 +19,8 @@ AES-CCM-8."
 To help us navigate the rich world of secure communication, in addition to
 RFC-8446 and the documents it references, we also studied:
 
+* https://safecurves.cr.yp.to/
+* https://www.enisa.europa.eu/publications/algorithms-key-size-and-parameters-report-2014
 * https://latacora.micro.blog/2018/04/03/cryptographic-right-answers.html
 * https://gist.github.com/atoponce/07d8d4c833873be2f68c34f9afc5a78a
 
