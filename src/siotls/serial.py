@@ -53,7 +53,7 @@ class SerialIO(io.BytesIO):
             if len(self._limits) > 1:
                 n = max_n
         elif n > max_n:
-            e = f"Expected {n} bytes but can only read {max_n}."
+            e = f"expected {n} bytes but can only read {max_n}"
             raise TooMuchDataError(e)
         return super().read(n)
 
@@ -62,7 +62,7 @@ class SerialIO(io.BytesIO):
         while len(data) != n:
             read = self.read(n - len(data))
             if not read:
-                e = f"Expected {n} bytes but could only read {len(data)}."
+                e = f"expected {n} bytes but could only read {len(data)}"
                 raise MissingDataError(e)
             data += read
         return data
@@ -84,8 +84,8 @@ class SerialIO(io.BytesIO):
     def read_listint(self, nlist, nitem):
         length = self.read_int(nlist)
         if length % nitem != 0:
-            e =(f"Cannot read {length // nitem + 1} uint{nitem * 8}_t out of "
-                f"{length} bytes.")
+            e =(f"cannot read {length // nitem + 1} uint{nitem * 8}_t out of "
+                f"{length} bytes")
             raise SerializationError(e)
 
         it = iter(self.read_exactly(length))
@@ -137,14 +137,14 @@ class SerialIO(io.BytesIO):
         eof_pos = self.seek(0, 2)
         if remaining := eof_pos - current_pos:
             self.seek(current_pos, 0)
-            e = f"Expected end of stream but {remaining} bytes remain."
+            e = f"expected end of stream but {remaining} bytes remain"
             raise TooMuchDataError(e)
 
     @contextlib.contextmanager
     def limit(self, length):
         new_limit = self.tell() + length
         if new_limit > self._limits[-1]:
-            e = "An more restrictive limit is present already"
+            e = "a more restrictive limit is present already"
             raise ValueError(e)
 
         self._limits.append(new_limit)
@@ -158,5 +158,5 @@ class SerialIO(io.BytesIO):
             e = "+inf was pop"
             raise RuntimeError(e)
         if (remaining := new_limit - self.tell()):
-            e = f"Expected end of chunk but {remaining} bytes remain."
+            e = f"expected end of chunk but {remaining} bytes remain"
             raise TooMuchDataError(e)
