@@ -67,7 +67,7 @@ def init_ff(key_exchange):
 def resume_ff(key_exchange, private_key, peer_key_share):
     p, g, q, p_length, min_key_length = ffdhe.groups[key_exchange]
     if len(peer_key_share) < min_key_length:
-        e = "The peer's key doesn't meet our security requirements"
+        e = "the peer's key is too short"
         raise alerts.InsufficientSecurity(e)
 
     pn = dh.DHParameterNumbers(p, q)

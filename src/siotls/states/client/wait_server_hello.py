@@ -24,20 +24,20 @@ class ClientWaitServerHello(State):
 
     def process(self, content):
         if content.content_type != ContentType.HANDSHAKE:
-            e = "Can only receive Handshake in this state."
+            e = "can only receive Handshake in this state"
             raise alerts.UnexpectedMessage(e)
         if self._is_first_server_hello:
             if content.msg_type != HandshakeType.SERVER_HELLO:
-                e =("Can only receive ServerHello or HelloRetryRequest "
-                    "in this state.")
+                e =("can only receive ServerHello or HelloRetryRequest "
+                    "in this state")
                 raise alerts.UnexpectedMessage(e)
         else:
             if content.msg_type is not HandshakeType.SERVER_HELLO:
-                e = "Can only receive ServerHello in this state."
+                e = "can only receive ServerHello in this state"
                 raise alerts.UnexpectedMessage(e)
 
         if content.cipher_suite not in self.config.cipher_suites:
-            e =(f"The server's selected {content.cipher_suite} wasn't offered "
+            e =(f"the server's selected {content.cipher_suite} wasn't offered "
                 f"in ClientHello: {self.config.cipher_suites}")
             raise alerts.IllegalParameter(e)
 
@@ -58,10 +58,10 @@ class ClientWaitServerHello(State):
 
         key_share = hello_retry_request.extensions.get(ExtensionType.KEY_SHARE)
         if not key_share:
-            e = "Missing Key Share in HelloRetryRequest"
+            e = "missing Key Share in HelloRetryRequest"
             raise alerts.MissingExtension(e)
         if key_share.selected_group not in self.config.key_exchanges:
-            e =(f"The server's selected {key_share.selected_group} wasn't "
+            e =(f"the server's selected {key_share.selected_group} wasn't "
                 f"offered in ClientHello: {self.config.key_exchanges}")
             raise alerts.IllegalParameter(e)
 
@@ -101,8 +101,7 @@ class ClientWaitServerHello(State):
         if not key_share_ext:
             raise alerts.MissingExtension(ExtensionType.KEY_SHARE)
         elif key_share_ext.group not in my_private_keys:
-            e =(f"The server's selected {key_share_ext.selected_group} was "
-                f"not offered in ClientHello: {self.config.key_exchanges}")
+            e = "the server-selected key exchange wasn't offered"
             raise alerts.IllegalParameter(e)
         else:
             shared_key, _ = key_share_resume(
@@ -117,12 +116,7 @@ class ClientWaitServerHello(State):
         if not mfl_ext:
             self.nconfig.max_fragment_length = MaxFragmentLengthOctets.MAX_16384
         elif mfl_ext.octets != self.config.max_fragment_length:
-            try:
-                code = self.config.max_fragment_length.to_code()
-            except ValueError:
-                code = None
-            e =(f"The server's selected {mfl_ext.code} "
-                f"wasn't offered in ClientHello: {code}")
+            e = "the server-selected max fragment length wasn't offered"
             raise alerts.IllegalParameter(e)
         else:
             self.nconfig.max_fragment_length = mfl_ext.octets
@@ -131,13 +125,12 @@ class ClientWaitServerHello(State):
         if not alpn_ext:
             return
         elif length := len(alpn_ext.protocol_name_list) != 1:
-            e =("Invalid Application Layer Protocol Negociation (ALPN) "
-                f"response. Expected 1 protocol, {length} found.")
+            e =(f"the server selected {length} application layer"
+                " protocols (ALPN) instead of 1")
             raise alerts.IllegalParameter(e)
         elif alpn_ext.protocol_name_list[0] not in self.config.alpn:
-            e =("The server's selected Application Layer Protocol (ALPN) "
-                f"{alpn_ext.protocol_name_list[0]!r} wasn't offered in "
-                f"ClientHello: {self.config.alpn}")
+            e =("the server-selected application layer protocol (ALPN) "
+                "wasn't offered")
             raise alerts.IllegalParameter(e)
         else:
             self.nconfig.alpn = alpn_ext.protocol_name_list[0]

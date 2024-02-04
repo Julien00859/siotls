@@ -34,12 +34,12 @@ class MaxFragmentLength(Extension, SerializableBody):
         octets: MaxFragmentLengthOctets | None = None,
     ):
         if octets and code:
-            e = "The code and octets arguments are mutualy exclusive."
+            e = "the code and octets arguments are mutualy exclusive"
             raise ValueError(e)
         elif octets:
             code = MaxFragmentLengthOctets(octets).to_code()
         elif not code:
-            e = "Missing code or octets arguments."
+            e = "missing code or octets arguments"
             raise ValueError(e)
         self._max_fragment_length = code
 

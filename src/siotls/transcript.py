@@ -96,8 +96,8 @@ class Transcript:
         if self._order_i == len(ORDER):
             return
         if (side, handshake_type) != ORDER[self._order_i]:
-            e =(f"Was expecting {ORDER[self._order_i]} but found "
-                f"{(side, handshake_type)} instead.")
+            e =(f"was expecting {ORDER[self._order_i]} but found "
+                f"{(side, handshake_type)} instead")
             raise alerts.UnexpectedMessage(e)
         for hash_ in self._hashes:
             hash_.update(handshake_data)
