@@ -53,7 +53,7 @@ class Extension(Serializable):
                 existing_cls = registry.setdefault(htname, cls)
                 if existing_cls != cls:
                     etname = cls.extension_type.name
-                    e =(f"Cannot register {cls} at pair ({etname}, {htname}), "
+                    e =(f"cannot register {cls} at pair ({etname}, {htname}), "
                         f"another exist already: {existing_cls}")
                     raise ValueError(e)
 

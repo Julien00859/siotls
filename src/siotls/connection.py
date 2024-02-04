@@ -159,8 +159,8 @@ class TLSConnection:
         if self._cipher.must_decrypt:
             max_fragment_length += 256
         if content_length > max_fragment_length:
-            e =(f"The record is longer ({content_length} bytes) than "
-                f"the allowed maximum ({max_fragment_length} bytes).")
+            e =(f"the record is longer ({content_length} bytes) than "
+                f"the allowed maximum ({max_fragment_length} bytes)")
             raise alerts.RecordOverFlow(e)
 
         if len(self._input_data) - 5 < content_length:
@@ -203,8 +203,8 @@ class TLSConnection:
             else:
                 self._input_handshake = fragment
         elif content_type != ContentType.HANDSHAKE:
-            e =(f"Expected {ContentType.HANDSHAKE} continuation record "
-                f"but {content_type} found.")
+            e =(f"expected {ContentType.HANDSHAKE} continuation record "
+                f"but {content_type} found")
             raise alerts.UnexpectedMessage(e)
         else:
             self._input_handshake += fragment
@@ -218,13 +218,13 @@ class TLSConnection:
                 return None
             content_type, fragment = record
             if content_type != ContentType.HANDSHAKE:
-                e =(f"Expected {ContentType.HANDSHAKE} continuation record "
-                    f"but {content_type} found.")
+                e =(f"expected {ContentType.HANDSHAKE} continuation record "
+                    f"but {content_type} found")
                 raise alerts.UnexpectedMessage(e)
             self._input_handshake += fragment
         if len(self._input_handshake) - 4 > handshake_length:
-            e = (f"Expected {handshake_length + 4} bytes but "
-                 f"{len(self._input_handshake)} read.")
+            e = (f"expected {handshake_length + 4} bytes but "
+                 f"{len(self._input_handshake)} read")
             raise TooMuchDataError(e)
 
         content_data = self._input_handshake
@@ -251,9 +251,9 @@ class TLSConnection:
                 for i in range(0, len(data), fragment_length)
             )
         else:
-            e =(f"Serialized {content} ({len(data)} bytes) doesn't fit "
+            e =(f"serialized {content} ({len(data)} bytes) doesn't fit "
                 f"inside a single record (max {fragment_length} bytes) "
-                " and cannot be fragmented over multiple ones.")
+                " and cannot be fragmented over multiple ones")
             raise ValueError(e)
 
         if self._cipher.must_encrypt:

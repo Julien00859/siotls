@@ -38,10 +38,10 @@ class ServerWaitClientHello(State):
 
     def process(self, client_hello):
         if client_hello.content_type != ContentType.HANDSHAKE:
-            e = "Can only receive Handshake in this state."
+            e = "can only receive Handshake in this state"
             raise alerts.UnexpectedMessage(e)
         if client_hello.msg_type != HandshakeType.CLIENT_HELLO:
-            e = "Can only receive ClientHello in this state."
+            e = "can only receive ClientHello in this state"
             raise alerts.UnexpectedMessage(e)
 
         if self._is_first_client_hello:
@@ -53,10 +53,10 @@ class ServerWaitClientHello(State):
             self._transcript.post_init(self._cipher.digestmod)
         else:
             if cipher_suite != self.nconfig.cipher_suite:
-                e = "Client's cipher suite cannot change in between Hellos"
+                e = "client's cipher suite cannot change in between Hellos"
                 raise alerts.IllegalParameter(e)
             if client_hello.random != self._client_unique:
-                e = "Client's random cannot change in between Hellos"
+                e = "client's random cannot change in between Hellos"
                 raise alerts.IllegalParameter(e)
 
         clear_extensions, encrypted_extensions, shared_key = (
@@ -140,9 +140,11 @@ class ServerWaitClientHello(State):
 
     def _negociate_supported_versions(self, supported_versions_ext):
         if not supported_versions_ext:
-            raise alerts.MissingExtension(ExtensionType.SUPPORTED_VERSIONS)
+            e = "client doesn't support TLS 1.3"
+            raise alerts.ProtocolVersion(e)
         if TLSVersion.TLS_1_3 not in supported_versions_ext.versions:
-            raise NotImplementedError  # unclear spec
+            e = "client doesn't support TLS 1.3"
+            raise alerts.ProtocolVersion(e)
         return [SupportedVersionsResponse(TLSVersion.TLS_1_3)], []
 
     def _negociate_supported_groups(self, supported_groups_ext):
