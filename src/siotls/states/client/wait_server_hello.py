@@ -9,6 +9,7 @@ from siotls.iana import (
     HandshakeType_,
     HeartbeatMode,
     MaxFragmentLengthOctets,
+    TLSVersion,
 )
 
 from .. import State
@@ -91,11 +92,20 @@ class ClientWaitServerHello(State):
             meth = getattr(self, f'_negociate_{ext_name}')
             return meth(ext, *args, **kwargs)
 
+        negociate('supported_versions')
         shared_key = negociate('key_share', self._key_shares)
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')
         negociate('heartbeat')
         return shared_key
+
+    def _negociate_supported_versions(self, supported_versions_ext):
+        if not supported_versions_ext:
+            e = "the server doesn't support TLS 1.3"
+            raise alerts.ProtocolVersion(e)
+        if supported_versions_ext.selected_version != TLSVersion.TLS_1_3:
+            e = "the server-selected supported version wasn't offered"
+            raise alerts.ProtocolVersion(e)
 
     def _negociate_key_share(self, key_share_ext, my_private_keys):
         if not key_share_ext:
@@ -104,11 +114,15 @@ class ClientWaitServerHello(State):
             e = "the server-selected key exchange wasn't offered"
             raise alerts.IllegalParameter(e)
         else:
-            shared_key, _ = key_share_resume(
-                key_share_ext.group,
-                my_private_keys[key_share_ext.group],
-                key_share_ext.client_shares[key_share_ext.group],
-            )
+            try:
+                shared_key, _ = key_share_resume(
+                    key_share_ext.group,
+                    my_private_keys[key_share_ext.group],
+                    key_share_ext.key_exchange,
+                )
+            except ValueError as exc:
+                e = "error while resuming key share"
+                raise alerts.IllegalParameter(e) from exc
             self.nconfig.key_exchanges = key_share_ext.group
             return shared_key
 
@@ -123,8 +137,9 @@ class ClientWaitServerHello(State):
 
     def _negociate_application_layer_protocol_negotiation(self, alpn_ext):
         if not alpn_ext:
+            self.nconfig.alpn = None
             return
-        elif length := len(alpn_ext.protocol_name_list) != 1:
+        elif (length := len(alpn_ext.protocol_name_list)) != 1:
             e =(f"the server selected {length} application layer"
                 " protocols (ALPN) instead of 1")
             raise alerts.IllegalParameter(e)
@@ -134,6 +149,7 @@ class ClientWaitServerHello(State):
             raise alerts.IllegalParameter(e)
         else:
             self.nconfig.alpn = alpn_ext.protocol_name_list[0]
+    _negociate_alpn = _negociate_application_layer_protocol_negotiation
 
     def _negociate_heartbeat(self, heartbeat_ext):
         if not heartbeat_ext:
