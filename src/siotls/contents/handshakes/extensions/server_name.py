@@ -82,12 +82,9 @@ class HostName(ServerName, SerializableBody):
         ])
 
 @dataclasses.dataclass(init=False)
-class ServerNameList(Extension, SerializableBody):
+class ServerNameListRequest(Extension, SerializableBody):
     extension_type = ExtensionType.SERVER_NAME
-    _handshake_types = (
-        HandshakeType.CLIENT_HELLO,
-        HandshakeType.ENCRYPTED_EXTENSIONS
-    )
+    _handshake_types = (HandshakeType.CLIENT_HELLO,)
     _struct = textwrap.dedent("""
         struct {
             ServerName server_name_list<1..2^16-1>
@@ -120,3 +117,20 @@ class ServerNameList(Extension, SerializableBody):
             len(server_name_list).to_bytes(2, 'big'),
             server_name_list
         ])
+
+
+@dataclasses.dataclass(init=False)
+class ServerNameResponse(Extension, SerializableBody):
+    extension_type = ExtensionType.SERVER_NAME
+    _handshake_types = (HandshakeType.ENCRYPTED_EXTENSIONS,)
+    _struct = r"struct {}"
+
+    def __init__(self):
+        pass
+
+    @classmethod
+    def parse_body(cls, stream):  # noqa: ARG003
+        return cls()
+
+    def serialize_body(self):
+        return b''

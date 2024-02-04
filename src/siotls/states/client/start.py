@@ -5,7 +5,7 @@ from siotls.contents.handshakes.extensions import (
     Heartbeat,
     HostName,
     KeyShareRequest,
-    ServerNameList,
+    ServerNameListRequest,
     SignatureAlgorithms,
     SupportedGroups,
     SupportedVersionsRequest,
@@ -32,7 +32,7 @@ class ClientStart(State):
             ),
         ]
         if self.config.hostnames:
-            extensions.append(ServerNameList([
+            extensions.append(ServerNameListRequest([
                 HostName(hostname) for hostname in self.config.hostnames
             ]))
         if self.config.alpn:

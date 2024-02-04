@@ -1,19 +1,27 @@
-import unittest
-from siotls.contents.handshakes import Handshake, ClientHello
-from siotls.iana import (
-    HandshakeType,
-    ExtensionType,
-    TLSVersion,
-    CipherSuites,
+import contextlib
+from siotls.contents.handshakes import (
+    ClientHello,
+    EncryptedExtensions,
+    Handshake,
 )
+from siotls.iana import CipherSuites, ExtensionType
 from siotls.serial import SerialIO
-from siotls.utils import hexdump
+
+from . import TestContent
 
 
-class TestWireExtension(unittest.TestCase):
+class TestContentHandshake(TestContent):
+    @contextlib.contextmanager
+    def neuter_extension(self, handshake, attr='extensions'):
+        extensions = getattr(handshake, attr)
+        setattr(handshake, attr, list(extensions.keys()))
+        yield
+        setattr(handshake, attr, extensions)
 
-    def test_wire_client_hello0_parsing(self):
-        payload = "".join("""
+
+class TestContentHandshakeClientHello(TestContentHandshake):
+    def test_content_client_hello(self):
+        payload = bytes.fromhex("""
             010001fc03033019520a80cf1a5b038de9c17e6a7f376425194f6cdaf8df484f64
             6d930ee35f207cd20364a3a6731c7882bc433cc5cbb1f0b091e735bff00d95007e
             e5348d9f74000813021303130100ff010001ab0000000f000d00000a6c6f63616c
@@ -30,9 +38,9 @@ class TestWireExtension(unittest.TestCase):
             000000000000000000000000000000000000000000000000000000000000000000
             000000000000000000000000000000000000000000000000000000000000000000
             0000000000000000000000000000000000
-        """.split())
-        stream = SerialIO(bytes.fromhex(payload))
+        """)
 
+        stream = SerialIO(payload)
         handshake = Handshake.parse(stream)
         self.assertTrue(stream.is_eof(), stream.read())
 
@@ -52,9 +60,6 @@ class TestWireExtension(unittest.TestCase):
         client_hello.legacy_session_id=bytes.fromhex("""
             7cd20364a3a6731c7882bc433cc5cbb1f0b091e735bff00d95007ee5348d9f74
         """)
-
-        # only test for the extensions types, not their payload
-        handshake.extensions = list(handshake.extensions.keys())
         client_hello.extensions = [
             ExtensionType.SERVER_NAME,
             0xb,  # ex point formats
@@ -70,32 +75,25 @@ class TestWireExtension(unittest.TestCase):
             ExtensionType.KEY_SHARE,
             ExtensionType.PADDING,
         ]
-        self.assertEqual(handshake, client_hello)
+        with self.neuter_extension(handshake):
+            self.assertEqual(handshake, client_hello)
+
+        self.assertEqual(handshake.serialize(), payload)
 
 
-    def test_wire_client_hello1_serialization(self):
-        payload = "".join("""
-            010001fc03033019520a80cf1a5b038de9c17e6a7f376425194f6cdaf8df484f64
-            6d930ee35f207cd20364a3a6731c7882bc433cc5cbb1f0b091e735bff00d95007e
-            e5348d9f74000813021303130100ff010001ab0000000f000d00000a6c6f63616c
-            686f737432000b000403000102000a00160014001d0017001e0019001801000101
-            010201030104337400000010000e000c02683208687474702f312e310016000000
-            17000000310000000d001e001c040305030603080708080809080a080b08040805
-            0806040105010601002b0003020304002d00020101003300260024001d0020a9da
-            4a99bec4360f651b5fc3cb3f88ad8cdb1bb61bfe327d34b715ec40ca2777001500
-            f70000000000000000000000000000000000000000000000000000000000000000
-            000000000000000000000000000000000000000000000000000000000000000000
-            000000000000000000000000000000000000000000000000000000000000000000
-            000000000000000000000000000000000000000000000000000000000000000000
-            000000000000000000000000000000000000000000000000000000000000000000
-            000000000000000000000000000000000000000000000000000000000000000000
-            000000000000000000000000000000000000000000000000000000000000000000
-            0000000000000000000000000000000000
-        """.split())
-        stream = SerialIO(bytes.fromhex(payload))
+class TestContentHandshakeEncryptedExtensions(TestContentHandshake):
+    def test_content_encryted_extensions(self):
+        payload = bytes.fromhex("0800000f000d00000000001000050003026832")
+        stream = SerialIO(payload)
+        handshake = EncryptedExtensions.parse(stream)
+        self.assertTrue(stream.is_eof())
 
-        handshake = Handshake.parse(stream)
-        self.assertTrue(stream.is_eof(), stream.read())
+        ee = EncryptedExtensions({})
+        ee.extensions = [
+            ExtensionType.SERVER_NAME,
+            ExtensionType.APPLICATION_LAYER_PROTOCOL_NEGOTIATION
+        ]
+        with self.neuter_extension(handshake):
+            self.assertEqual(handshake, ee)
 
-        self.maxDiff = None
-        self.assertEqual(handshake.serialize().hex(), payload)
+        self.assertEqual(handshake.serialize(), payload)
