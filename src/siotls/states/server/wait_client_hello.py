@@ -45,7 +45,7 @@ class ServerWaitClientHello(State):
             raise alerts.UnexpectedMessage(e)
 
         if self._is_first_client_hello:
-            cipher_suite = self._find_common_cipher_suite(client_hello)
+            cipher_suite = self._find_common_cipher_suite(client_hello.cipher_suites)
             self.nconfig = TLSNegociatedConfiguration(cipher_suite)
             self._client_unique = client_hello.random
             self._cipher = cipher_suite_registry[cipher_suite](
@@ -90,9 +90,9 @@ class ServerWaitClientHello(State):
         self._send_content(Finished(...))
         self._move_to_state(ServerWaitFlight2)
 
-    def _find_common_cipher_suite(self, client_hello):
+    def _find_common_cipher_suite(self, cipher_suites):
         for cipher_suite in self.config.cipher_suites:
-            if cipher_suite in client_hello.cipher_suites:
+            if cipher_suite in cipher_suites:
                 return cipher_suite
         e = "no common cipher suite found"
         raise alerts.HandshakeFailure(e)
