@@ -129,7 +129,7 @@ from .padding import Padding
 from .post_handshake_auth import PostHandshakeAuth
 from .pre_shared_key import PreSharedKeyRequest, PreSharedKeyResponse, PskIdentity
 from .psk_key_exchange_modes import PskKeyExchangeModes
-from .server_name import HostName, ServerName, ServerNameList
+from .server_name import HostName, ServerName, ServerNameListRequest, ServerNameResponse
 from .signature_algorithms import SignatureAlgorithms, SignatureAlgorithmsCert
 from .signed_certificate_timestamp import SignedCertificateTimestamp
 from .status_request import CertificateStatusRequest, OCSPStatusRequest
