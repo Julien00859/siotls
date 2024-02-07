@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import logging
 import re
 import unittest
@@ -18,3 +19,11 @@ class TestCase(unittest.TestCase):
         if error_msg is None:
             return super().assertRaises(exception, *args, **kwds)
         return self.assertRaisesRegex(exception, re.escape(str(error_msg)), *args, **kwds)
+
+    @contextlib.contextmanager
+    def assertLogs(self, logger='', level=logging.NOTSET, log_msg=None, *args, **kwds):  # noqa: N802
+        with super().assertLogs(logger, level, *args, **kwds) as capture:
+            yield capture
+        if log_msg is not None:
+            self.assertEqual(len(capture.output), 1)
+            self.assertRegex(capture.output[0].split(':', 2)[2], re.escape(str(log_msg)))
