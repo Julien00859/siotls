@@ -13,6 +13,18 @@ from .extensions import Extension
 logger = logging.getLogger(__name__)
 
 
+def _find_duplicated_extension(extensions):
+    for ext_no, ext1 in enumerate(extensions):
+        for ext2 in extensions[ext_no+1:]:
+            if ext1.extension_type != ext2.extension_type:
+                continue
+            if ext1 != ext2:
+                e = f"duplicated extension: {ext1} vs {ext2}"
+                raise ValueError(e)
+            else:
+                logger.warning("duplicated extension: %s", ext1)
+
+
 @dataclasses.dataclass(init=False)
 class ClientHello(Handshake, SerializableBody):
     msg_type = HandshakeType.CLIENT_HELLO
@@ -47,21 +59,23 @@ class ClientHello(Handshake, SerializableBody):
         self.legacy_compression_methods = type(self).legacy_compression_methods
         self.extensions = {ext.extension_type: ext for ext in extensions}
 
-        if len(self.extensions) != len(extensions):
-            for ext_no, ext1 in enumerate(extensions):
-                for ext2 in extensions[ext_no+1:]:
-                    if ext1.extension_type == ext2.extension_type:
-                        break
-            e = f"duplicated {ext1.extension_type}: {ext1} vs {ext2}"
+        if len(random) != 32:  # noqa: PLR2004
+            e = "random must be exactly 32 bytes longs"
             raise ValueError(e)
+
+        if not cipher_suites:
+            e = "cipher suites cannot be empty"
+            raise ValueError(e)
+
+        if len(self.extensions) != len(extensions):
+            _find_duplicated_extension(extensions)
 
         if ExtensionType.PRE_SHARED_KEY in self.extensions:
             if extensions[-1].extension_type != ExtensionType.PRE_SHARED_KEY:
-                e =(f"{ExtensionType.PRE_SHARED_KEY} must be the last"
-                    " extension inside the list")
+                e = "PreSharedKey() must be the last extension of the list"
                 raise ValueError(e)
             if ExtensionType.PSK_KEY_EXCHANGE_MODES not in self.extensions:
-                e = f"missing mandatory {ExtensionType.PSK_KEY_EXCHANGE_MODES}"
+                e = "missing mandatory extension: PskKeyExchangeModes()"
                 raise ValueError(e)
 
 

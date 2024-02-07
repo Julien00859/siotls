@@ -1,5 +1,5 @@
-import unittest
+from .. import TestCase  # noqa: TID252
 
 
-class TestContent(unittest.TestCase):
+class TestContent(TestCase):
     pass

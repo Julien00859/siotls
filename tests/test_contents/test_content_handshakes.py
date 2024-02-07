@@ -1,10 +1,22 @@
 import contextlib
+import logging
+
 from siotls.contents.handshakes import (
     ClientHello,
     EncryptedExtensions,
     Handshake,
 )
-from siotls.iana import CipherSuites, ExtensionType
+from siotls.contents.handshakes.extensions import (
+    Cookie,
+    PreSharedKeyRequest,
+    PskIdentity,
+    PskKeyExchangeModes,
+)
+from siotls.iana import (
+    CipherSuites,
+    ExtensionType,
+    PskKeyExchangeMode,
+)
 from siotls.serial import SerialIO
 
 from . import TestContent
@@ -80,6 +92,75 @@ class TestContentHandshakeClientHello(TestContentHandshake):
 
         self.assertEqual(handshake.serialize(), payload)
 
+    def test_content_client_hello_bad_random(self):
+        e = "random must be exactly 32 bytes longs"
+        with self.assertRaises(ValueError, error_msg=e):
+            ClientHello(
+                random=b'bad random',
+                cipher_suites=[CipherSuites.TLS_AES_128_GCM_SHA256],
+                extensions=[]
+            )
+
+    def test_content_client_hello_empty_cipher_suites(self):
+        e = "cipher suites cannot be empty"
+        with self.assertRaises(ValueError, error_msg=e):
+            ClientHello(
+                random=b'a' * 32,
+                cipher_suites=[],
+                extensions=[]
+            )
+
+    def test_content_client_hello_duplicated_different_extensions(self):
+        e = "duplicated extension: Cookie(cookie='foo') vs Cookie(cookie='bar')"
+        with self.assertRaises(ValueError, error_msg=e):
+            ClientHello(
+                random=b'a' * 32,
+                cipher_suites=[CipherSuites.TLS_AES_128_GCM_SHA256],
+                extensions=[Cookie('foo'), Cookie('bar')]
+            )
+
+    def test_content_client_hello_duplicated_identic_extensions(self):
+        logger = 'siotls.contents.handshakes.client_hello'
+        w = "duplicated extension: Cookie(cookie='foo')"
+        with self.assertLogs(logger, logging.WARNING, log_msg=w):
+            ClientHello(
+                random=b'a' * 32,
+                cipher_suites=[CipherSuites.TLS_AES_128_GCM_SHA256],
+                extensions=[Cookie('foo'), Cookie('foo')]
+            )
+
+    def test_content_client_hello_psk_not_last(self):
+        e = "PreSharedKey() must be the last extension of the list"
+        with self.assertRaises(ValueError, error_msg=e):
+            ClientHello(
+                random=b'a' * 32,
+                cipher_suites=[CipherSuites.TLS_AES_128_GCM_SHA256],
+                extensions=[
+                    PreSharedKeyRequest([PskIdentity(b'', 0)], b''),
+                    Cookie('bar')
+                ]
+            )
+
+    def test_content_client_hello_missing_psk_exchange_mode(self):
+        e = "missing mandatory extension: PskKeyExchangeModes()"
+        with self.assertRaises(ValueError, error_msg=e):
+            ClientHello(
+                random=b'a' * 32,
+                cipher_suites=[CipherSuites.TLS_AES_128_GCM_SHA256],
+                extensions=[
+                    PreSharedKeyRequest([PskIdentity(b'', 0)], b''),
+                ]
+            )
+
+    def test_content_client_hello_valid_psk(self):
+        ClientHello(
+            random=b'a' * 32,
+            cipher_suites=[CipherSuites.TLS_AES_128_GCM_SHA256],
+            extensions=[
+                PskKeyExchangeModes(PskKeyExchangeMode.PSK_DHE_KE),
+                PreSharedKeyRequest([PskIdentity(b'', 0)], b''),
+            ]
+        )
 
 class TestContentHandshakeEncryptedExtensions(TestContentHandshake):
     def test_content_encryted_extensions(self):
