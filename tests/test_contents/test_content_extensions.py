@@ -1,8 +1,10 @@
+from siotls.contents import alerts
 from siotls.contents.handshakes.extensions import (
     ALPN,
     Extension,
     HostName,
     KeyShareRequest,
+    MaxFragmentLength,
     PostHandshakeAuth,
     PskKeyExchangeModes,
     ServerNameListRequest,
@@ -12,12 +14,14 @@ from siotls.contents.handshakes.extensions import (
 )
 from siotls.iana import (
     HandshakeType,
+    MaxFragmentLengthCode,
+    MaxFragmentLengthOctets,
     NamedGroup,
     PskKeyExchangeMode,
     SignatureScheme,
     TLSVersion,
 )
-from siotls.serial import SerialIO
+from siotls.serial import SerialIO, SerializationError
 
 from . import TestContent
 
@@ -31,7 +35,7 @@ class TestContentExtension(TestContent):
 
 
 class TestContentALPN(TestContentExtension):
-    def test_content_application_layer_protocol_negotiation(self):
+    def test_content_alpn_io(self):
         payload = bytes.fromhex("0010000e000c02683208687474702f312e31")
         ext = self.parse_extension(payload)
         self.assertEqual(ext, ALPN(["h2", "http/1.1"]))
@@ -39,7 +43,7 @@ class TestContentALPN(TestContentExtension):
 
 
 class TestContentKeyShare(TestContentExtension):
-    def test_content_key_share(self):
+    def test_content_key_share_io(self):
         payload = bytes.fromhex("""
             003300260024001d0020ad4061d3f71e40a1bacce42538e303abadbc2c9485fabb
             fada051b859e5e961b
@@ -54,8 +58,45 @@ class TestContentKeyShare(TestContentExtension):
         self.assertEqual(ext.serialize(), payload)
 
 
+class TestContentMaxFragmentLength(TestContentExtension):
+    def test_content_max_fragment_length_io(self):
+        payload = bytes.fromhex("0001000101")
+        ext = self.parse_extension(payload)
+        self.assertEqual(ext, MaxFragmentLength(MaxFragmentLengthCode.MAX_512))
+        self.assertEqual(ext.serialize(), payload)
+
+    def test_content_max_fragment_length_io_bad_code(self):
+        payload = bytes.fromhex("0001000100")
+        with self.assertRaises(alerts.IllegalParameter):
+            self.parse_extension(payload)
+
+    def test_content_max_fragment_length_io_missing_code(self):
+        payload = bytes.fromhex("00010001")
+        with self.assertRaises(SerializationError):
+            self.parse_extension(payload)
+
+
+    def test_content_max_fragment_length_init_code_and_octets(self):
+        e = "the code and octets arguments are mutualy exclusive"
+        with self.assertRaises(ValueError, error_msg=e):
+            MaxFragmentLength(
+                code=MaxFragmentLengthCode.MAX_512,
+                octets=MaxFragmentLengthOctets.MAX_512,
+            )
+
+    def test_content_max_fragment_length_init_neither_code_nor_octets(self):
+        e = "missing code or octets arguments"
+        with self.assertRaises(ValueError, error_msg=e):
+            MaxFragmentLength()
+
+    def test_content_max_fragment_length_reflexion(self):
+        mfl = MaxFragmentLength(code=MaxFragmentLengthCode.MAX_512)
+        self.assertEqual(mfl.code, MaxFragmentLengthCode.MAX_512)
+        self.assertEqual(mfl.octets, MaxFragmentLengthOctets.MAX_512)
+
+
 class TestContentPostHandshakeAuth(TestContentExtension):
-    def test_content_post_handshake_auth(self):
+    def test_content_post_handshake_auth_io(self):
         payload = bytes.fromhex("00310000")
         ext = self.parse_extension(payload)
         self.assertEqual(ext, PostHandshakeAuth())
@@ -63,7 +104,7 @@ class TestContentPostHandshakeAuth(TestContentExtension):
 
 
 class TestContentPostSignatureAlgorithms(TestContentExtension):
-    def test_content_post_signature_algorithms(self):
+    def test_content_post_signature_algorithms_io(self):
         payload = bytes.fromhex("""
             000d001e001c040305030603080708080809080a080b0804080508060401050106
             01
@@ -89,7 +130,7 @@ class TestContentPostSignatureAlgorithms(TestContentExtension):
 
 
 class TestContentPskKeyExchangeModes(TestContentExtension):
-    def test_content_psk_key_exchange_modes(self):
+    def test_content_psk_key_exchange_modes_io(self):
         payload = bytes.fromhex("002d00020101")
         ext = self.parse_extension(payload)
         self.assertEqual(ext, PskKeyExchangeModes([
@@ -99,7 +140,7 @@ class TestContentPskKeyExchangeModes(TestContentExtension):
 
 
 class TestContentServerName(TestContentExtension):
-    def test_content_server_name(self):
+    def test_content_server_name_io(self):
         payload = bytes.fromhex("0000000e000c0000096c6f63616c686f7374")
         ext = self.parse_extension(payload)
         self.assertEqual(ext, ServerNameListRequest([HostName("localhost")]))
@@ -107,7 +148,7 @@ class TestContentServerName(TestContentExtension):
 
 
 class TestContentSupportedGroup(TestContentExtension):
-    def test_content_supported_group(self):
+    def test_content_supported_group_io(self):
         payload = bytes.fromhex("""
             000a00160014001d0017001e0019001801000101010201030104
         """)
@@ -128,7 +169,7 @@ class TestContentSupportedGroup(TestContentExtension):
 
 
 class TestContentSupportedVersions(TestContentExtension):
-    def test_content_supported_versions(self):
+    def test_content_supported_versions_io(self):
         payload = bytes.fromhex("002b0003020304")
         ext = self.parse_extension(payload)
         self.assertEqual(ext, SupportedVersionsRequest([TLSVersion.TLS_1_3]))

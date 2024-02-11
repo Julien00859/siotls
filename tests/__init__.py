@@ -15,7 +15,7 @@ setup_logging(logging.WARNING - 10 * options.verbosity)
 
 
 class TestCase(unittest.TestCase):
-    def assertRaises(self, exception, error_msg=None, *args, **kwds):  # noqa: N802
+    def assertRaises(self, exception, *args, error_msg=None, **kwds):  # noqa: N802
         if error_msg is None:
             return super().assertRaises(exception, *args, **kwds)
         return self.assertRaisesRegex(exception, re.escape(str(error_msg)), *args, **kwds)
