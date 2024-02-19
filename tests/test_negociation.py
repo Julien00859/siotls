@@ -1,3 +1,4 @@
+import dataclasses
 import unittest
 import unittest.mock
 
@@ -44,14 +45,18 @@ class TestNegociationServer(TestCase):
             self.server.config.cipher_suites[0]
         )
 
+    @classmethod
+    def replace_config(cls, **kwargs):
+        cls.server.config = dataclasses.replace(cls.server.config, **kwargs)
+
 
 class TestNegociationServerCipherSuite(TestNegociationServer):
     def setUp(self):
-        self.server.config.cipher_suites = [
+        self.replace_config(cipher_suites=[
             CipherSuites.TLS_CHACHA20_POLY1305_SHA256,
             CipherSuites.TLS_AES_256_GCM_SHA384,
             CipherSuites.TLS_AES_128_GCM_SHA256,
-        ]
+        ])
         self.server.nconfig = None
 
     # Cipher suite isn't an extension, is part of the ClientHello header
@@ -128,7 +133,7 @@ class TestNegociationServerSupportedGroups(TestNegociationServer):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.server.config.key_exchanges = [NamedGroup.x25519, NamedGroup.secp256r1]
+        cls.replace_config(key_exchanges=[NamedGroup.x25519, NamedGroup.secp256r1])
 
     def test_negociation_server_supported_groups_missing(self):
         e = ExtensionType.SUPPORTED_GROUPS
@@ -172,10 +177,10 @@ class TestNegociationServerSignatureAlgorithms(TestNegociationServer):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.server.config.signature_algorithms = [
+        cls.replace_config(signature_algorithms=[
             SignatureScheme.ed25519,
             SignatureScheme.ecdsa_secp256r1_sha256,
-        ]
+        ])
 
     def test_negociation_server_signature_algorithms_missing(self):
         e = ExtensionType.SIGNATURE_ALGORITHMS
@@ -281,7 +286,7 @@ class TestNegociationServerMaxFragmentLength(TestNegociationServer):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.server.config.max_fragment_length = MaxFragmentLengthOctets.MAX_16384
+        cls.replace_config(max_fragment_length=MaxFragmentLengthOctets.MAX_16384)
 
     def test_negociation_server_max_fragment_length_missing(self):
         clears, crypts = self.server._state._negociate_max_fragment_length(None)
@@ -310,7 +315,7 @@ class TestNegociationServerALPN(TestNegociationServer):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.server.config.alpn = ['h2', 'http/1.1']
+        cls.replace_config(alpn=['h2', 'http/1.1'])
 
     def _negociate_alpn(self, alpn_ext):
         return self.server._state._negociate_application_layer_protocol_negotiation(alpn_ext)
@@ -322,7 +327,7 @@ class TestNegociationServerALPN(TestNegociationServer):
         self.assertIsNone(self.server.nconfig.alpn)
 
     def test_negociation_server_alpn_unconfigured(self):
-        self.server.config.alpn = None
+        self.replace_config(alpn=None)
         clears, crypts = self._negociate_alpn(ALPN(['http/1.1']))
         self.assertEqual(clears, [])
         self.assertEqual(crypts, [])
@@ -350,14 +355,14 @@ class TestNegociationServerHeartbeat(TestNegociationServer):
     def test_negociation_server_heartbeat_missing(self):
         client_hb = None
 
-        self.server.config.can_echo_heartbeat = True
+        self.replace_config(can_echo_heartbeat=True)
         clears, crypts = self.server._state._negociate_heartbeat(client_hb)
         self.assertEqual(clears, [])
         self.assertEqual(crypts, [])
         self.assertFalse(self.server.nconfig.can_echo_heartbeat)
         self.assertFalse(self.server.nconfig.can_send_heartbeat)
 
-        self.server.config.can_echo_heartbeat = False
+        self.replace_config(can_echo_heartbeat=False)
         clears, crypts = self.server._state._negociate_heartbeat(client_hb)
         self.assertEqual(clears, [])
         self.assertEqual(crypts, [])
@@ -367,14 +372,14 @@ class TestNegociationServerHeartbeat(TestNegociationServer):
     def test_negociation_server_heartbeat_client_allows_server_pings(self):
         client_hb = Heartbeat(HeartbeatMode.PEER_ALLOWED_TO_SEND)
 
-        self.server.config.can_echo_heartbeat = True
+        self.replace_config(can_echo_heartbeat=True)
         clears, crypts = self.server._state._negociate_heartbeat(client_hb)
         self.assertEqual(clears, [])
         self.assertEqual(crypts, [Heartbeat(HeartbeatMode.PEER_ALLOWED_TO_SEND)])
         self.assertTrue(self.server.nconfig.can_echo_heartbeat)
         self.assertTrue(self.server.nconfig.can_send_heartbeat)
 
-        self.server.config.can_echo_heartbeat = False
+        self.replace_config(can_echo_heartbeat=False)
         clears, crypts = self.server._state._negociate_heartbeat(client_hb)
         self.assertEqual(clears, [])
         self.assertEqual(crypts, [Heartbeat(HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND)])
@@ -384,14 +389,14 @@ class TestNegociationServerHeartbeat(TestNegociationServer):
     def test_negociation_server_heartbeat_client_refuses_server_pings(self):
         client_hb = Heartbeat(HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND)
 
-        self.server.config.can_echo_heartbeat = True
+        self.replace_config(can_echo_heartbeat=True)
         clears, crypts = self.server._state._negociate_heartbeat(client_hb)
         self.assertEqual(clears, [])
         self.assertEqual(crypts, [Heartbeat(HeartbeatMode.PEER_ALLOWED_TO_SEND)])
         self.assertTrue(self.server.nconfig.can_echo_heartbeat)
         self.assertFalse(self.server.nconfig.can_send_heartbeat)
 
-        self.server.config.can_echo_heartbeat = False
+        self.replace_config(can_echo_heartbeat=False)
         clears, crypts = self.server._state._negociate_heartbeat(client_hb)
         self.assertEqual(clears, [])
         self.assertEqual(crypts, [Heartbeat(HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND)])
@@ -413,6 +418,10 @@ class TestNegociationClient(TestCase):
         self.client.nconfig = TLSNegociatedConfiguration(
             self.client.config.cipher_suites[0]
         )
+
+    @classmethod
+    def replace_config(cls, **kwargs):
+        cls.client.config = dataclasses.replace(cls.client.config, **kwargs)
 
 
 class TestNegociationClientSupportedVersions(TestNegociationClient):
@@ -476,7 +485,7 @@ class TestNegociationClientKeyShare(TestNegociationClient):
 
 class TestNegociationClientMaxFragmentLength(TestNegociationClient):
     def test_negociation_client_max_fragment_length_missing_not_offered(self):
-        self.client.config.max_fragment_length = MaxFragmentLengthOctets.MAX_16384
+        self.replace_config(max_fragment_length=MaxFragmentLengthOctets.MAX_16384)
         self.client._state._negociate_max_fragment_length(None)
         self.assertEqual(
             self.client.nconfig.max_fragment_length,
@@ -484,7 +493,7 @@ class TestNegociationClientMaxFragmentLength(TestNegociationClient):
         )
 
     def test_negociation_client_max_fragment_length_missing_offered(self):
-        self.client.config.max_fragment_length = MaxFragmentLengthOctets.MAX_1024
+        self.replace_config(max_fragment_length=MaxFragmentLengthOctets.MAX_1024)
         self.client._state._negociate_max_fragment_length(None)
         self.assertEqual(
             self.client.nconfig.max_fragment_length,
@@ -492,7 +501,7 @@ class TestNegociationClientMaxFragmentLength(TestNegociationClient):
         )
 
     def test_negociation_client_max_fragment_length_present_not_offered(self):
-        self.client.config.max_fragment_length = MaxFragmentLengthOctets.MAX_16384
+        self.replace_config(max_fragment_length=MaxFragmentLengthOctets.MAX_16384)
         e = "the server-selected max fragment length wasn't offered"
         with self.assertRaises(alerts.IllegalParameter, error_msg=e):
             self.client._state._negociate_max_fragment_length(
@@ -500,7 +509,7 @@ class TestNegociationClientMaxFragmentLength(TestNegociationClient):
             )
 
     def test_negociation_client_max_fragment_length_present_invalid(self):
-        self.client.config.max_fragment_length = MaxFragmentLengthOctets.MAX_4096
+        self.replace_config(max_fragment_length=MaxFragmentLengthOctets.MAX_4096)
         e = "the server-selected max fragment length wasn't offered"
         with self.assertRaises(alerts.IllegalParameter, error_msg=e):
             self.client._state._negociate_max_fragment_length(
@@ -508,7 +517,7 @@ class TestNegociationClientMaxFragmentLength(TestNegociationClient):
             )
 
     def test_negociation_client_max_fragment_length_present_valid(self):
-        self.client.config.max_fragment_length = MaxFragmentLengthOctets.MAX_1024
+        self.replace_config(max_fragment_length=MaxFragmentLengthOctets.MAX_1024)
         self.client._state._negociate_max_fragment_length(
             MaxFragmentLength(octets=MaxFragmentLengthOctets.MAX_1024)
         )
@@ -520,35 +529,35 @@ class TestNegociationClientMaxFragmentLength(TestNegociationClient):
 
 class TestNegociationClientALPN(TestNegociationClient):
     def test_negociation_client_alpn_missing_not_offered(self):
-        self.client.config.alpn = []
+        self.replace_config(alpn=[])
         self.client._state._negociate_alpn(None)
         self.assertEqual(self.client.nconfig.alpn, None)
 
     def test_negociation_client_alpn_missing_offered(self):
-        self.client.config.alpn = ['h2', 'http/1.1']
+        self.replace_config(alpn=['h2', 'http/1.1'])
         self.client._state._negociate_alpn(None)
         self.assertEqual(self.client.nconfig.alpn, None)
 
     def test_negociation_client_alpn_present_not_offered(self):
-        self.client.config.alpn = []
+        self.replace_config(alpn=[])
         e = "the server-selected application layer protocol (ALPN) wasn't offered"
         with self.assertRaises(alerts.IllegalParameter, error_msg=e):
             self.client._state._negociate_alpn(ALPN(['h2']))
 
     def test_negociation_client_alpn_present_invalid(self):
-        self.client.config.alpn = ['h2', 'http/1.1']
+        self.replace_config(alpn=['h2', 'http/1.1'])
         e = "the server-selected application layer protocol (ALPN) wasn't offered"
         with self.assertRaises(alerts.IllegalParameter, error_msg=e):
             self.client._state._negociate_alpn(ALPN(['h3']))
 
     def test_negociation_client_alpn_too_many_protocols_present(self):
-        self.client.config.alpn = ['h2', 'http/1.1']
+        self.replace_config(alpn=['h2', 'http/1.1'])
         e = "the server selected 2 application layer protocols (ALPN) instead of 1"
         with self.assertRaises(alerts.IllegalParameter, error_msg=e):
             self.client._state._negociate_alpn(ALPN(['h2', 'http/1.1']))
 
     def test_negociation_client_alpn_present_valid(self):
-        self.client.config.alpn = ['h2', 'http/1.1']
+        self.replace_config(alpn=['h2', 'http/1.1'])
         with self.subTest(msg="server picked h2"):
             self.client._state._negociate_alpn(ALPN(['h2']))
             self.assertEqual(self.client.nconfig.alpn, 'h2')
@@ -561,7 +570,7 @@ class TestNegociationClientHeartbeat(TestNegociationClient):
     # Note: we always send the Heartbeat extension
 
     def test_negociation_client_heartbeat_client_allows_server_pings(self):
-        self.client.config.can_echo_heartbeat = True
+        self.replace_config(can_echo_heartbeat=True)
         # We sent PEER_ALLOWED_TO_SEND
 
         with self.subTest(server_send=False, server_echo=False):
@@ -584,7 +593,7 @@ class TestNegociationClientHeartbeat(TestNegociationClient):
             self.assertTrue(self.client.nconfig.can_send_heartbeat)
 
     def test_negociation_server_heartbeat_client_refuses_server_pings(self):
-        self.client.config.can_echo_heartbeat = False
+        self.replace_config(can_echo_heartbeat=False)
         # We sent PEER_NOT_ALLOWED_TO_SEND
 
         with self.subTest(server_send=False, server_echo=False):

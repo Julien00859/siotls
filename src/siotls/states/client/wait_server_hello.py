@@ -1,3 +1,5 @@
+import dataclasses
+
 from siotls.ciphers import cipher_suite_registry
 from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import ChangeCipherSpec, alerts
@@ -67,6 +69,10 @@ class ClientWaitServerHello(State):
             raise alerts.IllegalParameter(e)
 
         # make sure we select the algorithms selected by the server
+        self.config = dataclasses.replace(self.config,
+            cipher_suites=[self.nconfig.cipher_suite],
+            key_exchanges=[self.nconfig.key_exchange],
+        )
         self.config.cipher_suites = [hello_retry_request.cipher_suite]
         self.config.key_exchanges = [key_share.selected_group]
 

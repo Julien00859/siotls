@@ -131,11 +131,11 @@ class TestCURL(unittest.TestCase):
     def test_curl_keylogfile(self):
         KeyLogFormat = namedtuple("KeyLogFormat", ["label", "client_random", "value"])
 
-        config = TLSConfiguration('server')
+        config = TLSConfiguration('server', log_keys=True)
         proc, client = self.curl()
 
         with self.assertLogs('siotls.keylog', level='INFO') as logs:
-            conn = TLSConnection(config, log_keys=True)
+            conn = TLSConnection(config)
             conn.initiate_connection()
             client_hello = client.recv(16384)
             conn.receive_data(client_hello)
