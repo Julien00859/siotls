@@ -10,7 +10,7 @@ from siotls.iana import (
 )
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(frozen=True)
 class TLSConfiguration:
     side: typing.Literal['client', 'server']
 
@@ -64,6 +64,7 @@ class TLSNegociatedConfiguration:
     max_fragment_length: MLFOctets | None
 
     def __init__(self, cipher_suite):
+        object.__setattr__(self, '_frozen', False)
         self.cipher_suite = cipher_suite
         self.signature_algorithm = None
         self.key_exchange = None
@@ -71,3 +72,12 @@ class TLSNegociatedConfiguration:
         self.can_send_heartbeat = None
         self.can_echo_heartbeat = None
         self.max_fragment_length = None
+
+    def freeze(self):
+        self._frozen = True
+
+    def __setattr__(self, attr, value):
+        if self._frozen:
+            e = f"cannot assign attribute {attr!r}: class frozen"
+            raise TypeError(e)
+        super().__setattr__(attr, value)
