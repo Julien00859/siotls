@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import secrets
 import struct
@@ -26,10 +25,7 @@ def startswith_change_cipher_spec(data):
 
 
 class TLSConnection:
-    def __init__(self, config, **config_changes):
-        config = dataclasses.replace(config, **config_changes)
-        config.validate()
-
+    def __init__(self, config):
         self.config = config
         self.nconfig = None
         self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
