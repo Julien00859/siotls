@@ -10,7 +10,9 @@ class State:
         return object.__getattribute__(self, name)
 
     def __setattr__(self, name, value):
-        return setattr(self.connection, name, value)
+        if hasattr(self.connection, name):
+            setattr(self.connection, name, value)
+        super().__setattr__(name, value)
 
     def initiate_connection(self):
         e = "cannot initiate connection in this state"

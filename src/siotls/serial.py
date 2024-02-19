@@ -152,7 +152,7 @@ class SerialIO(io.BytesIO):
 
         self._limits.append(new_limit)
 
-        yield
+        yield new_limit
 
         if self._limits.pop() != new_limit:  # pragma: no cover
             e = "another limit was pop"

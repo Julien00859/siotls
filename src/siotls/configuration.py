@@ -1,6 +1,12 @@
 import dataclasses
 import typing
 
+from cryptography.hazmat.primitives.asymmetric.types import (
+    PrivateKeyTypes,
+    PublicKeyTypes,
+)
+from cryptography.x509 import Certificate
+
 from siotls.iana import (
     ALPNProtocol,
     CipherSuites,
@@ -33,6 +39,11 @@ class TLSConfiguration:
             NamedGroup.secp256r1,
         ].copy)
 
+    # mandatory server-side, optional client-side
+    private_key: PrivateKeyTypes | None = None
+    public_key: PublicKeyTypes | None = None
+    certificate_chain: list[Certificate] | None = None
+
     # extensions
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384
     can_echo_heartbeat: bool = True
@@ -47,9 +58,23 @@ class TLSConfiguration:
         return 'server' if self.side == 'client' else 'client'
 
     def validate(self):
+        if self.public_key and self.certificate_chain:
+            e =("the certificate chain and public key (RFC-7250) "
+                "are mutually exclusives")
+            raise ValueError(e)
+
         if self.side == 'server':
             if self.max_fragment_length != MLFOctets.MAX_16384:
                 e = "max fragment length is only configurable client side"
+                raise ValueError(e)
+
+            if not self.private_key:
+                e = "the private key is mandatory server side"
+                raise ValueError(e)
+
+            if not (self.public_key or self.certificate_chain):
+                e =("the certificate chain (or public key for RFC-7250)"
+                    " is mandatory server side")
                 raise ValueError(e)
 
 
