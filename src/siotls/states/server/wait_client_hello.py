@@ -1,3 +1,5 @@
+import dataclasses
+
 from siotls.ciphers import cipher_suite_registry
 from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import ChangeCipherSpec, alerts
@@ -99,8 +101,10 @@ class ServerWaitClientHello(State):
 
     def _send_hello_retry_request(self, client_hello, clear_extensions):
         # make sure the client doesn't change its algorithms in between flights
-        self.config.cipher_suites = [self.nconfig.cipher_suite]
-        self.config.key_exchanges = [self.nconfig.key_exchange]
+        self.config = dataclasses.replace(self.config,
+            cipher_suites=[self.nconfig.cipher_suite],
+            key_exchanges=[self.nconfig.key_exchange],
+        )
 
         self._send_content(HelloRetryRequest(
             HelloRetryRequest.random,
