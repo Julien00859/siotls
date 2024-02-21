@@ -1,14 +1,16 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT
+
+from siotls.iana import ExtensionType, HandshakeType
 from siotls.serial import SerializableBody
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class Padding(Extension, SerializableBody):
     extension_type = ExtensionType.PADDING
-    _handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = (HandshakeType.CLIENT_HELLO,)
 
     _struct = textwrap.dedent("""
         struct {

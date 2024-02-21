@@ -2,7 +2,6 @@ import abc
 import contextlib
 import io
 import logging
-from .utils import hexdump
 
 logger = logging.getLogger(__name__)
 
@@ -11,11 +10,11 @@ class SerializationError(ValueError):
     pass
 
 
-class MissingData(SerializationError):
+class MissingDataError(SerializationError):
     pass
 
 
-class TooMuchData(SerializationError):
+class TooMuchDataError(SerializationError):
     pass
 
 
@@ -23,24 +22,24 @@ class Serializable(metaclass=abc.ABCMeta):
     _struct: str
 
     @abc.abstractclassmethod
-    def parse(cls, stream):
-        raise NotImplementedError("abstract method")
+    def parse(cls, stream):  # pragma: no cover
+        pass
 
     @abc.abstractmethod
-    def serialize(self):
-        raise NotImplementedError("abstract method")
+    def serialize(self):  # pragma: no cover
+        pass
 
 
 class SerializableBody(metaclass=abc.ABCMeta):
     _struct: str
 
     @abc.abstractclassmethod
-    def parse_body(cls, stream):
-        raise NotImplementedError("abstract method")
+    def parse_body(cls, stream):  # pragma: no cover
+        pass
 
     @abc.abstractmethod
-    def serialize_body(self):
-        raise NotImplementedError("abstract method")
+    def serialize_body(self):  # pragma: no cover
+        pass
 
 
 class SerialIO(io.BytesIO):
@@ -54,8 +53,8 @@ class SerialIO(io.BytesIO):
             if len(self._limits) > 1:
                 n = max_n
         elif n > max_n:
-            e = f"Expected {n} bytes but can only read {max_n}."
-            raise TooMuchData(e)
+            e = f"expected {n} bytes but can only read {max_n}"
+            raise TooMuchDataError(e)
         return super().read(n)
 
     def read_exactly(self, n):
@@ -63,12 +62,15 @@ class SerialIO(io.BytesIO):
         while len(data) != n:
             read = self.read(n - len(data))
             if not read:
-                e = f"Expected {n} bytes but could only read {len(data)}."
-                raise MissingData(e)
+                e = f"expected {n} bytes but could only read {len(data)}"
+                raise MissingDataError(e)
             data += read
         return data
 
     def read_int(self, n):
+        if not n:
+            e = "cannot read a integer of 0 bytes"
+            raise ValueError(e)
         return int.from_bytes(self.read_exactly(n), 'big')
 
     def write_int(self, n, i):
@@ -85,17 +87,17 @@ class SerialIO(io.BytesIO):
     def read_listint(self, nlist, nitem):
         length = self.read_int(nlist)
         if length % nitem != 0:
-            e =(f"Cannot read {length // nitem + 1} uint{nitem * 8}_t out of "
-                f"{length} bytes.")
+            e =(f"cannot read {length // nitem + 1} uint{nitem * 8}_t out of "
+                f"{length} bytes")
             raise SerializationError(e)
 
         it = iter(self.read_exactly(length))
         return [
             int.from_bytes(bytes(group), 'big')
-            for group in zip(*([it] * nitem))
+            for group in zip(*([it] * nitem), strict=True)
         ]
 
-    def write_listin(self, nlist, nitem, items):
+    def write_listint(self, nlist, nitem, items):
         self.write_int(nlist, len(items) * nitem)
         for item in items:
             self.write_int(nitem, item)
@@ -138,24 +140,26 @@ class SerialIO(io.BytesIO):
         eof_pos = self.seek(0, 2)
         if remaining := eof_pos - current_pos:
             self.seek(current_pos, 0)
-            e = f"Expected end of stream but {remaining} bytes remain."
-            raise TooMuchData(e)
+            e = f"expected end of stream but {remaining} bytes remain"
+            raise TooMuchDataError(e)
 
     @contextlib.contextmanager
     def limit(self, length):
         new_limit = self.tell() + length
         if new_limit > self._limits[-1]:
-            e = "An more restrictive limit is present already"
+            e = "a more restrictive limit is present already"
             raise ValueError(e)
 
         self._limits.append(new_limit)
-        try:
-            yield
-        except:
-            raise
-        else:
-            assert self._limits.pop() == new_limit, "another limit was pop"
-            assert self._limits, "+inf was pop"
-            if (remaining := new_limit - self.tell()):
-                e = f"Expected end of chunk but {remaining} bytes remain."
-                raise TooMuchData(e)
+
+        yield new_limit
+
+        if self._limits.pop() != new_limit:  # pragma: no cover
+            e = "another limit was pop"
+            raise RuntimeError(e)
+        if not self._limits:  # pragma: no cover
+            e = "+inf was pop"
+            raise RuntimeError(e)
+        if (remaining := new_limit - self.tell()):
+            e = f"expected end of chunk but {remaining} bytes remain"
+            raise TooMuchDataError(e)

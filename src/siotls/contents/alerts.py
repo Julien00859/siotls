@@ -1,14 +1,16 @@
 import dataclasses
 import textwrap
-from siotls.iana import AlertLevel, AlertDescription, ContentType
-from siotls.serial import SerialIO, Serializable
-from . import Content
+import typing
 
+from siotls.iana import AlertDescription, AlertLevel, ContentType
+from siotls.serial import Serializable
+
+from . import Content
 
 _alert_registry = {}
 
 @dataclasses.dataclass(init=False)
-class Alert(Exception, Content, Serializable):
+class Alert(Exception, Content, Serializable):  # noqa: N818
     content_type = ContentType.ALERT
     can_fragment = False
 
@@ -48,11 +50,12 @@ class Alert(Exception, Content, Serializable):
             };
         } Alert;
     """).strip('\n')
+    args: tuple[typing.Any]
     level: AlertLevel
     description: AlertDescription | int
 
-    def __init__(self, message='', level=None):
-        super().__init__(message)
+    def __init__(self, *args, level=None):
+        super().__init__(*args)
         self.level = level or type(self).level
 
     def __init_subclass__(cls, **kwargs):
@@ -65,7 +68,7 @@ class Alert(Exception, Content, Serializable):
         try:
             level = AlertLevel(stream.read_int(1))
         except ValueError as exc:
-            raise IllegalParameter() from exc
+            raise IllegalParameter from exc
         description = stream.read_int(1)
 
         try:
@@ -277,7 +280,7 @@ class UserCanceled(Alert):
     description = AlertDescription.USER_CANCELED
 
 
-class MissingExtension(Alert):
+class MissingExtension(KeyError, Alert):  # noqa: N818
     """
     Sent by endpoints that receive a handshake message not containing an
     extension that is mandatory to send for the offered TLS version or

@@ -1,28 +1,32 @@
-from siotls.iana import (
-    ContentType,
-    HandshakeType,
-    HeartbeatMode,
-    ExtensionType,
-    TLSVersion,
-)
+import dataclasses
+
+from siotls.ciphers import cipher_suite_registry
 from siotls.configuration import TLSNegociatedConfiguration
-from siotls.contents import alerts, ChangeCipherSpec
+from siotls.contents import ChangeCipherSpec, alerts
 from siotls.contents.handshakes import (
-    HelloRetryRequest,
-    ServerHello,
-    EncryptedExtensions,
     Certificate,
     CertificateVerify,
+    EncryptedExtensions,
     Finished,
+    HelloRetryRequest,
+    ServerHello,
 )
 from siotls.contents.handshakes.extensions import (
-    SupportedVersionsResponse,
-    KeyShareResponse, KeyShareRetry,
+    ALPN,
     Heartbeat,
-    ApplicationLayerProtocolNegotiation as ALPN,
+    KeyShareResponse,
+    KeyShareRetry,
+    SupportedVersionsResponse,
 )
 from siotls.crypto.key_share import resume as key_share_resume
-from siotls.ciphers import cipher_suite_registry
+from siotls.iana import (
+    ContentType,
+    ExtensionType,
+    HandshakeType,
+    HeartbeatMode,
+    TLSVersion,
+)
+
 from .. import State
 from . import ServerWaitFlight2
 
@@ -36,29 +40,30 @@ class ServerWaitClientHello(State):
 
     def process(self, client_hello):
         if client_hello.content_type != ContentType.HANDSHAKE:
-            e = "Can only receive Handshake in this state."
+            e = "can only receive Handshake in this state"
             raise alerts.UnexpectedMessage(e)
         if client_hello.msg_type != HandshakeType.CLIENT_HELLO:
-            e = "Can only receive ClientHello in this state."
+            e = "can only receive ClientHello in this state"
             raise alerts.UnexpectedMessage(e)
 
         if self._is_first_client_hello:
-            cipher_suite = self._find_common_cipher_suite(client_hello)
+            cipher_suite = self._find_common_cipher_suite(client_hello.cipher_suites)
             self.nconfig = TLSNegociatedConfiguration(cipher_suite)
             self._client_unique = client_hello.random
             self._cipher = cipher_suite_registry[cipher_suite](
-                'server', self.config.log_keys, self._client_unique)
+                'server', self._client_unique, log_keys=self.config.log_keys)
             self._transcript.post_init(self._cipher.digestmod)
         else:
             if cipher_suite != self.nconfig.cipher_suite:
-                e = "Client's cipher suite cannot change in between Hellos"
+                e = "client's cipher suite cannot change in between Hellos"
                 raise alerts.IllegalParameter(e)
             if client_hello.random != self._client_unique:
-                e = "Client's random cannot change in between Hellos"
+                e = "client's random cannot change in between Hellos"
                 raise alerts.IllegalParameter(e)
 
         clear_extensions, encrypted_extensions, shared_key = (
             self._negociate_extensions(client_hello.extensions))
+        self.nconfig.freeze()
 
         if not shared_key:
             if not self._is_first_client_hello:
@@ -88,22 +93,24 @@ class ServerWaitClientHello(State):
         self._send_content(Finished(...))
         self._move_to_state(ServerWaitFlight2)
 
-    def _find_common_cipher_suite(self, client_hello):
+    def _find_common_cipher_suite(self, cipher_suites):
         for cipher_suite in self.config.cipher_suites:
-            if cipher_suite in client_hello.cipher_suites:
+            if cipher_suite in cipher_suites:
                 return cipher_suite
         e = "no common cipher suite found"
         raise alerts.HandshakeFailure(e)
 
     def _send_hello_retry_request(self, client_hello, clear_extensions):
         # make sure the client doesn't change its algorithms in between flights
-        self.config.cipher_suites = [self.nconfig.cipher_suite]
-        self.config.key_exchanges = [self.nconfig.key_exchange]
+        self.config = dataclasses.replace(self.config,
+            cipher_suites=[self.nconfig.cipher_suite],
+            key_exchanges=[self.nconfig.key_exchange],
+        )
 
         self._send_content(HelloRetryRequest(
             HelloRetryRequest.random,
             client_hello.legacy_session_id,
-            nconfig.cipher_suite,
+            self.nconfig.cipher_suite,
             clear_extensions,
         ))
         self._transcript.do_hrr_dance()
@@ -138,9 +145,11 @@ class ServerWaitClientHello(State):
 
     def _negociate_supported_versions(self, supported_versions_ext):
         if not supported_versions_ext:
-            raise MissingExtension(ExtensionType.SUPPORTED_VERSIONS)
+            e = "client doesn't support TLS 1.3"
+            raise alerts.ProtocolVersion(e)
         if TLSVersion.TLS_1_3 not in supported_versions_ext.versions:
-            raise NotImplementedError("todo")  # unclear spec
+            e = "client doesn't support TLS 1.3"
+            raise alerts.ProtocolVersion(e)
         return [SupportedVersionsResponse(TLSVersion.TLS_1_3)], []
 
     def _negociate_supported_groups(self, supported_groups_ext):
@@ -168,8 +177,12 @@ class ServerWaitClientHello(State):
         if key_share_ext and key_exchange in key_share_ext.client_shares:
             # possible to resume key share => ServerHello
             peer_exchange = key_share_ext.client_shares[key_exchange]
-            shared_key, my_exchange = key_share_resume(
-                key_exchange, None, peer_exchange)
+            try:
+                shared_key, my_exchange = key_share_resume(
+                    key_exchange, None, peer_exchange)
+            except ValueError as exc:
+                e = "error while resuming key share"
+                raise alerts.HandshakeFailure(e) from exc
             response = KeyShareResponse(key_exchange, my_exchange)
         else:
             # impossible to resume key share => HelloRetryRequest
@@ -197,20 +210,18 @@ class ServerWaitClientHello(State):
         raise alerts.NoApplicationProtocol(e)
 
     def _negociate_heartbeat(self, client_hb):
-        server_hb = self.config.can_send_heartbeat or self.config.can_echo_heartbeat
-        if client_hb and server_hb:
-            self.nconfig.can_send_heartbeat = (
-                self.config.can_send_heartbeat and
-                client_hb.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
-            )
-            self.nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat
-            response = Heartbeat(
-                HeartbeatMode.PEER_ALLOWED_TO_SEND
-                if self.config.can_echo_heartbeat else
-                HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND
-            )
-            return [], [response]
+        if not client_hb:
+            self.nconfig.can_send_heartbeat = False
+            self.nconfig.can_echo_heartbeat = False
+            return [], []
 
-        self.nconfig.can_send_heartbeat = False
-        self.nconfig.can_echo_heartbeat = False
-        return [], []
+        self.nconfig.can_send_heartbeat = (
+            client_hb.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
+        )
+        self.nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat
+        response = Heartbeat(
+            HeartbeatMode.PEER_ALLOWED_TO_SEND
+            if self.config.can_echo_heartbeat else
+            HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND
+        )
+        return [], [response]

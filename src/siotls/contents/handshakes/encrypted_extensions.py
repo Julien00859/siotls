@@ -1,8 +1,10 @@
 import dataclasses
 import logging
 import textwrap
-from siotls.iana import HandshakeType, ExtensionType
+
+from siotls.iana import ExtensionType, HandshakeType
 from siotls.serial import SerialIO, SerializableBody
+
 from . import Handshake
 from .extensions import Extension
 
@@ -12,7 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclasses.dataclass(init=False)
 class EncryptedExtensions(Handshake, SerializableBody):
     msg_type = HandshakeType.ENCRYPTED_EXTENSIONS
-    ...
+
     _struct = textwrap.dedent("""
         struct {
             Extension extensions<0..2^16-1>;
@@ -35,7 +37,7 @@ class EncryptedExtensions(Handshake, SerializableBody):
         return cls(extensions)
 
     def serialize_body(self):
-        extensions = b''.join((ext.serialize() for ext in self.extensions.values()))
+        extensions = b''.join(ext.serialize() for ext in self.extensions.values())
         return b''.join([
             len(extensions).to_bytes(2, 'big'),
             extensions,

@@ -5,18 +5,14 @@ import struct
 import types
 
 from siotls import key_logger
-from siotls.iana import (
-    AlertLevel,
-    ContentType,
-    TLSVersion,
-)
-from siotls.serial import SerializationError, TooMuchData, SerialIO
-from .contents import Content, ApplicationData, alerts, Handshake
+from siotls.ciphers import cipher_suite_registry
+from siotls.iana import AlertLevel, ContentType, TLSVersion
+from siotls.serial import SerialIO, SerializationError, TooMuchDataError
+
+from .contents import ApplicationData, Content, Handshake, alerts
 from .states import ClientStart, ServerStart
 from .transcript import Transcript
 from .utils import try_cast
-from siotls.ciphers import cipher_suite_registry
-
 
 logger = logging.getLogger(__name__)
 cipher_plaintext = types.SimpleNamespace(
@@ -63,10 +59,10 @@ class TLSConnection:
 
     def initiate_connection(self):
         if self.config.log_keys:
-            is_key_logger_enabled = any((
+            is_key_logger_enabled = any(
                 not isinstance(handler, logging.NullHandler)
                 for handler in key_logger.handlers
-            ))
+            )
             if is_key_logger_enabled:
                 logger.info("Key log enabled for current connection.")
             else:
@@ -75,7 +71,7 @@ class TLSConnection:
                     "logging.Handler seems setup on the %r logger. You must "
                     "setup one.\nlogging.getLogger(%r).addHandler(logging."
                     "FileHandler(path_to_keylogfile, %r))",
-                    self, key_logger.name, key_logger.name, "w")
+                    key_logger.name, key_logger.name, "w")
 
         self.state.initiate_connection()
 
@@ -93,7 +89,7 @@ class TLSConnection:
                     content = Content.get_parser(content_type).parse(stream)
                     stream.assert_eof()
                 except SerializationError as exc:
-                    raise alerts.DecodeError() from exc
+                    raise alerts.DecodeError from exc
                 logger.info("received %s", type(content).__name__)
                 match content:
                     case alerts.Alert(level=AlertLevel.WARNING):
@@ -134,7 +130,7 @@ class TLSConnection:
         return output
 
     def rekey(self):
-        raise NotImplementedError("todo")
+        raise NotImplementedError
 
     # ------------------------------------------------------------------
     # Internal APIs
@@ -153,8 +149,8 @@ class TLSConnection:
         while startswith_change_cipher_spec(self._input_data):
             self._input_data = self._input_data[6:]
 
-        if len(self._input_data) < 5:
-            return
+        if len(self._input_data) < 5:  # noqa: PLR2004
+            return None
 
         content_type, _legacy_version, content_length = \
             struct.unpack('!BHH', self._input_data[:5])
@@ -163,12 +159,12 @@ class TLSConnection:
         if self._cipher.must_decrypt:
             max_fragment_length += 256
         if content_length > max_fragment_length:
-            e =(f"The record is longer ({content_length} bytes) than "
-                f"the allowed maximum ({max_fragment_length} bytes).")
+            e =(f"the record is longer ({content_length} bytes) than "
+                f"the allowed maximum ({max_fragment_length} bytes)")
             raise alerts.RecordOverFlow(e)
 
         if len(self._input_data) - 5 < content_length:
-            return
+            return None
 
         header = self._input_data[:5]
         fragment = self._input_data[5:content_length + 5]
@@ -198,7 +194,7 @@ class TLSConnection:
 
         record = self._read_next_record()
         if not record:
-            return
+            return None
 
         content_type, fragment = record
         if not self._input_handshake:
@@ -207,29 +203,29 @@ class TLSConnection:
             else:
                 self._input_handshake = fragment
         elif content_type != ContentType.HANDSHAKE:
-            e =(f"Expected {ContentType.HANDSHAKE} continuation record "
-                f"but {content_type} found.")
+            e =(f"expected {ContentType.HANDSHAKE} continuation record "
+                f"but {content_type} found")
             raise alerts.UnexpectedMessage(e)
         else:
             self._input_handshake += fragment
 
-        if len(self._input_handshake) < 4:
-            return
+        if len(self._input_handshake) < 4:  # noqa: PLR2004
+            return None
         handshake_length = int.from_bytes(self._input_handshake[1:4], 'big')
         while len(self._input_handshake) - 4 < handshake_length:
             record = self._read_next_record()
             if not record:
-                return
+                return None
             content_type, fragment = record
             if content_type != ContentType.HANDSHAKE:
-                e =(f"Expected {ContentType.HANDSHAKE} continuation record "
-                    f"but {content_type} found.")
+                e =(f"expected {ContentType.HANDSHAKE} continuation record "
+                    f"but {content_type} found")
                 raise alerts.UnexpectedMessage(e)
             self._input_handshake += fragment
         if len(self._input_handshake) - 4 > handshake_length:
-            e = (f"Expected {handshake_length + 4} bytes but "
-                 f"{len(self._input_handshake)} read.")
-            raise TooMuchData(e)
+            e = (f"expected {handshake_length + 4} bytes but "
+                 f"{len(self._input_handshake)} read")
+            raise TooMuchDataError(e)
 
         content_data = self._input_handshake
         self._input_handshake = bytearray()
@@ -255,9 +251,9 @@ class TLSConnection:
                 for i in range(0, len(data), fragment_length)
             )
         else:
-            e =(f"Serialized {content} ({len(data)} bytes) doesn't fit "
+            e =(f"serialized {content} ({len(data)} bytes) doesn't fit "
                 f"inside a single record (max {fragment_length} bytes) "
-                " and cannot be fragmented over multiple ones.")
+                " and cannot be fragmented over multiple ones")
             raise ValueError(e)
 
         if self._cipher.must_encrypt:
@@ -298,6 +294,6 @@ class TLSConnection:
             encrypted_fragment = self._cipher.encrypt(data, header)
 
             assert len(encrypted_fragment) == len(data) + self._cipher.tag_length, \
-                (len(encrypted_fragment), len(data), self._cipher.tag_length)
+                (len(encrypted_fragment), len(data), self._cipher.tag_length)  # noqa: S101
 
             yield encrypted_fragment

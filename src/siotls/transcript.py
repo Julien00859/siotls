@@ -46,9 +46,8 @@ stateless HelloRetryRequest but we still have to implement the hack
 otherwise the transcript wouldn't be right.
 """
 
-from siotls.iana import HandshakeType
 from siotls.contents import alerts
-
+from siotls.iana import HandshakeType
 
 ORDER = [
     ('client', HandshakeType.CLIENT_HELLO),
@@ -83,8 +82,9 @@ class Transcript:
         self._hashes.append(hash_)
 
     def do_hrr_dance(self):
-        assert self._order_i == 2, \
-            "can only dance after receiving/sending HelloRetryRequest"
+        if self._order_i != 2:  # noqa: PLR2004
+            e = "can only dance after receiving/sending HelloRetryRequest"
+            raise RuntimeError(e)
         self._hashes[0] = type(self._hashes[0])(b''.join([
             HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
             b'\x00\x00',
@@ -96,8 +96,8 @@ class Transcript:
         if self._order_i == len(ORDER):
             return
         if (side, handshake_type) != ORDER[self._order_i]:
-            e =(f"Was expecting {ORDER[self._order_i]} but found "
-                f"{(side, handshake_type)} instead.")
+            e =(f"was expecting {ORDER[self._order_i]} but found "
+                f"{(side, handshake_type)} instead")
             raise alerts.UnexpectedMessage(e)
         for hash_ in self._hashes:
             hash_.update(handshake_data)

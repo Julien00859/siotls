@@ -1,15 +1,22 @@
 import dataclasses
 import typing
+
+from cryptography.hazmat.primitives.asymmetric.types import (
+    PrivateKeyTypes,
+    PublicKeyTypes,
+)
+from cryptography.x509 import Certificate
+
 from siotls.iana import (
-    CipherSuites,
-    SignatureScheme,
-    NamedGroup,
     ALPNProtocol,
+    CipherSuites,
     MaxFragmentLengthOctets as MLFOctets,
+    NamedGroup,
+    SignatureScheme,
 )
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(frozen=True)
 class TLSConfiguration:
     side: typing.Literal['client', 'server']
 
@@ -32,9 +39,13 @@ class TLSConfiguration:
             NamedGroup.secp256r1,
         ].copy)
 
+    # mandatory server-side, optional client-side
+    private_key: PrivateKeyTypes | None = None
+    public_key: PublicKeyTypes | None = None
+    certificate_chain: list[Certificate] | None = None
+
     # extensions
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384
-    can_send_heartbeat: bool = False
     can_echo_heartbeat: bool = True
     alpn: list[ALPNProtocol] = dataclasses.field(default_factory=list)
     hostnames: list[str] = dataclasses.field(default_factory=list)
@@ -47,9 +58,23 @@ class TLSConfiguration:
         return 'server' if self.side == 'client' else 'client'
 
     def validate(self):
+        if self.public_key and self.certificate_chain:
+            e =("the certificate chain and public key (RFC-7250) "
+                "are mutually exclusives")
+            raise ValueError(e)
+
         if self.side == 'server':
             if self.max_fragment_length != MLFOctets.MAX_16384:
                 e = "max fragment length is only configurable client side"
+                raise ValueError(e)
+
+            if not self.private_key:
+                e = "the private key is mandatory server side"
+                raise ValueError(e)
+
+            if not (self.public_key or self.certificate_chain):
+                e =("the certificate chain (or public key for RFC-7250)"
+                    " is mandatory server side")
                 raise ValueError(e)
 
 
@@ -64,6 +89,7 @@ class TLSNegociatedConfiguration:
     max_fragment_length: MLFOctets | None
 
     def __init__(self, cipher_suite):
+        object.__setattr__(self, '_frozen', False)
         self.cipher_suite = cipher_suite
         self.signature_algorithm = None
         self.key_exchange = None
@@ -71,3 +97,12 @@ class TLSNegociatedConfiguration:
         self.can_send_heartbeat = None
         self.can_echo_heartbeat = None
         self.max_fragment_length = None
+
+    def freeze(self):
+        self._frozen = True
+
+    def __setattr__(self, attr, value):
+        if self._frozen:
+            e = f"cannot assign attribute {attr!r}: class frozen"
+            raise TypeError(e)
+        super().__setattr__(attr, value)

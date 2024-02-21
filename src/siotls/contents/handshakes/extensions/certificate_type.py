@@ -1,15 +1,17 @@
 import dataclasses
 import textwrap
-from siotls.iana import ExtensionType, HandshakeType as HT, CertificateType
+
+from siotls.contents import alerts
+from siotls.iana import CertificateType, ExtensionType, HandshakeType
 from siotls.serial import SerializableBody, SerializationError
 from siotls.utils import try_cast
-from ... import alerts
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class _CertificateTypeRequest(SerializableBody):
-    _handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = (HandshakeType.CLIENT_HELLO,)
     certificate_types: list[CertificateType | int]
     _struct = ""  # mute the warning
 
@@ -32,7 +34,7 @@ class _CertificateTypeRequest(SerializableBody):
 
 @dataclasses.dataclass(init=False)
 class _CertificateTypeResponse(SerializableBody):
-    _handshake_types = {HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = (HandshakeType.ENCRYPTED_EXTENSIONS,)
     certificate_type: CertificateType
     _struct = ""  # mute the warning
 
@@ -46,7 +48,7 @@ class _CertificateTypeResponse(SerializableBody):
         except SerializationError:
             raise
         except ValueError as exc:
-            raise alerts.IllegalParameter() from exc
+            raise alerts.IllegalParameter from exc
         return cls(certificate_type)
 
     @classmethod

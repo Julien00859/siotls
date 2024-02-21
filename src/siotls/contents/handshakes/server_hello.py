@@ -1,12 +1,18 @@
 import dataclasses
 import logging
 import textwrap
+
+from siotls.contents import alerts
 from siotls.iana import (
-    CipherSuites, HandshakeType, HandshakeType_, ExtensionType, TLSVersion
+    CipherSuites,
+    ExtensionType,
+    HandshakeType,
+    HandshakeType_,
+    TLSVersion,
 )
 from siotls.serial import SerialIO, SerializableBody
 from siotls.utils import try_cast
-from .. import alerts
+
 from . import Handshake
 from .extensions import Extension
 
@@ -51,7 +57,7 @@ class ServerHello(Handshake, SerializableBody):
     def parse_body(cls, stream):
         legacy_version = stream.read_int(2)
         if legacy_version != TLSVersion.TLS_1_2:
-            e = f"Expected {TLSVersion.TLS_1_2} but {legacy_version} found"
+            e = f"expected {TLSVersion.TLS_1_2} but {legacy_version} found"
             raise alerts.ProtocolVersion(e)
         legacy_version = TLSVersion(legacy_version)
 
@@ -65,7 +71,7 @@ class ServerHello(Handshake, SerializableBody):
 
         legacy_compression_methods = stream.read_int(1)
         if legacy_compression_methods != 0:  # "null" compression method
-            e = "Only the NULL compression method is supported in TLS 1.3"
+            e = "only the NULL compression method is supported in TLS 1.3"
             raise alerts.IllegalParameter(e)
 
         extensions = []
@@ -77,7 +83,7 @@ class ServerHello(Handshake, SerializableBody):
         return cls(random, legacy_session_id_echo, cipher_suite, extensions)
 
     def serialize_body(self):
-        extensions = b''.join((ext.serialize() for ext in self.extensions.values()))
+        extensions = b''.join(ext.serialize() for ext in self.extensions.values())
 
         return b''.join([
             self.legacy_version.to_bytes(2, 'big'),

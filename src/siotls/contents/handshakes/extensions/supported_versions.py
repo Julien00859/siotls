@@ -1,21 +1,23 @@
 import dataclasses
 import textwrap
+
+from siotls.contents import alerts
 from siotls.iana import (
     ExtensionType,
-    HandshakeType as HT,
-    HandshakeType_ as HT_,
+    HandshakeType,
+    HandshakeType_,
     TLSVersion,
 )
 from siotls.serial import SerializableBody, SerializationError
 from siotls.utils import try_cast
-from ... import alerts
+
 from . import Extension
 
 
 @dataclasses.dataclass(init=False)
 class SupportedVersionsRequest(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_VERSIONS
-    _handshake_types = {HT.CLIENT_HELLO}
+    _handshake_types = (HandshakeType.CLIENT_HELLO,)
 
     _struct = textwrap.dedent("""\
         struct {
@@ -45,7 +47,10 @@ class SupportedVersionsRequest(Extension, SerializableBody):
 @dataclasses.dataclass(init=False)
 class SupportedVersionsResponse(Extension, SerializableBody):
     extension_type = ExtensionType.SUPPORTED_VERSIONS
-    _handshake_types = [HT.SERVER_HELLO, HT_.HELLO_RETRY_REQUEST]
+    _handshake_types = (
+        HandshakeType.SERVER_HELLO,
+        HandshakeType_.HELLO_RETRY_REQUEST
+    )
 
     _struct = textwrap.dedent("""\
         struct {
@@ -56,8 +61,8 @@ class SupportedVersionsResponse(Extension, SerializableBody):
 
     def __init__(self, selected_version):
         if selected_version < TLSVersion.TLS_1_3:
-            e =("Versions prior to TLS 1.3 must set the version on the record "
-                "(legacy_version) instead.")
+            e =("versions prior to TLS 1.3 must set the version on the record "
+                "(legacy_version) instead")
             raise ValueError(e)
         self.selected_version = selected_version
 
@@ -68,7 +73,7 @@ class SupportedVersionsResponse(Extension, SerializableBody):
         except SerializationError:
             raise
         except ValueError as exc:
-            raise alerts.IllegalParameter() from exc
+            raise alerts.IllegalParameter from exc
         return cls(selected_version)
 
     def serialize_body(self):

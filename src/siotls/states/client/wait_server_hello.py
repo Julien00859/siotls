@@ -1,15 +1,19 @@
-from siotls.crypto.key_share import resume as key_share_resume
+import dataclasses
+
+from siotls.ciphers import cipher_suite_registry
 from siotls.configuration import TLSNegociatedConfiguration
-from siotls.contents import alerts, ChangeCipherSpec
+from siotls.contents import ChangeCipherSpec, alerts
+from siotls.crypto.key_share import resume as key_share_resume
 from siotls.iana import (
     ContentType,
+    ExtensionType,
     HandshakeType,
     HandshakeType_,
     HeartbeatMode,
-    ExtensionType,
     MaxFragmentLengthOctets,
+    TLSVersion,
 )
-from siotls.ciphers import cipher_suite_registry
+
 from .. import State
 from . import ClientWaitEncryptedExtensions
 
@@ -23,20 +27,20 @@ class ClientWaitServerHello(State):
 
     def process(self, content):
         if content.content_type != ContentType.HANDSHAKE:
-            e = "Can only receive Handshake in this state."
+            e = "can only receive Handshake in this state"
             raise alerts.UnexpectedMessage(e)
         if self._is_first_server_hello:
             if content.msg_type != HandshakeType.SERVER_HELLO:
-                e =("Can only receive ServerHello or HelloRetryRequest "
-                    "in this state.")
+                e =("can only receive ServerHello or HelloRetryRequest "
+                    "in this state")
                 raise alerts.UnexpectedMessage(e)
         else:
             if content.msg_type is not HandshakeType.SERVER_HELLO:
-                e = "Can only receive ServerHello in this state."
+                e = "can only receive ServerHello in this state"
                 raise alerts.UnexpectedMessage(e)
 
         if content.cipher_suite not in self.config.cipher_suites:
-            e =(f"The server's selected {content.cipher_suite} wasn't offered "
+            e =(f"the server's selected {content.cipher_suite} wasn't offered "
                 f"in ClientHello: {self.config.cipher_suites}")
             raise alerts.IllegalParameter(e)
 
@@ -57,14 +61,18 @@ class ClientWaitServerHello(State):
 
         key_share = hello_retry_request.extensions.get(ExtensionType.KEY_SHARE)
         if not key_share:
-            e = "Missing Key Share in HelloRetryRequest"
+            e = "missing Key Share in HelloRetryRequest"
             raise alerts.MissingExtension(e)
         if key_share.selected_group not in self.config.key_exchanges:
-            e =(f"The server's selected {key_share.selected_group} wasn't "
+            e =(f"the server's selected {key_share.selected_group} wasn't "
                 f"offered in ClientHello: {self.config.key_exchanges}")
             raise alerts.IllegalParameter(e)
 
         # make sure we select the algorithms selected by the server
+        self.config = dataclasses.replace(self.config,
+            cipher_suites=[self.nconfig.cipher_suite],
+            key_exchanges=[self.nconfig.key_exchange],
+        )
         self.config.cipher_suites = [hello_retry_request.cipher_suite]
         self.config.key_exchanges = [key_share.selected_group]
 
@@ -90,56 +98,64 @@ class ClientWaitServerHello(State):
             meth = getattr(self, f'_negociate_{ext_name}')
             return meth(ext, *args, **kwargs)
 
+        negociate('supported_versions')
         shared_key = negociate('key_share', self._key_shares)
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')
         negociate('heartbeat')
         return shared_key
 
+    def _negociate_supported_versions(self, supported_versions_ext):
+        if not supported_versions_ext:
+            e = "the server doesn't support TLS 1.3"
+            raise alerts.ProtocolVersion(e)
+        if supported_versions_ext.selected_version != TLSVersion.TLS_1_3:
+            e = "the server-selected supported version wasn't offered"
+            raise alerts.ProtocolVersion(e)
+
     def _negociate_key_share(self, key_share_ext, my_private_keys):
         if not key_share_ext:
             raise alerts.MissingExtension(ExtensionType.KEY_SHARE)
         elif key_share_ext.group not in my_private_keys:
-            e =(f"The server's selected {key_share_ext.selected_group} was "
-                f"not offered in ClientHello: {self.config.key_exchanges}")
+            e = "the server-selected key exchange wasn't offered"
             raise alerts.IllegalParameter(e)
         else:
-            shared_key, _ = key_share_resume(
-                key_share_ext.group,
-                my_private_keys[key_share_ext.group],
-                key_share_ext.client_shares[key_share_ext.group],
-            )
+            try:
+                shared_key, _ = key_share_resume(
+                    key_share_ext.group,
+                    my_private_keys[key_share_ext.group],
+                    key_share_ext.key_exchange,
+                )
+            except ValueError as exc:
+                e = "error while resuming key share"
+                raise alerts.IllegalParameter(e) from exc
             self.nconfig.key_exchanges = key_share_ext.group
             return shared_key
 
     def _negociate_max_fragment_length(self, mfl_ext):
         if not mfl_ext:
-            return MaxFragmentLengthOctets.MAX_16384
+            self.nconfig.max_fragment_length = MaxFragmentLengthOctets.MAX_16384
         elif mfl_ext.octets != self.config.max_fragment_length:
-            try:
-                code = self.config.max_fragment_length.to_code()
-            except ValueError:
-                code = None
-            e =(f"The server's selected {mfl_ext.code} "
-                f"wasn't offered in ClientHello: {code}")
+            e = "the server-selected max fragment length wasn't offered"
             raise alerts.IllegalParameter(e)
         else:
             self.nconfig.max_fragment_length = mfl_ext.octets
 
     def _negociate_application_layer_protocol_negotiation(self, alpn_ext):
         if not alpn_ext:
-            return None
-        elif length := len(alpn_ext.protocol_name_list) != 1:
-            e =("Invalid Application Layer Protocol Negociation (ALPN) "
-                f"response. Expected 1 protocol, {length} found.")
+            self.nconfig.alpn = None
+            return
+        elif (length := len(alpn_ext.protocol_name_list)) != 1:
+            e =(f"the server selected {length} application layer"
+                " protocols (ALPN) instead of 1")
             raise alerts.IllegalParameter(e)
         elif alpn_ext.protocol_name_list[0] not in self.config.alpn:
-            e =("The server's selected Application Layer Protocol (ALPN) "
-                f"{alpn_ext.protocol_name_list[0]!r} wasn't offered in "
-                f"ClientHello: {self.config.alpn}")
+            e =("the server-selected application layer protocol (ALPN) "
+                "wasn't offered")
             raise alerts.IllegalParameter(e)
         else:
             self.nconfig.alpn = alpn_ext.protocol_name_list[0]
+    _negociate_alpn = _negociate_application_layer_protocol_negotiation
 
     def _negociate_heartbeat(self, heartbeat_ext):
         if not heartbeat_ext:
@@ -147,7 +163,6 @@ class ClientWaitServerHello(State):
             self.nconfig.can_echo_heartbeat = False
         else:
             self.nconfig.can_send_heartbeat = (
-                self.config.can_send_heartbeat and
                 heartbeat_ext.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
             )
             self.nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat

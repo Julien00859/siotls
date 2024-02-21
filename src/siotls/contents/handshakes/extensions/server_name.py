@@ -1,13 +1,15 @@
-import dataclasses
 import contextlib
+import dataclasses
 import logging
 import textwrap
-import idna
-from siotls.iana import ExtensionType, HandshakeType as HT, NameType
-from siotls.serial import Serializable, SerializableBody, SerialIO
-from ... import alerts
-from . import Extension
 
+import idna
+
+from siotls.contents import alerts
+from siotls.iana import ExtensionType, HandshakeType, NameType
+from siotls.serial import SerialIO, Serializable, SerializableBody
+
+from . import Extension
 
 logger = logging.getLogger(__name__)
 _server_name_registry = {}
@@ -28,7 +30,7 @@ class ServerName(Serializable):
     """).strip('\n')
     name_type: NameType = dataclasses.field(repr=False)
 
-    def __init_subclass__(cls, register=True, **kwargs):
+    def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and ServerName in cls.__bases__:
             _server_name_registry[cls.name_type] = cls
@@ -42,7 +44,7 @@ class ServerName(Serializable):
             # unknown type, can choice to either crash or ignore
             # this extension, crash for now.
             # should be configurable (should it?)
-            raise alerts.UnrecognizedName() from exc
+            raise alerts.UnrecognizedName from exc
 
         return cls.parse_body(stream)
 
@@ -80,19 +82,28 @@ class HostName(ServerName, SerializableBody):
         ])
 
 @dataclasses.dataclass(init=False)
-class ServerNameList(Extension, SerializableBody):
+class ServerNameListRequest(Extension, SerializableBody):
     extension_type = ExtensionType.SERVER_NAME
-    _handshake_types = {HT.CLIENT_HELLO, HT.ENCRYPTED_EXTENSIONS}
+    _handshake_types = (HandshakeType.CLIENT_HELLO,)
     _struct = textwrap.dedent("""
         struct {
             ServerName server_name_list<1..2^16-1>
         } ServerNameList;
     """).strip('\n')
 
-    server_name_list: list[ServerName]
+    server_names: dict[NameType, ServerName]
 
-    def __init__(self, server_name_list):
-        self.server_name_list = server_name_list
+    def __init__(self, server_name_list: list[ServerName]):
+        self.server_names = {}
+        for server_name in server_name_list:
+            sn = self.server_names.setdefault(server_name.name_type, server_name)
+            if sn != server_name:
+                e = "there can only be one value per server name type"
+                raise alerts.IllegalParameter(e)
+
+    @property
+    def host_name(self):
+        return self.server_names[NameType.HOST_NAME]
 
     @classmethod
     def parse_body(cls, stream):
@@ -108,10 +119,27 @@ class ServerNameList(Extension, SerializableBody):
         server_name_list = b''.join([
             server_name.serialize()
             for server_name
-            in self.server_name_list
+            in self.server_names.values()
         ])
 
         return b''.join([
             len(server_name_list).to_bytes(2, 'big'),
             server_name_list
         ])
+
+
+@dataclasses.dataclass(init=False)
+class ServerNameResponse(Extension, SerializableBody):
+    extension_type = ExtensionType.SERVER_NAME
+    _handshake_types = (HandshakeType.ENCRYPTED_EXTENSIONS,)
+    _struct = r"struct {}"
+
+    def __init__(self):
+        pass
+
+    @classmethod
+    def parse_body(cls, stream):  # noqa: ARG003
+        return cls()
+
+    def serialize_body(self):
+        return b''
