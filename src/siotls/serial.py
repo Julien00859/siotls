@@ -22,11 +22,11 @@ class Serializable(metaclass=abc.ABCMeta):
     _struct: str
 
     @abc.abstractclassmethod
-    def parse(cls, stream):
+    def parse(cls, stream):  # pragma: no cover
         pass
 
     @abc.abstractmethod
-    def serialize(self):
+    def serialize(self):  # pragma: no cover
         pass
 
 
@@ -34,11 +34,11 @@ class SerializableBody(metaclass=abc.ABCMeta):
     _struct: str
 
     @abc.abstractclassmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream):  # pragma: no cover
         pass
 
     @abc.abstractmethod
-    def serialize_body(self):
+    def serialize_body(self):  # pragma: no cover
         pass
 
 
@@ -68,6 +68,9 @@ class SerialIO(io.BytesIO):
         return data
 
     def read_int(self, n):
+        if not n:
+            e = "cannot read a integer of 0 bytes"
+            raise ValueError(e)
         return int.from_bytes(self.read_exactly(n), 'big')
 
     def write_int(self, n, i):
@@ -94,7 +97,7 @@ class SerialIO(io.BytesIO):
             for group in zip(*([it] * nitem), strict=True)
         ]
 
-    def write_listin(self, nlist, nitem, items):
+    def write_listint(self, nlist, nitem, items):
         self.write_int(nlist, len(items) * nitem)
         for item in items:
             self.write_int(nitem, item)
@@ -149,12 +152,12 @@ class SerialIO(io.BytesIO):
 
         self._limits.append(new_limit)
 
-        yield
+        yield new_limit
 
-        if self._limits.pop() != new_limit:
+        if self._limits.pop() != new_limit:  # pragma: no cover
             e = "another limit was pop"
             raise RuntimeError(e)
-        if not self._limits:
+        if not self._limits:  # pragma: no cover
             e = "+inf was pop"
             raise RuntimeError(e)
         if (remaining := new_limit - self.tell()):
