@@ -109,7 +109,7 @@ class ClientHello(Handshake, SerializableBody):
         try:
             self = cls(random, cipher_suites, extensions)
         except ValueError as exc:
-            raise alerts.IllegalParameter from exc
+            raise alerts.IllegalParameter(*exc.args) from exc
         self.legacy_session_id = legacy_session_id
         return self
 

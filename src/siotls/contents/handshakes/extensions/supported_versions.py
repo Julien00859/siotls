@@ -71,7 +71,7 @@ class SupportedVersionsResponse(Extension, SerializableBody):
         try:
             selected_version = TLSVersion(stream.read_int(2))
         except ValueError as exc:
-            raise alerts.IllegalParameter from exc
+            raise alerts.IllegalParameter(*exc.args) from exc
         return cls(selected_version)
 
     def serialize_body(self):
