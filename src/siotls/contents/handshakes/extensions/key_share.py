@@ -8,7 +8,7 @@ from siotls.iana import (
     HandshakeType_,
     NamedGroup,
 )
-from siotls.serial import SerialIO, SerializableBody, SerializationError
+from siotls.serial import SerialIO, SerializableBody
 from siotls.utils import try_cast
 
 from . import Extension
@@ -81,8 +81,6 @@ class KeyShareRetry(Extension, SerializableBody):
     def parse_body(cls, stream):
         try:
             selected_group = NamedGroup(stream.read_int(2))
-        except SerializationError:
-            raise
         except ValueError as exc:
             raise alerts.IllegalParameter from exc
         return cls(selected_group)
