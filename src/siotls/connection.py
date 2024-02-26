@@ -46,9 +46,6 @@ class TLSConnection:
             self._client_unique = None
             self._server_unique = secrets.token_bytes(32)
 
-        self._key_shares = {}
-        self._cookie = None
-
     # ------------------------------------------------------------------
     # Public APIs
     # ------------------------------------------------------------------
@@ -132,8 +129,8 @@ class TLSConnection:
     # Internal APIs
     # ------------------------------------------------------------------
 
-    def _move_to_state(self, state_type):
-        self.state = state_type(self)
+    def _move_to_state(self, state_type, *args, **kwargs):
+        self.state = state_type(self, *args, **kwargs)
 
     @property
     def _max_fragment_length(self):

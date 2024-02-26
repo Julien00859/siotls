@@ -21,9 +21,10 @@ from . import ClientWaitEncryptedExtensions
 class ClientWaitServerHello(State):
     can_send_application_data = False
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, connection, key_shares):
+        super().__init__(connection)
         self._is_first_server_hello = self.nconfig is None
+        self._key_shares = key_shares
 
     def process(self, content):
         if content.content_type != ContentType.HANDSHAKE:
@@ -74,12 +75,10 @@ class ClientWaitServerHello(State):
             key_exchanges=[key_share.selected_group],
         )
 
-        if cookie := hello_retry_request.extensions.get(ExtensionType.COOKIE):
-            self._cookie = cookie.cookie
-
         self._transcript.do_hrr_dance()
 
-        self._move_to_state(ClientStart)
+        cookie_ext = hello_retry_request.extensions.get(ExtensionType.COOKIE)
+        self._move_to_state(ClientStart, cookie=cookie_ext and cookie_ext.cookie)
         self.connection.initiate_connection()
 
     def _process_server_hello(self, server_hello):
