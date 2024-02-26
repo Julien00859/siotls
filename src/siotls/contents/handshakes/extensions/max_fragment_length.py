@@ -8,7 +8,7 @@ from siotls.iana import (
     MaxFragmentLengthCode,
     MaxFragmentLengthOctets,
 )
-from siotls.serial import SerializableBody, SerializationError
+from siotls.serial import SerializableBody
 
 from . import Extension
 
@@ -55,8 +55,6 @@ class MaxFragmentLength(Extension, SerializableBody):
     def parse_body(cls, stream):
         try:
             max_fragment_length = MaxFragmentLengthCode(stream.read_int(1))
-        except SerializationError:
-            raise
         except ValueError as exc:
             raise alerts.IllegalParameter from exc
         return cls(max_fragment_length)
