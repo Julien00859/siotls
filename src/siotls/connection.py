@@ -6,7 +6,7 @@ import types
 from siotls import key_logger
 from siotls.ciphers import cipher_suite_registry
 from siotls.iana import AlertLevel, ContentType, TLSVersion
-from siotls.serial import SerialIO, SerializationError, TooMuchDataError
+from siotls.serial import SerialIO, TLSBufferError, TooMuchDataError
 
 from .contents import ApplicationData, Content, Handshake, alerts
 from .states import ClientStart, ServerStart
@@ -84,7 +84,7 @@ class TLSConnection:
                 try:
                     content = Content.get_parser(content_type).parse(stream)
                     stream.assert_eof()
-                except SerializationError as exc:
+                except TLSBufferError as exc:
                     raise alerts.DecodeError from exc
                 logger.info("received %s", type(content).__name__)
                 match content:
