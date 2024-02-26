@@ -46,7 +46,7 @@ class Handshake(Content, Serializable):
         try:
             cls = _handshake_registry[HandshakeType(msg_type)]
         except ValueError as exc:
-            raise alerts.UnrecognizedName from exc
+            raise alerts.IllegalParameter from exc
         with stream.limit(length):
             return cls.parse_body(stream)
 
