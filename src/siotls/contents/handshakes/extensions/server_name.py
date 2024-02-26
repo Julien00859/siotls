@@ -91,10 +91,19 @@ class ServerNameListRequest(Extension, SerializableBody):
         } ServerNameList;
     """).strip('\n')
 
-    server_name_list: list[ServerName]
+    server_names: dict[NameType, ServerName]
 
-    def __init__(self, server_name_list):
-        self.server_name_list = server_name_list
+    def __init__(self, server_name_list: list[ServerName]):
+        self.server_names = {}
+        for server_name in server_name_list:
+            sn = self.server_names.setdefault(server_name.name_type, server_name)
+            if sn != server_name:
+                e = "there can only be one value per server name type"
+                raise alerts.IllegalParameter(e)
+
+    @property
+    def host_name(self):
+        return self.server_names[NameType.HOST_NAME]
 
     @classmethod
     def parse_body(cls, stream):
@@ -110,7 +119,7 @@ class ServerNameListRequest(Extension, SerializableBody):
         server_name_list = b''.join([
             server_name.serialize()
             for server_name
-            in self.server_name_list
+            in self.server_names.values()
         ])
 
         return b''.join([
