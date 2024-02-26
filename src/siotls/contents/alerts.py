@@ -68,7 +68,7 @@ class Alert(Exception, Content, Serializable):  # noqa: N818
         try:
             level = AlertLevel(stream.read_int(1))
         except ValueError as exc:
-            raise IllegalParameter from exc
+            raise IllegalParameter(*exc.args) from exc
         description = stream.read_int(1)
 
         try:

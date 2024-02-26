@@ -82,7 +82,7 @@ class KeyShareRetry(Extension, SerializableBody):
         try:
             selected_group = NamedGroup(stream.read_int(2))
         except ValueError as exc:
-            raise alerts.IllegalParameter from exc
+            raise alerts.IllegalParameter(*exc.args) from exc
         return cls(selected_group)
 
     def serialize_body(self):

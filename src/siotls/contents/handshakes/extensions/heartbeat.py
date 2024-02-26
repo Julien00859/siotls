@@ -31,7 +31,7 @@ class Heartbeat(Extension, SerializableBody):
         try:
             mode = HeartbeatMode(stream.read_int(1))
         except ValueError as exc:
-            raise alerts.IllegalParameter from exc
+            raise alerts.IllegalParameter(*exc.args) from exc
         return cls(mode)
 
     def serialize_body(self):
