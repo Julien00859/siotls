@@ -16,7 +16,7 @@ class Content:
         try:
             return _content_registry[ContentType(content_type)]
         except ValueError as exc:
-            raise DecodeError from exc
+            raise DecodeError(*exc.args) from exc
 
 
 from .alerts import Alert, DecodeError

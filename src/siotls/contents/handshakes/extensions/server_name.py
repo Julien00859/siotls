@@ -44,7 +44,7 @@ class ServerName(Serializable):
             # unknown type, can choice to either crash or ignore
             # this extension, crash for now.
             # should be configurable (should it?)
-            raise alerts.UnrecognizedName from exc
+            raise alerts.UnrecognizedName(*exc.args) from exc
 
         return cls.parse_body(stream)
 

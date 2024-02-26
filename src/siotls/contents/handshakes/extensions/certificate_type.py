@@ -16,6 +16,9 @@ class _CertificateTypeRequest(SerializableBody):
     _struct = ""  # mute the warning
 
     def __init__(self, certificate_types):
+        if not certificate_types:
+            e = "list cannot be empty"
+            raise ValueError(e)
         self.certificate_types = certificate_types
 
     @classmethod
@@ -24,7 +27,10 @@ class _CertificateTypeRequest(SerializableBody):
             try_cast(CertificateType, ct)
             for ct in stream.read_listint(1, 1)
         ]
-        return cls(certificate_types)
+        try:
+            return cls(certificate_types)
+        except ValueError as exc:
+            raise alerts.IllegalParameter(*exc.args) from exc
 
     def serialize_body(self):
         return b''.join([
@@ -46,7 +52,7 @@ class _CertificateTypeResponse(SerializableBody):
         try:
             certificate_type = CertificateType(stream.read_int(1))
         except ValueError as exc:
-            raise alerts.IllegalParameter from exc
+            raise alerts.IllegalParameter(*exc.args) from exc
         return cls(certificate_type)
 
     @classmethod

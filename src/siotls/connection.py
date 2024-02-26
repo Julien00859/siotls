@@ -82,7 +82,7 @@ class TLSConnection:
                     content = Content.get_parser(content_type).parse(stream)
                     stream.assert_eof()
                 except TLSBufferError as exc:
-                    raise alerts.DecodeError from exc
+                    raise alerts.DecodeError(*exc.args) from exc
                 logger.info("received %s", type(content).__name__)
                 match content:
                     case alerts.Alert(level=AlertLevel.WARNING):

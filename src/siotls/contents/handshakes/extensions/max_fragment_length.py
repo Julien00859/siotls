@@ -56,7 +56,7 @@ class MaxFragmentLength(Extension, SerializableBody):
         try:
             max_fragment_length = MaxFragmentLengthCode(stream.read_int(1))
         except ValueError as exc:
-            raise alerts.IllegalParameter from exc
+            raise alerts.IllegalParameter(*exc.args) from exc
         return cls(max_fragment_length)
 
     def serialize_body(self):

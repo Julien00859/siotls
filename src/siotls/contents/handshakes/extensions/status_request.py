@@ -41,7 +41,7 @@ class CertificateStatusRequest(Extension, SerializableBody):
         except ValueError as exc:
             # Unlike for ServerName, nothing states how to process
             # unknown certificate status types, crash for now
-            raise alerts.UnrecognizedName from exc
+            raise alerts.UnrecognizedName(*exc.args) from exc
         return cls.parse_bodybody(stream)
 
     def serialize_body(self):
