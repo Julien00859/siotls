@@ -20,6 +20,11 @@ from . import ClientWaitServerHello
 class ClientStart(State):
     can_send_application_data = False
 
+    def __init__(self, connection, cookie=None):
+        super().__init__(connection)
+        self._cookie = cookie
+        self._key_shares = {}
+
     def initiate_connection(self):
         extensions = [
             SupportedVersionsRequest([TLSVersion.TLS_1_3]),
@@ -39,13 +44,12 @@ class ClientStart(State):
             extensions.append(ALPN(self.config.alpn))
         if self._cookie:
             extensions.append(Cookie(self._cookie))
-            self._cookie = None
         extensions.append(KeyShareRequest(self._init_key_share()))
 
         self._send_content(ClientHello(
             self._client_unique, self.config.cipher_suites, extensions,
         ))
-        self._move_to_state(ClientWaitServerHello)
+        self._move_to_state(ClientWaitServerHello, key_shares=self._key_shares)
 
     def _init_key_share(self):
         # We could send a ClientHello without KeyShareRequest, wait for

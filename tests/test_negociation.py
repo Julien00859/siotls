@@ -412,7 +412,7 @@ class TestNegociationClient(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TLSConnection(TLSConfiguration('client'))
-        cls.client._state = ClientWaitServerHello(cls.client)
+        cls.client._state = ClientWaitServerHello(cls.client, {})
 
     def setUp(self):
         self.client.nconfig = TLSNegociatedConfiguration(
