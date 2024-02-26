@@ -34,9 +34,9 @@ from . import ServerWaitFlight2
 class ServerWaitClientHello(State):
     can_send_application_data = False
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._is_first_client_hello = self.nconfig is None
+    def __init__(self, connection):
+        super().__init__(connection)
+        self._is_first_client_hello = True
 
     def process(self, client_hello):
         if client_hello.content_type != ContentType.HANDSHAKE:
@@ -70,7 +70,7 @@ class ServerWaitClientHello(State):
                 e = "invalid KeyShare in second ClientHello"
                 raise alerts.IllegalParameter(e)
             self._send_hello_retry_request(client_hello, clear_extensions)
-            self._move_to_state(ServerWaitClientHello)  # update _is_first_client_hello
+            self._is_first_client_hello = False
             return
 
         self._cipher.skip_early_secrets()

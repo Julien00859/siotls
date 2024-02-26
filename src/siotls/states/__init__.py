@@ -2,15 +2,15 @@ class State:
     can_send_application_data: bool
 
     def __init__(self, connection):
-        object.__setattr__(self, 'connection', connection)
+        super().__setattr__('connection', connection)
 
     def __getattr__(self, name):
-        if hasattr(self.connection, name):
-            return getattr(self.connection, name)
-        return object.__getattribute__(self, name)
+        return getattr(self.connection, name)
 
     def __setattr__(self, name, value):
-        return setattr(self.connection, name, value)
+        if hasattr(self.connection, name):
+            setattr(self.connection, name, value)
+        super().__setattr__(name, value)
 
     def initiate_connection(self):
         e = "cannot initiate connection in this state"
