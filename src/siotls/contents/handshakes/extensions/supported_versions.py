@@ -8,7 +8,7 @@ from siotls.iana import (
     HandshakeType_,
     TLSVersion,
 )
-from siotls.serial import SerializableBody, SerializationError
+from siotls.serial import SerializableBody
 from siotls.utils import try_cast
 
 from . import Extension
@@ -70,8 +70,6 @@ class SupportedVersionsResponse(Extension, SerializableBody):
     def parse_body(cls, stream):
         try:
             selected_version = TLSVersion(stream.read_int(2))
-        except SerializationError:
-            raise
         except ValueError as exc:
             raise alerts.IllegalParameter from exc
         return cls(selected_version)

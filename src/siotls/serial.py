@@ -6,15 +6,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class SerializationError(ValueError):
+class TLSBufferError(BufferError):
     pass
 
 
-class MissingDataError(SerializationError):
+class MissingDataError(TLSBufferError):
     pass
 
 
-class TooMuchDataError(SerializationError):
+class TooMuchDataError(TLSBufferError):
     pass
 
 
@@ -89,7 +89,7 @@ class SerialIO(io.BytesIO):
         if length % nitem != 0:
             e =(f"cannot read {length // nitem + 1} uint{nitem * 8}_t out of "
                 f"{length} bytes")
-            raise SerializationError(e)
+            raise TLSBufferError(e)
 
         it = iter(self.read_exactly(length))
         return [

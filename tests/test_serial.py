@@ -1,7 +1,7 @@
 from siotls.serial import (
     MissingDataError,
     SerialIO,
-    SerializationError,
+    TLSBufferError,
     TooMuchDataError,
 )
 
@@ -101,7 +101,7 @@ class TestSerial(TestCase):
         self.assertEqual(SerialIO(b"\x03\x00\x02\x01").read_listint(1, 1), [0, 2, 1])
         self.assertRaises(MissingDataError, SerialIO(b"\x03\x00\x02").read_listint, 1, 1)
         self.assertEqual(SerialIO(b"\x04\x00\x02\x01\x01").read_listint(1, 2), [2, 257])
-        self.assertRaises(SerializationError, SerialIO(b"\x01\x00").read_listint, 1, 2)
+        self.assertRaises(TLSBufferError, SerialIO(b"\x01\x00").read_listint, 1, 2)
         self.assertEqual(SerialIO(b"\x00\x04\x00\x02\x01\x01").read_listint(2, 1), [0, 2, 1, 1])
         self.assertEqual(SerialIO(b"\x00\x04\x00\x02\x01\x01").read_listint(2, 2), [2, 257])
 

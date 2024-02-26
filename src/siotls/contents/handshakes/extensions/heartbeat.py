@@ -3,7 +3,7 @@ import textwrap
 
 from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType, HeartbeatMode
-from siotls.serial import SerializableBody, SerializationError
+from siotls.serial import SerializableBody
 
 from . import Extension
 
@@ -30,8 +30,6 @@ class Heartbeat(Extension, SerializableBody):
     def parse_body(cls, stream):
         try:
             mode = HeartbeatMode(stream.read_int(1))
-        except SerializationError:
-            raise
         except ValueError as exc:
             raise alerts.IllegalParameter from exc
         return cls(mode)
