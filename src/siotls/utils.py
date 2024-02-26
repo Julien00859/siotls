@@ -52,14 +52,6 @@ def try_cast(type_, value, exceptions=ValueError):
         return value
 
 
-def is_string(proto):
-    try:
-        proto.decode()
-    except UnicodeDecodeError:
-        return False
-    return True
-
-
 class peekable:  # noqa: N801
     def __init__(self, iterable):
         self._it = iter(iterable)

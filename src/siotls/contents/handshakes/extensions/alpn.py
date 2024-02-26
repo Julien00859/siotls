@@ -3,7 +3,7 @@ import textwrap
 
 from siotls.iana import ALPNProtocol, ExtensionType, HandshakeType
 from siotls.serial import SerializableBody
-from siotls.utils import is_string, try_cast
+from siotls.utils import try_cast
 
 from . import Extension
 
@@ -32,7 +32,7 @@ class ALPN(Extension, SerializableBody):
         protocol_name_list = [
             try_cast(ALPNProtocol, protocol.decode())
             for protocol in stream.read_listvar(2, 1)
-            if is_string(protocol)  # skip GREASE
+            if all(ord(' ') <= char <= ord('~') for char in protocol)  # skip GREASE
         ]
         return cls(protocol_name_list)
 
