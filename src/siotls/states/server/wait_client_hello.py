@@ -1,6 +1,5 @@
 import dataclasses
 
-from siotls.ciphers import cipher_suite_registry
 from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import ChangeCipherSpec, alerts
 from siotls.contents.handshakes import (
@@ -18,6 +17,7 @@ from siotls.contents.handshakes.extensions import (
     KeyShareRetry,
     SupportedVersionsResponse,
 )
+from siotls.crypto.ciphers import cipher_suite_registry
 from siotls.crypto.key_share import resume as key_share_resume
 from siotls.iana import (
     ContentType,
