@@ -115,6 +115,13 @@ openssl genpkey -out user-x448.key.pem -algorithm X448
 
 
 set -x
+
+# special case, self-signed CA cert with rsa for encryption and rsa-pss for signature
+openssl req -config openssl.conf -x509 -days 1 \
+            -extensions ca_cert -key ca-rsa.key.pem -out ca-rsae.cert.pem \
+            -sigopt rsa_padding_mode:pss -sha256 -sigopt rsa_pss_saltlen:20 \
+            -subj "/C=BE/L=Houtesiplou/CN=Houtesiplou ca-rsae"
+
 for key in ca*.key.pem
 do
     # generate self-signed cert for this CA key
