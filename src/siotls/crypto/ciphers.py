@@ -2,6 +2,7 @@
 # ruff: noqa: N801, S101
 import enum
 import hashlib
+from functools import partial
 
 from cryptography.hazmat.primitives.ciphers import aead
 
@@ -305,13 +306,9 @@ class TLS_AES_128_CCM_SHA256(_TLSCipherSuite):
     hashempty = SHA256_EMPTY
     hashzeros = SHA256_ZEROS
 
-class _AESCCM8(aead.AESCCM):
-    def __init__(self, key):
-        super().__init__(key, tag_length=8)
-
 class TLS_AES_128_CCM_8_SHA256(_TLSCipherSuite):
     iana_id = CipherSuites.TLS_AES_128_CCM_8_SHA256
-    _ciphermod = _AESCCM8
+    _ciphermod = partial(aead.AESCCM, tag_length=8)
     digestmod = hashlib.sha256
     block_size = 16
     key_length = 16

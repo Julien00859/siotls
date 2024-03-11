@@ -4,7 +4,7 @@ import struct
 import types
 
 from siotls import key_logger
-from siotls.ciphers import cipher_suite_registry
+from siotls.crypto.ciphers import cipher_suite_registry
 from siotls.iana import AlertLevel, ContentType, TLSVersion
 from siotls.serial import SerialIO, TLSBufferError, TooMuchDataError
 
