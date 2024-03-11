@@ -18,7 +18,7 @@ SHA384_EMPTY = hashlib.sha384(b'').digest()
 SHA384_ZEROS = b'\x00' * hashlib.sha384().digest_size
 
 
-class _SaltState(enum.IntEnum):
+class CipherState(enum.IntEnum):
     EARLY = 0
     HANDSHAKE = 1
     APPLICATION = 2
@@ -26,29 +26,29 @@ class _SaltState(enum.IntEnum):
 
 class _TLSSecrets:
     def __init__(self, digestmod, hashempty, hashzeros):
+        self.state = CipherState.EARLY
         self._digestmod = digestmod
         self._hashempty = hashempty
         self._hashzeros = hashzeros
         self._salt = self._hashzeros
-        self._salt_state = _SaltState.EARLY
 
     def _make_deriver(self, ikm, transcript_hash, *, update_salt):
         secret = hkdf_extract(self._digestmod, self._salt, ikm)
         if update_salt:
             self._salt = derive_secret(
                 self._digestmod, secret, b'derived', self._hashempty)
-            self._salt_state = _SaltState(self._salt_state + 1)
+            self.state = CipherState(self.state + 1)
         return lambda label, *, transcript_hash=transcript_hash: (
             derive_secret(self._digestmod, secret, label, transcript_hash)
         )
 
     def skip_early_secrets(self):
-        assert self._salt_state is _SaltState.EARLY
+        assert self.state is CipherState.EARLY
         psk = self._hashzeros
         self._make_deriver(psk, transcript_hash=None, update_salt=True)
 
     def derive_early_secrets(self, psk, psk_mode, client_hello_transcript_hash):
-        assert self._salt_state is _SaltState.EARLY
+        assert self.state is CipherState.EARLY
         assert psk_mode in ('external', 'resume')
         psk_label = f'{psk_mode[:3]} binder'.encode()
         derive_early_secret = self._make_deriver(
@@ -65,7 +65,7 @@ class _TLSSecrets:
         )
 
     def derive_handshake_secrets(self, shared_key, server_hello_transcript_hash):
-        assert self._salt_state is _SaltState.HANDSHAKE
+        assert self.state is CipherState.HANDSHAKE
         derive_handshake_secret = self._make_deriver(
             shared_key, server_hello_transcript_hash, update_salt=True)
 
@@ -79,7 +79,7 @@ class _TLSSecrets:
     def derive_master_secrets(
         self, server_finished_transcript_hash, client_finished_transcript_hash
     ):
-        assert self._salt_state is _SaltState.APPLICATION
+        assert self.state is CipherState.APPLICATION
         derive_master_secret = self._make_deriver(
             self._hashzeros, server_finished_transcript_hash, update_salt=False)
 
@@ -118,6 +118,10 @@ class _TLSCipherSuite:
         self._client_unique_hex = client_unique.hex() if log_keys else ''
         self._read_cipher = self._read_iv = self._read_seq = None
         self._write_cipher = self._write_iv = self._write_seq = None
+
+    @property
+    def state(self):
+        return self._secrets.state
 
     # ------------------------------------------------------------------
     # AEAD Encryption and Decryption

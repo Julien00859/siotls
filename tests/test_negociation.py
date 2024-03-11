@@ -37,7 +37,11 @@ from . import TestCase
 class TestNegociationServer(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.server = TLSConnection(TLSConfiguration('server'))
+        config = TLSConfiguration('server',
+            private_key=...,
+            certificate_chain=...,
+        )
+        cls.server = TLSConnection(config)
         cls.server._state = ServerWaitClientHello(cls.server)
 
     def setUp(self):

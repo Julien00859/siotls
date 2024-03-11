@@ -1,5 +1,6 @@
 import argparse
 import contextlib
+import importlib.resources
 import logging
 import re
 import unittest
@@ -12,6 +13,10 @@ options, _ = parser.parse_known_args()
 
 logging.basicConfig()
 setup_logging(logging.WARNING - 10 * options.verbosity)
+
+
+TEST_KEY_PATH = importlib.resources.path('siotls.data', 'self-signed-key.pem')
+TEST_CERT_PATH = importlib.resources.path('siotls.data', 'self-signed-cert.pem')
 
 
 class TestCase(unittest.TestCase):

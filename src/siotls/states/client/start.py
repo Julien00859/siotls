@@ -1,10 +1,12 @@
 from siotls.contents.handshakes import ClientHello
 from siotls.contents.handshakes.extensions import (
     ALPN,
+    ClientCertificateTypeRequest,
     Cookie,
     Heartbeat,
     HostName,
     KeyShareRequest,
+    ServerCertificateTypeRequest,
     ServerNameListRequest,
     SignatureAlgorithms,
     SupportedGroups,
@@ -42,6 +44,10 @@ class ClientStart(State):
             ]))
         if self.config.alpn:
             extensions.append(ALPN(self.config.alpn))
+        if self.config.public_key:  # x509 assumed when extension missing
+            extensions.append(ClientCertificateTypeRequest(self.config.certificate_types))
+        if self.config.trusted_public_keys:  # x509 assumed when extension missing
+            extensions.append(ServerCertificateTypeRequest(self.config.peer_certificate_types))
         if self._cookie:
             extensions.append(Cookie(self._cookie))
         extensions.append(KeyShareRequest(self._init_key_share()))

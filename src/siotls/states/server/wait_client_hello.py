@@ -88,7 +88,7 @@ class ServerWaitClientHello(State):
         self._cipher.derive_handshake_secrets(shared_key, self._transcript.digest())
 
         self._send_content(EncryptedExtensions(encrypted_extensions))
-        self._send_content(Certificate(...))
+        self._send_content(Certificate(self.config.certificate_chain))
         self._send_content(CertificateVerify(...))
         self._send_content(Finished(...))
         self._move_to_state(ServerWaitFlight2)
@@ -131,11 +131,15 @@ class ServerWaitClientHello(State):
 
         negociate('supported_versions')
         negociate('supported_groups')
-        negociate('signature_algorithms')
 
         shared_key = negociate('key_share')
         if not shared_key:
             return clear_extensions, encrypted_extensions, None
+
+        negociate('server_certificate_type')
+        if self.nconfig.server_certificate_type == CertificateType.X509:
+            negociate('signature_algorithms')
+
 
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')

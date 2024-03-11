@@ -234,11 +234,22 @@ class SignatureScheme(Hex2Enum):
     rsa_pkcs1_sha512 = 0x0601
 
     # ECDSA algorithms
+    # Subject Public Key Info:
+    #     Public Key Algorithm: id-ecPublicKey
+    #         Public-Key: (256 bit)
+    #         pub: -redacted-
+    #         ASN1 OID: prime256v1
+    #         NIST CURVE: P-256
     ecdsa_secp256r1_sha256 = 0x0403
     ecdsa_secp384r1_sha384 = 0x0503
     ecdsa_secp521r1_sha512 = 0x0603
 
-    # RSASSA-PSS algorithms with public key OID rsaEncryption
+    # RSASSA-PSS algorithms with public key OID rsaEncryption (rsaE)
+    # Subject Public Key Info:
+    #     Public Key Algorithm: rsaEncryption
+    #         Public-Key: (2048 bit)
+    #         Modulus: -redacted-
+    #         Exponent: 65537 (0x10001)
     rsa_pss_rsae_sha256 = 0x0804
     rsa_pss_rsae_sha384 = 0x0805
     rsa_pss_rsae_sha512 = 0x0806
@@ -248,13 +259,19 @@ class SignatureScheme(Hex2Enum):
     ed448 = 0x0808
 
     # RSASSA-PSS algorithms with public key OID RSASSA-PSS
+    # Subject Public Key Info:
+    #     Public Key Algorithm: rsassaPss
+    #         Public-Key: (2048 bit)
+    #         Modulus: -redacted-
+    #         Exponent: 65537 (0x10001)
+    #         PSS parameter restrictions:
+    #           Hash Algorithm: SHA2-256
+    #           Mask Algorithm: MGF1 with SHA1 (default)
+    #           Minimum Salt Length: 20 (default)
+    #           Trailer Field: 0x1 (default)
     rsa_pss_pss_sha256 = 0x0809
     rsa_pss_pss_sha384 = 0x080a
     rsa_pss_pss_sha512 = 0x080b
-
-    # Legacy algorithms
-    rsa_pkcs1_sha1 = 0x0201
-    ecdsa_sha1 = 0x0203
 
 
 class TLSVersion(Hex2Enum):

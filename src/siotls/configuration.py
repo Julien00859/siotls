@@ -1,13 +1,26 @@
 import dataclasses
+import functools
+import logging
 import typing
 
+from cryptography.hazmat.primitives.asymmetric.types import (
+    PrivateKeyTypes,
+    PublicKeyTypes,
+)
+from cryptography.x509 import Certificate
+from cryptography.x509.verification import Store
+
+from siotls.crypto.trust_store import build_system_store
 from siotls.iana import (
     ALPNProtocol,
+    CertificateType,
     CipherSuites,
     MaxFragmentLengthOctets as MLFOctets,
     NamedGroup,
     SignatureScheme,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -22,17 +35,18 @@ class TLSConfiguration:
             CipherSuites.TLS_AES_256_GCM_SHA384,
             CipherSuites.TLS_AES_128_GCM_SHA256,
         ].copy)
-    signature_algorithms: list[SignatureScheme] = \
-        dataclasses.field(default_factory=[
-            SignatureScheme.rsa_pkcs1_sha256,
-            SignatureScheme.rsa_pss_rsae_sha256,
-            SignatureScheme.ecdsa_secp256r1_sha256,
-        ].copy)
     key_exchanges: list[NamedGroup] = \
         dataclasses.field(default_factory=[
             NamedGroup.x25519,
             NamedGroup.secp256r1,
         ].copy)
+
+    trust_store: Store | None = None
+    trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
+
+    private_key: PrivateKeyTypes | None = None
+    public_key: PublicKeyTypes | None = None
+    certificate_chain: list[Certificate] | None = None
 
     # extensions
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384
@@ -44,6 +58,28 @@ class TLSConfiguration:
     log_keys: bool = False
 
     @property
+    def require_peer_certificate(self):
+        return bool(self.trust_store or self.trusted_public_keys)
+
+    @functools.cached_property
+    def certificate_types(self):
+        types = []
+        if self.certificate_chain:
+            types.append(CertificateType.X509)
+        if self.public_key:
+            types.append(CertificateType.RawPublicKey)
+        return types
+
+    @functools.cached_property
+    def peer_certificate_types(self):
+        types = []
+        if self.trust_store:
+            types.append(CertificateType.X509)
+        if self.trusted_public_keys:
+            types.append(CertificateType.RawPublicKey)
+        return types
+
+    @property
     def other_side(self):
         return 'server' if self.side == 'client' else 'client'
 
@@ -51,6 +87,14 @@ class TLSConfiguration:
         if self.side == 'server':
             if self.max_fragment_length != MLFOctets.MAX_16384:
                 e = "max fragment length is only configurable client side"
+                raise ValueError(e)
+
+            if not self.private_key:
+                e = "the private key is mandatory server side"
+                raise ValueError(e)
+
+            if not self.certificate_chain:
+                e = "the certificate chain is mandatory server side"
                 raise ValueError(e)
 
 
@@ -63,6 +107,10 @@ class TLSNegociatedConfiguration:
     can_send_heartbeat: bool | None
     can_echo_heartbeat: bool | None
     max_fragment_length: MLFOctets | None
+    client_certificate_type: CertificateType | None
+    server_certificate_type: CertificateType | None
+    peer_public_key: PublicKeyTypes | None = None
+    peer_certificate_chain: list[Certificate] | None = None
 
     def __init__(self, cipher_suite):
         object.__setattr__(self, '_frozen', False)
