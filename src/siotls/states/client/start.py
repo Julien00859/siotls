@@ -9,6 +9,7 @@ from siotls.contents.handshakes.extensions import (
     ServerCertificateTypeRequest,
     ServerNameListRequest,
     SignatureAlgorithms,
+    SignatureAlgorithmsCert,
     SupportedGroups,
     SupportedVersionsRequest,
 )
@@ -38,6 +39,10 @@ class ClientStart(State):
                 HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND
             ),
         ]
+        if self.config.signature_algorithms_cert:
+            extensions.append(
+                SignatureAlgorithmsCert(self.config.signature_algorithms_cert),
+            )
         if self.config.hostnames:
             extensions.append(ServerNameListRequest([
                 HostName(hostname) for hostname in self.config.hostnames

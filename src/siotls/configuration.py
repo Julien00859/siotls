@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.asymmetric.types import (
 from cryptography.x509 import Certificate
 from cryptography.x509.verification import Store
 
+from siotls.crypto.signatures import TLSSignatureSuite
 from siotls.crypto.trust_store import build_system_store
 from siotls.iana import (
     ALPNProtocol,
@@ -40,6 +41,24 @@ class TLSConfiguration:
             NamedGroup.x25519,
             NamedGroup.secp256r1,
         ].copy)
+    signature_algorithms: list[NamedGroup] = \
+        dataclasses.field(default_factory=[
+            SignatureScheme.ed25519,
+            SignatureScheme.ed448,
+            SignatureScheme.ecdsa_secp256r1_sha256,
+            SignatureScheme.ecdsa_secp384r1_sha384,
+            SignatureScheme.ecdsa_secp521r1_sha512,
+            SignatureScheme.rsa_pss_pss_sha256,
+            SignatureScheme.rsa_pss_pss_sha384,
+            SignatureScheme.rsa_pss_pss_sha512,
+            SignatureScheme.rsa_pss_rsae_sha256,
+            SignatureScheme.rsa_pss_rsae_sha384,
+            SignatureScheme.rsa_pss_rsae_sha512,
+            SignatureScheme.rsa_pkcs1_sha256,
+            SignatureScheme.rsa_pkcs1_sha384,
+            SignatureScheme.rsa_pkcs1_sha512,
+        ].copy)
+    signature_algorithms_cert: list[NamedGroup] | None = None
 
     trust_store: Store | None = None
     trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
@@ -101,7 +120,7 @@ class TLSConfiguration:
 @dataclasses.dataclass(init=False)
 class TLSNegociatedConfiguration:
     cipher_suite: CipherSuites
-    signature_algorithm: SignatureScheme | None
+    signature_algorithm: TLSSignatureSuite
     key_exchange: NamedGroup | None
     alpn: ALPNProtocol | None | type(...)
     can_send_heartbeat: bool | None

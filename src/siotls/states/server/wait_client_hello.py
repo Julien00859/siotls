@@ -19,6 +19,7 @@ from siotls.contents.handshakes.extensions import (
 )
 from siotls.crypto.ciphers import cipher_suite_registry
 from siotls.crypto.key_share import resume as key_share_resume
+from siotls.crypto.signatures import TLSSignatureSuite
 from siotls.iana import (
     ContentType,
     ExtensionType,
@@ -131,15 +132,15 @@ class ServerWaitClientHello(State):
 
         negociate('supported_versions')
         negociate('supported_groups')
+        negociate('signature_algorithms')
 
         shared_key = negociate('key_share')
         if not shared_key:
             return clear_extensions, encrypted_extensions, None
 
         negociate('server_certificate_type')
-        if self.nconfig.server_certificate_type == CertificateType.X509:
-            negociate('signature_algorithms')
-
+        if ...:  # x509
+            negociate('signature_algorithms_cert')
 
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')
@@ -169,12 +170,34 @@ class ServerWaitClientHello(State):
     def _negociate_signature_algorithms(self, sa_ext):
         if not sa_ext:
             raise alerts.MissingExtension(ExtensionType.SIGNATURE_ALGORITHMS)
-        for signature_algorithms in self.config.signature_algorithms:
-            if signature_algorithms in sa_ext.supported_signature_algorithms:
-                self.nconfig.signature_algorithm = signature_algorithms
+
+        compatible_suites = {
+            suite.iana_id: suite
+            for suite in TLSSignatureSuite.for_public_key(
+                self.config.public_key or self.config.certificate_chain[0].public_key()
+            )
+        }
+        for sign_algo_id in sa_ext.supported_signature_algorithms:
+            if sign_algo_cls := compatible_suites.get(sign_algo_id):
+                self.nconfig.signature_algorithm = sign_algo_cls(self.config.private_key)
                 return [], []
         e = "no common digital signature found"
         raise alerts.HandshakeFailure(e)
+
+    def _negociate_signature_algorithms_cert(self, sa_cert_ext):
+        if ...:  # RawPublicKey
+            e = "cannot negociate signature algorithms cert with raw public keys"
+            raise alerts.UnsupportedExtension(e)
+        if not sa_cert_ext:
+            self.nconfig.signature_algorithm_cert = self.nconfig.signature_algorithm
+            return []
+
+        sign_algo_cls = TLSSignatureSuite.for_cert(self.config.certificate_chain[0])
+        if sign_algo_cls.iana_id not in sa_cert_ext.supported_signature_algorithms:
+            e = "no common digital signature found"
+            raise alerts.HandshakeFailure(e)
+        self.nconfig.signature_algorithm_cert = sign_algo_cls(self.config.private_key)
+        return [], []
 
     def _negociate_key_share(self, key_share_ext):
         key_exchange = self.nconfig.key_exchange
