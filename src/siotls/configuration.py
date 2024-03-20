@@ -58,7 +58,7 @@ class TLSConfiguration:
             SignatureScheme.rsa_pkcs1_sha384,
             SignatureScheme.rsa_pkcs1_sha512,
         ].copy)
-    signature_algorithms_cert: list[NamedGroup] | None = None
+    signature_algorithms_cert: list[NamedGroup] = dataclasses.field(default_factory=list)
 
     trust_store: Store | None = None
     trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
@@ -82,7 +82,7 @@ class TLSConfiguration:
 
     @functools.cached_property
     def certificate_types(self):
-        types = []
+        types = []  # order is important, x509 must be first
         if self.certificate_chain:
             types.append(CertificateType.X509)
         if self.public_key:
@@ -91,7 +91,7 @@ class TLSConfiguration:
 
     @functools.cached_property
     def peer_certificate_types(self):
-        types = []
+        types = []  # order is important, x509 must be first
         if self.trust_store:
             types.append(CertificateType.X509)
         if self.trusted_public_keys:
@@ -109,11 +109,29 @@ class TLSConfiguration:
                 raise ValueError(e)
 
             if not self.private_key:
-                e = "the private key is mandatory server side"
+                e = "a private key is mandatory server side"
                 raise ValueError(e)
 
-            if not self.certificate_chain:
-                e = "the certificate chain is mandatory server side"
+            if not (self.certificate_chain or self.public_key):
+                e = "a certificate or a public key is mandatory server side"
+                raise ValueError(e)
+
+            if not self.public_key:
+                self.public_key = self.certificate_chain[0].public_key()
+
+        else:  # self.side == 'client':SignatureAlgorithmsCert
+            if not (self.trust_store or self.trusted_public_keys):
+                e =("a trust store or a list of trusted public keys is"
+                    "mandatory server side")
+                raise ValueError(e)
+
+        if CertificateType.X509 in self.peer_certificate_types:
+            if not self.signature_algorithms_cert:
+                self.signature_algorithms_cert = self.signature_algorithms
+        else:
+            if self.signature_algorithms_cert:
+                e =("The Signature Algorithm Cert extension can only be "
+                    "used with x509 SignatureAlgorithmsCertcertificates, not raw public keys")
                 raise ValueError(e)
 
 

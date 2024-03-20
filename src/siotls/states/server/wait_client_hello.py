@@ -3,24 +3,34 @@ import dataclasses
 from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import ChangeCipherSpec, alerts
 from siotls.contents.handshakes import (
+    X509,
     Certificate,
+    CertificateRequest,
     CertificateVerify,
     EncryptedExtensions,
     Finished,
     HelloRetryRequest,
+    RawPublicKey,
     ServerHello,
 )
 from siotls.contents.handshakes.extensions import (
     ALPN,
+    ClientCertificateTypeRequest,
+    ClientCertificateTypeResponse,
     Heartbeat,
     KeyShareResponse,
     KeyShareRetry,
+    ServerCertificateTypeRequest,
+    ServerCertificateTypeResponse,
+    SignatureAlgorithms,
+    SignatureAlgorithmsCert,
     SupportedVersionsResponse,
 )
 from siotls.crypto.ciphers import cipher_suite_registry
 from siotls.crypto.key_share import resume as key_share_resume
 from siotls.crypto.signatures import TLSSignatureSuite
 from siotls.iana import (
+    CertificateType,
     ContentType,
     ExtensionType,
     HandshakeType,
@@ -64,7 +74,7 @@ class ServerWaitClientHello(State):
 
         clear_extensions, encrypted_extensions, shared_key = (
             self._negociate_extensions(client_hello.extensions))
-        self.nconfig.freeze()
+        self.nconfig.freeze()  # wrong place, CertRequest negociates too
 
         if not shared_key:
             if not self._is_first_client_hello:
@@ -89,7 +99,10 @@ class ServerWaitClientHello(State):
         self._cipher.derive_handshake_secrets(shared_key, self._transcript.digest())
 
         self._send_content(EncryptedExtensions(encrypted_extensions))
-        self._send_content(Certificate(self.config.certificate_chain))
+
+        if self.config.require_peer_certificate:
+            self._send_content(CertificateRequest(...))  # + client cert type?
+        self._send_content(Certificate(...))  # + signed timestamps / status request
         self._send_content(CertificateVerify(...))
         self._send_content(Finished(...))
         self._move_to_state(ServerWaitFlight2)
@@ -132,15 +145,18 @@ class ServerWaitClientHello(State):
 
         negociate('supported_versions')
         negociate('supported_groups')
-        negociate('signature_algorithms')
 
         shared_key = negociate('key_share')
         if not shared_key:
             return clear_extensions, encrypted_extensions, None
 
+        negociate('signature_algorithms')
         negociate('server_certificate_type')
-        if ...:  # x509
+        if self.nconfig.server_certificate_type == CertificateType.X509:
             negociate('signature_algorithms_cert')
+        negociate('client_certificate_type')  # todo, + verify that it is
+                                              # indeed the client who send
+                                              # this extension as request
 
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')
@@ -170,31 +186,41 @@ class ServerWaitClientHello(State):
     def _negociate_signature_algorithms(self, sa_ext):
         if not sa_ext:
             raise alerts.MissingExtension(ExtensionType.SIGNATURE_ALGORITHMS)
-
-        compatible_suites = {
+        suites = {
             suite.iana_id: suite
-            for suite in TLSSignatureSuite.for_public_key(
-                self.config.public_key or self.config.certificate_chain[0].public_key()
-            )
+            for suite
+            in TLSSignatureSuite.for_public_key(self.config.public_key)
         }
         for sign_algo_id in sa_ext.supported_signature_algorithms:
-            if sign_algo_cls := compatible_suites.get(sign_algo_id):
+            if sign_algo_cls := suites.get(sign_algo_id):
                 self.nconfig.signature_algorithm = sign_algo_cls(self.config.private_key)
                 return [], []
-        e = "no common digital signature found"
+        e =("no common signature algorithm found: the client isn't "
+            "compatible with the server public key algorithm")
+        raise alerts.HandshakeFailure(e)
+
+    def _negociate_server_certificate_type(self, sct_ext):
+        if not sct_ext:
+            sct_ext = ServerCertificateTypeRequest([CertificateType.X509])
+        for cert_type in self.config.certificate_types:
+            if cert_type in sct_ext.certificate_types:
+                self.nconfig.server_certificate_type = cert_type
+                return [], [ServerCertificateTypeResponse(cert_type)]
+        e = "no common server certificate type found"
         raise alerts.HandshakeFailure(e)
 
     def _negociate_signature_algorithms_cert(self, sa_cert_ext):
-        if ...:  # RawPublicKey
+        if self.nconfig.server_certificate_type == CertificateType.RAW_PUBLIC_KEY:
             e = "cannot negociate signature algorithms cert with raw public keys"
             raise alerts.UnsupportedExtension(e)
         if not sa_cert_ext:
             self.nconfig.signature_algorithm_cert = self.nconfig.signature_algorithm
             return []
-
         sign_algo_cls = TLSSignatureSuite.for_cert(self.config.certificate_chain[0])
         if sign_algo_cls.iana_id not in sa_cert_ext.supported_signature_algorithms:
-            e = "no common digital signature found"
+            e =("no common certificate signature algorithm found: the "
+                "client isn't compatible with the signature algorithm "
+                "used by the CA to sign the server public key")
             raise alerts.HandshakeFailure(e)
         self.nconfig.signature_algorithm_cert = sign_algo_cls(self.config.private_key)
         return [], []
