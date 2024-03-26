@@ -15,6 +15,7 @@ from siotls.contents.handshakes import (
 )
 from siotls.contents.handshakes.extensions import (
     ALPN,
+    CertificateAuthorities,
     ClientCertificateTypeRequest,
     ClientCertificateTypeResponse,
     Heartbeat,
@@ -101,8 +102,23 @@ class ServerWaitClientHello(State):
         self._send_content(EncryptedExtensions(encrypted_extensions))
 
         if self.config.require_peer_certificate:
-            self._send_content(CertificateRequest(...))  # + client cert type?
+            # we ignore POST_HANDSHAKE_AUTH at the moment
+            cert_req_exts = [
+                SignatureAlgorithms(self.config.signature_algorithms),
+            ]
+            if self.config.trust_store:
+                cert_req_exts.append(SignatureAlgorithmsCert(self.config.signature_algorithms_cert))
+                #cert_req_exts.append(CertificateAuthorities(
+                #   cert.subject.public_bytes() for cert in self.config.trust_store.certs
+                #))
+
+            self._send_content(CertificateRequest(
+                certificate_request_context=b'',  # only for POST_HANDSHAKE_AUTH
+                extensions=cert_req_exts,
+            ))
+
         self._send_content(Certificate(...))  # + signed timestamps / status request
+
         self._send_content(CertificateVerify(...))
         self._send_content(Finished(...))
         self._move_to_state(ServerWaitFlight2)
@@ -150,13 +166,10 @@ class ServerWaitClientHello(State):
         if not shared_key:
             return clear_extensions, encrypted_extensions, None
 
-        negociate('signature_algorithms')
+        negociate('client_certificate_type')
         negociate('server_certificate_type')
-        if self.nconfig.server_certificate_type == CertificateType.X509:
-            negociate('signature_algorithms_cert')
-        negociate('client_certificate_type')  # todo, + verify that it is
-                                              # indeed the client who send
-                                              # this extension as request
+        negociate('signature_algorithms')
+        negociate('signature_algorithms_cert')
 
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')
@@ -183,6 +196,30 @@ class ServerWaitClientHello(State):
         e = "no common key exchange found"
         raise alerts.HandshakeFailure(e)
 
+    def _negociate_client_certificate_type(self, cct_ext):
+        if not self.config.require_peer_certificate:
+            return [], []
+        client_cert_types = cct_ext.certificate_types if cct_ext else [CertificateType.X509]
+        for cert_type in self.config.peer_certificate_types:
+            if cert_type in client_cert_types:
+                self.nconfig.client_certificate_type = cert_type
+                if cct_ext:
+                    return [], [ClientCertificateTypeResponse(cert_type)]
+                return [], []
+        e = "no common client certificate type found"
+        raise alerts.UnsupportedCertificate(e)
+
+    def _negociate_server_certificate_type(self, sct_ext):
+        server_cert_types = sct_ext.certificate_types if sct_ext else [CertificateType.X509]
+        for cert_type in self.config.certificate_types:
+            if cert_type in server_cert_types:
+                self.nconfig.server_certificate_type = cert_type
+                if sct_ext:
+                    return [], [ServerCertificateTypeResponse(cert_type)]
+                return [], []
+        e = "no common server certificate type found"
+        raise alerts.UnsupportedCertificate(e)
+
     def _negociate_signature_algorithms(self, sa_ext):
         if not sa_ext:
             raise alerts.MissingExtension(ExtensionType.SIGNATURE_ALGORITHMS)
@@ -199,23 +236,12 @@ class ServerWaitClientHello(State):
             "compatible with the server public key algorithm")
         raise alerts.HandshakeFailure(e)
 
-    def _negociate_server_certificate_type(self, sct_ext):
-        if not sct_ext:
-            sct_ext = ServerCertificateTypeRequest([CertificateType.X509])
-        for cert_type in self.config.certificate_types:
-            if cert_type in sct_ext.certificate_types:
-                self.nconfig.server_certificate_type = cert_type
-                return [], [ServerCertificateTypeResponse(cert_type)]
-        e = "no common server certificate type found"
-        raise alerts.HandshakeFailure(e)
-
     def _negociate_signature_algorithms_cert(self, sa_cert_ext):
-        if self.nconfig.server_certificate_type == CertificateType.RAW_PUBLIC_KEY:
-            e = "cannot negociate signature algorithms cert with raw public keys"
-            raise alerts.UnsupportedExtension(e)
+        if self.nconfig.server_certificate_type != CertificateType.X509:
+            return [], []
         if not sa_cert_ext:
             self.nconfig.signature_algorithm_cert = self.nconfig.signature_algorithm
-            return []
+            return [], []
         sign_algo_cls = TLSSignatureSuite.for_cert(self.config.certificate_chain[0])
         if sign_algo_cls.iana_id not in sa_cert_ext.supported_signature_algorithms:
             e =("no common certificate signature algorithm found: the "
@@ -261,6 +287,7 @@ class ServerWaitClientHello(State):
                 return [], [ALPN([proto])]
         e = "no common application layer protocol found"
         raise alerts.NoApplicationProtocol(e)
+    _negociate_alpn = _negociate_application_layer_protocol_negotiation
 
     def _negociate_heartbeat(self, client_hb):
         if not client_hb:

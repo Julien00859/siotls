@@ -103,42 +103,69 @@ class TLSConfiguration:
         return 'server' if self.side == 'client' else 'client'
 
     def __post_init__(self):
+        self._check_mandatory_settings()
         if self.side == 'server':
-            if self.max_fragment_length != MLFOctets.MAX_16384:
-                e = "max fragment length is only configurable client side"
-                raise ValueError(e)
-
-            if not self.private_key:
-                e = "a private key is mandatory server side"
-                raise ValueError(e)
-
-            if not (self.certificate_chain or self.public_key):
-                e = "a certificate or a public key is mandatory server side"
-                raise ValueError(e)
-
-            if not self.public_key:
-                self.public_key = self.certificate_chain[0].public_key()
-
-        else:  # self.side == 'client':SignatureAlgorithmsCert
-            if not (self.trust_store or self.trusted_public_keys):
-                e =("a trust store or a list of trusted public keys is"
-                    "mandatory server side")
-                raise ValueError(e)
-
-        if CertificateType.X509 in self.peer_certificate_types:
-            if not self.signature_algorithms_cert:
-                self.signature_algorithms_cert = self.signature_algorithms
+            self._check_server_settings()
         else:
-            if self.signature_algorithms_cert:
-                e =("The Signature Algorithm Cert extension can only be "
-                    "used with x509 SignatureAlgorithmsCertcertificates, not raw public keys")
-                raise ValueError(e)
+            self._check_client_settings()
+        if self.trust_store:
+            self._check_trust_store()
+
+    def _check_mandatory_settings(self):
+        if not self.cipher_suites:
+            e = "at least one cipher suite must be provided"
+            raise ValueError(e)
+        if not self.key_exchanges:
+            e = "at least one key exchange must be provided"
+            raise ValueError(e)
+        if not self.signature_algorithms:
+            e = "at least one signature algorithm must be provided"
+            raise ValueError(e)
+
+    def _check_server_settings(self):
+        if self.max_fragment_length != MLFOctets.MAX_16384:
+            e = "max fragment length is only configurable client side"
+            raise ValueError(e)
+        if not self.private_key:
+            e = "a private key is mandatory server side"
+            raise ValueError(e)
+        if not (self.certificate_chain or self.public_key):
+            e = "a certificate or a public key is mandatory server side"
+            raise ValueError(e)
+        if not self.public_key:
+            self.public_key = self.certificate_chain[0].public_key()
+        if self.request_peer_certificate:
+            m =("a trust store and/or a list of trusted public keys is "
+                "provided, client certificates will be requested")
+            logger.info(m)
+
+    def _check_client_settings(self):
+        if not (self.trust_store or self.trusted_public_keys):
+            w =("no trust store or trusted public keys provided, "
+                "server certificate validation disabled")
+            logger.warning(w)
+
+    def _check_trust_store(self):
+        if not self.signature_algorithms_cert:
+            self.signature_algorithms_cert = self.signature_algorithms
+        sign_algo_certs = frozenset(self.signature_algorithms_cert)
+        for ca_cert in self.trust_store.certs:
+            iana_ids = {
+                suite.iana_id
+                for suite
+                in TLSSignatureSuite.for_public_key(ca_cert.public_key())
+            }
+            if iana_ids.isdisjoint(sign_algo_certs):
+                w =("CA %r from the trust store is not compatible with "
+                    "any algorithm found inside the signature "
+                    "algorithms cert list, CA ignored")
+                logger.warning(w, ca_cert.subject.rfc4514_string)
 
 
 @dataclasses.dataclass(init=False)
 class TLSNegociatedConfiguration:
     cipher_suite: CipherSuites
-    signature_algorithm: TLSSignatureSuite
+    signature_algorithm: TLSSignatureSuite | None
     key_exchange: NamedGroup | None
     alpn: ALPNProtocol | None | type(...)
     can_send_heartbeat: bool | None

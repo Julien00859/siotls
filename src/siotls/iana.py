@@ -144,7 +144,6 @@ class ExtensionType(Hex2Enum):
     SIGNATURE_ALGORITHMS_CERT = 50  # Certificate signature
     KEY_SHARE = 51
 
-
 class HandshakeType(Hex1Enum):
     CLIENT_HELLO = 1
     SERVER_HELLO = 2
