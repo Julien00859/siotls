@@ -17,7 +17,7 @@ from siotls.contents.handshakes.extensions import (
     KeyShareRetry,
     SupportedVersionsResponse,
 )
-from siotls.crypto.ciphers import cipher_suite_registry
+from siotls.crypto.ciphers import TLSCipherSuite
 from siotls.crypto.key_share import resume as key_share_resume
 from siotls.iana import (
     ContentType,
@@ -50,7 +50,7 @@ class ServerWaitClientHello(State):
             cipher_suite = self._find_common_cipher_suite(client_hello.cipher_suites)
             self.nconfig = TLSNegociatedConfiguration(cipher_suite)
             self._client_unique = client_hello.random
-            self._cipher = cipher_suite_registry[cipher_suite](
+            self._cipher = TLSCipherSuite[cipher_suite](
                 'server', self._client_unique, log_keys=self.config.log_keys)
             self._transcript.post_init(self._cipher.digestmod)
         else:

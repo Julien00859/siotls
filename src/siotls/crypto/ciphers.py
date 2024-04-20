@@ -2,15 +2,15 @@
 # ruff: noqa: N801, S101
 import enum
 import hashlib
+from typing import ClassVar
 
 from cryptography.hazmat.primitives.ciphers import aead
 
 from siotls import key_logger
 from siotls.crypto.hkdf import derive_secret, hkdf_expand_label, hkdf_extract
 from siotls.iana import CipherSuites
-from siotls.utils import peekable
+from siotls.utils import RegistryMeta, peekable
 
-cipher_suite_registry = {}
 REKEY_THRESHOLD = 1024  # arbitrary
 SHA256_EMPTY = hashlib.sha256(b'').digest()
 SHA256_ZEROS = b'\x00' * hashlib.sha256().digest_size
@@ -96,11 +96,13 @@ class _TLSSecrets:
         )
 
 
-class _TLSCipherSuite:
+class TLSCipherSuite(metaclass=RegistryMeta):
+    _registry: ClassVar = {}
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        if _TLSCipherSuite in cls.__bases__:
-            cipher_suite_registry[cls.iana_id] = cls
+        if TLSCipherSuite in cls.__bases__:
+            cls._registry[cls.iana_id] = cls
 
     iana_id: CipherSuites
     # digestmod: hashlib._Hash
@@ -257,7 +259,7 @@ class _TLSCipherSuite:
         return exporter_master, resumption_master
 
 
-class TLS_AES_128_GCM_SHA256(_TLSCipherSuite):
+class TLS_AES_128_GCM_SHA256(TLSCipherSuite):
     iana_id = CipherSuites.TLS_AES_128_GCM_SHA256
     _ciphermod = aead.AESGCM
     digestmod = hashlib.sha256
@@ -269,7 +271,7 @@ class TLS_AES_128_GCM_SHA256(_TLSCipherSuite):
     hashempty = SHA256_EMPTY
     hashzeros = SHA256_ZEROS
 
-class TLS_AES_256_GCM_SHA384(_TLSCipherSuite):
+class TLS_AES_256_GCM_SHA384(TLSCipherSuite):
     iana_id = CipherSuites.TLS_AES_256_GCM_SHA384
     _ciphermod = aead.AESGCM
     digestmod = hashlib.sha384
@@ -281,7 +283,7 @@ class TLS_AES_256_GCM_SHA384(_TLSCipherSuite):
     hashempty = SHA384_EMPTY
     hashzeros = SHA384_ZEROS
 
-class TLS_CHACHA20_POLY1305_SHA256(_TLSCipherSuite):
+class TLS_CHACHA20_POLY1305_SHA256(TLSCipherSuite):
     iana_id = CipherSuites.TLS_CHACHA20_POLY1305_SHA256
     _ciphermod = aead.ChaCha20Poly1305
     digestmod = hashlib.sha256
@@ -293,7 +295,7 @@ class TLS_CHACHA20_POLY1305_SHA256(_TLSCipherSuite):
     hashempty = SHA256_EMPTY
     hashzeros = SHA256_ZEROS
 
-class TLS_AES_128_CCM_SHA256(_TLSCipherSuite):
+class TLS_AES_128_CCM_SHA256(TLSCipherSuite):
     iana_id = CipherSuites.TLS_AES_128_CCM_SHA256
     _ciphermod = aead.AESCCM
     digestmod = hashlib.sha256
@@ -309,7 +311,7 @@ class _AESCCM8(aead.AESCCM):
     def __init__(self, key):
         super().__init__(key, tag_length=8)
 
-class TLS_AES_128_CCM_8_SHA256(_TLSCipherSuite):
+class TLS_AES_128_CCM_8_SHA256(TLSCipherSuite):
     iana_id = CipherSuites.TLS_AES_128_CCM_8_SHA256
     _ciphermod = _AESCCM8
     digestmod = hashlib.sha256

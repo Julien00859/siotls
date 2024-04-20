@@ -2,7 +2,7 @@ import dataclasses
 
 from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import ChangeCipherSpec, alerts
-from siotls.crypto.ciphers import cipher_suite_registry
+from siotls.crypto.ciphers import TLSCipherSuite
 from siotls.crypto.key_share import resume as key_share_resume
 from siotls.iana import (
     ContentType,
@@ -47,7 +47,7 @@ class ClientWaitServerHello(State):
 
         if self._is_first_server_hello:
             self.nconfig = TLSNegociatedConfiguration(content.cipher_suite)
-            self._cipher = cipher_suite_registry[content.cipher_suite](
+            self._cipher = TLSCipherSuite[content.cipher_suite](
                 'client', self.config.log_keys, self._client_unique)
             self._transcript.post_init(self._cipher.digestmod)
             self._send_content(ChangeCipherSpec())
