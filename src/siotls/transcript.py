@@ -52,17 +52,17 @@ from siotls.contents import alerts
 from siotls.iana import HandshakeType
 
 ORDER = [
-    ('client', HandshakeType.CLIENT_HELLO),
-    ('server', HandshakeType.SERVER_HELLO),
-    ('server', HandshakeType.ENCRYPTED_EXTENSIONS),
-    ('server', HandshakeType.CERTIFICATE_REQUEST),
-    ('server', HandshakeType.CERTIFICATE),
-    ('server', HandshakeType.CERTIFICATE_VERIFY),
-    ('server', HandshakeType.FINISHED),
-    ('client', HandshakeType.END_OF_EARLY_DATA),
-    ('client', HandshakeType.CERTIFICATE),
-    ('client', HandshakeType.CERTIFICATE_VERIFY),
-    ('client', HandshakeType.FINISHED),
+    ('client', HandshakeType.CLIENT_HELLO, True),
+    ('server', HandshakeType.SERVER_HELLO, True),
+    ('server', HandshakeType.ENCRYPTED_EXTENSIONS, True),
+    ('server', HandshakeType.CERTIFICATE_REQUEST, False),  # optional
+    ('server', HandshakeType.CERTIFICATE, True),
+    ('server', HandshakeType.CERTIFICATE_VERIFY, True),
+    ('server', HandshakeType.FINISHED, True),
+    ('client', HandshakeType.END_OF_EARLY_DATA, False),    # optional
+    ('client', HandshakeType.CERTIFICATE, False),          # optional
+    ('client', HandshakeType.CERTIFICATE_VERIFY, False),   # optional
+    ('client', HandshakeType.FINISHED, True),
 ]
 
 
@@ -97,7 +97,10 @@ class Transcript:
     def update(self, handshake_data, side, handshake_type):
         if self._order_i == len(ORDER):
             return
-        if (side, handshake_type) != ORDER[self._order_i]:
+
+        while (side, handshake_type) != ORDER[self._order_i][:2] and not ORDER[self._order_i][2]:
+            self._order_i += 1
+        if (side, handshake_type) != ORDER[self._order_i][:2]:
             e =(f"was expecting {ORDER[self._order_i]} but found "
                 f"{(side, handshake_type)} instead")
             raise alerts.UnexpectedMessage(e)
