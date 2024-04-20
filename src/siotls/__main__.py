@@ -1,5 +1,4 @@
 import argparse
-import importlib.resources
 import logging
 import os
 import pathlib
@@ -52,10 +51,8 @@ def main():
     parser.add_argument('--port', action='store', type=int, default=8446,
         help="TCP port number on which the server will listen / client will connect")
     parser.add_argument('--tlscert', '--sslcert', action='store', type=pathlib.Path,
-        default=importlib.resources.path('siotls.data', 'self-signed-cert.pem'),
         help="Path to the SSL/TLS certificate file")
     parser.add_argument('--tlskey', '--sslkey', action='store', type=pathlib.Path,
-        default=importlib.resources.path('siotls.data', 'self-signed-key.pem'),
         help="Path to the SSL/TLS private key file")
     parser.add_argument('--keylogfile', action='store', type=pathlib.Path,
         help="Export TLS secrets to the specificed file for network analyzing "
