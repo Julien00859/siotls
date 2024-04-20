@@ -1,12 +1,23 @@
 import logging
 from socket import socket
 
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.x509 import load_pem_x509_certificates
+
 from siotls import TLSConfiguration, TLSConnection
 from siotls.utils import hexdump
 
 logger = logging.getLogger(__name__)
 
-def serve(host, port, tlscert, tlskey):  # noqa: ARG001
+def serve(host, port, certificate_chain_path, private_key_path):
+    with open(certificate_chain_path, 'rb') as certificate_chain_file, \
+         open(private_key_path, 'rb') as private_key_file:
+        tls_config = TLSConfiguration(
+            'server',
+            private_key=load_pem_private_key(private_key_file.read(), None),
+            certificate_chain=load_pem_x509_certificates(certificate_chain_file.read()),
+        )
+
     server = socket()
     server.bind((host, port))
     server.listen(1)
@@ -18,7 +29,7 @@ def serve(host, port, tlscert, tlskey):  # noqa: ARG001
             client, client_info = server.accept()
             logger.info("new connection from %s", client_info[1])
             try:
-                handle_one(client, client_info)
+                handle_one(client, client_info, tls_config)
             except Exception:
                 logger.exception("while parsing data from %s", client_info[1])
             logger.info("end of connection with %s", client_info[1])
@@ -31,9 +42,8 @@ def serve(host, port, tlscert, tlskey):  # noqa: ARG001
         server.close()
 
 
-def handle_one(client, client_info):
-    config = TLSConfiguration('server')
-    conn = TLSConnection(config)
+def handle_one(client, client_info, tls_config):
+    conn = TLSConnection(tls_config)
     conn.initiate_connection()
 
     while True:

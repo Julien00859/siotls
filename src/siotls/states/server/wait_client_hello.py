@@ -4,6 +4,7 @@ from siotls.configuration import TLSNegociatedConfiguration
 from siotls.contents import ChangeCipherSpec, alerts
 from siotls.contents.handshakes import (
     Certificate,
+    CertificateRequest,
     CertificateVerify,
     EncryptedExtensions,
     Finished,
@@ -15,10 +16,13 @@ from siotls.contents.handshakes.extensions import (
     Heartbeat,
     KeyShareResponse,
     KeyShareRetry,
+    SignatureAlgorithms,
+    SignatureAlgorithmsCert,
     SupportedVersionsResponse,
 )
 from siotls.crypto.ciphers import TLSCipherSuite
 from siotls.crypto.key_share import resume as key_share_resume
+from siotls.crypto.signatures import TLSSignatureSuite
 from siotls.iana import (
     ContentType,
     ExtensionType,
@@ -29,6 +33,12 @@ from siotls.iana import (
 
 from .. import State
 from . import ServerWaitFinished, ServerWaitFlight2
+
+CERTIFICATE_VERIFY_SERVER = b"".join([
+    b" " * 64,
+    b"TLS 1.3, server CertificateVerify",
+    b"\x00",
+])
 
 
 class ServerWaitClientHello(State):
@@ -129,10 +139,30 @@ class ServerWaitClientHello(State):
         self._send_content(EncryptedExtensions(encrypted_extensions))
 
     def _request_user_certificate(self):
-        ...
+        # we ignore POST_HANDSHAKE_AUTH at the moment
+        certificate_request_extensions = [
+            SignatureAlgorithms(self.config.signature_algorithms),
+        ]
+        self._send_content(CertificateRequest(
+            certificate_request_context=b'',  # only for POST_HANDSHAKE_AUTH
+            extensions=certificate_request_extensions,
+        ))
 
     def _send_server_certificate(self):
-        ...
+        certificate_list = []
+        certificate_list.extend([
+            X509(certificate, [])
+            for certificate
+            in self.config.certificate_chain
+        ])
+        self._send_content(Certificate(b'', certificate_list))
+        self._send_content(CertificateVerify(
+            self._signature.iana_id,
+            self._signature.sign(b''.join([
+                CERTIFICATE_VERIFY_SERVER,
+                self._transcript.digest(),
+            ]))
+        ))
 
     def _send_finished(self):
         ...
@@ -186,11 +216,12 @@ class ServerWaitClientHello(State):
     def _negociate_signature_algorithms(self, sa_ext):
         if not sa_ext:
             raise alerts.MissingExtension(ExtensionType.SIGNATURE_ALGORITHMS)
-        for signature_algorithms in self.config.signature_algorithms:
-            if signature_algorithms in sa_ext.supported_signature_algorithms:
-                self.nconfig.signature_algorithm = signature_algorithms
+        suites = TLSSignatureSuite.for_certificate(self.config.certificate_chain[0])
+        for server_suite in self.config.signature_algorithms:
+            if server_suite in suites and server_suite in sa_ext.supported_signature_algorithms:
+                self._signature = suites[server_suite](self.config.private_key)
                 return [], []
-        e = "no common digital signature found"
+        e = "no common signature algorithm found"
         raise alerts.HandshakeFailure(e)
 
     def _negociate_key_share(self, key_share_ext):

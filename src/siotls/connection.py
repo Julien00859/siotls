@@ -30,6 +30,8 @@ class TLSConnection:
         self.nconfig = None
         self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
         self._cipher = cipher_plaintext
+        self._signature = None
+
         self._transcript = Transcript({
             TLSCipherSuite[cipher_suite].digestmod
             for cipher_suite in config.cipher_suites
