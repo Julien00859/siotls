@@ -22,7 +22,6 @@ RFC-8446 and the documents it references, we also studied:
 * https://safecurves.cr.yp.to/
 * https://www.enisa.europa.eu/publications/algorithms-key-size-and-parameters-report-2014
 * https://latacora.micro.blog/2018/04/03/cryptographic-right-answers.html
-* https://gist.github.com/atoponce/07d8d4c833873be2f68c34f9afc5a78a
 
 Installation
 ------------
@@ -35,10 +34,9 @@ from main and build it using [`build`](https://build.pypa.io/en/latest/).
 Contributing
 ------------
 
-Thank you for considering contributing to siotls. While we suggest initiating
-the process by opening an issue to discuss changes like reporting problems or
-proposing features, you're welcome to submit pull requests directly if you
-prefer.
+Best it to start by opening an issue to discuss the things you wanna change or
+improve. You can also just open a PR and write down everything in the PR
+message.
 
 ### Installation
 
