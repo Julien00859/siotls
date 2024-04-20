@@ -1,9 +1,11 @@
 import dataclasses
+import functools
 import logging
 import typing
 
 from cryptography.hazmat.primitives.asymmetric.types import (
     PrivateKeyTypes,
+    PublicKeyTypes,
 )
 from cryptography.x509 import Certificate
 from cryptography.x509.verification import Store
@@ -11,6 +13,7 @@ from cryptography.x509.verification import Store
 from siotls.crypto.signatures import TLSSignatureSuite
 from siotls.iana import (
     ALPNProtocol,
+    CertificateType,
     CipherSuites,
     MaxFragmentLengthOctets as MLFOctets,
     NamedGroup,
@@ -53,8 +56,10 @@ class TLSConfiguration:
         ].copy)
 
     trust_store: Store | None = None
+    trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
 
     private_key: PrivateKeyTypes | None = None
+    public_key: PublicKeyTypes | None = None
     certificate_chain: list[Certificate] | None = None
 
     # extensions
@@ -68,7 +73,25 @@ class TLSConfiguration:
 
     @property
     def require_peer_certificate(self):
-        return bool(self.trust_store)
+        return bool(self.trust_store or self.trusted_public_keys)
+
+    @functools.cached_property
+    def certificate_types(self):
+        types = []  # order is important, x509 must be first
+        if self.certificate_chain:
+            types.append(CertificateType.X509)
+        if self.public_key:
+            types.append(CertificateType.RAW_PUBLIC_KEY)
+        return types
+
+    @functools.cached_property
+    def peer_certificate_types(self):
+        types = []  # order is important, x509 must be first
+        if self.trust_store:
+            types.append(CertificateType.X509)
+        if self.trusted_public_keys:
+            types.append(CertificateType.RAW_PUBLIC_KEY)
+        return types
 
     @property
     def other_side(self):
@@ -99,18 +122,18 @@ class TLSConfiguration:
         if not self.private_key:
             e = "a private key is mandatory server side"
             raise ValueError(e)
-        if not self.certificate_chain:
-            e = "a certificate is mandatory server side"
+        if not (self.certificate_chain or self.public_key):
+            e = "a certificate or a public key is mandatory server side"
             raise ValueError(e)
         if self.require_peer_certificate:
-            m =("a trust store is provided, client certificates will "
-                "be requested")
+            m =("a trust store and/or a list of trusted public keys is "
+                "provided, client certificates will be requested")
             logger.info(m)
 
     def _check_client_settings(self):
-        if not self.trust_store:
-            w =("no trust store provided, server certificate "
-                "validation disabled")
+        if not (self.trust_store or self.trusted_public_keys):
+            w =("no trust store or trusted public keys provided, "
+                "server certificate validation disabled")
             logger.warning(w)
 
 
@@ -123,6 +146,8 @@ class TLSNegociatedConfiguration:
     can_send_heartbeat: bool | None
     can_echo_heartbeat: bool | None
     max_fragment_length: MLFOctets | None
+    client_certificate_type: CertificateType | None
+    server_certificate_type: CertificateType | None
 
     def __init__(self, cipher_suite):
         object.__setattr__(self, '_frozen', False)
@@ -133,6 +158,8 @@ class TLSNegociatedConfiguration:
         self.can_send_heartbeat = None
         self.can_echo_heartbeat = None
         self.max_fragment_length = None
+        self.client_certificate_type = None
+        self.server_certificate_type = None
 
     def freeze(self):
         self._frozen = True

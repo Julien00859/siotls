@@ -5,6 +5,7 @@ from siotls.contents import ChangeCipherSpec, alerts
 from siotls.crypto.ciphers import TLSCipherSuite
 from siotls.crypto.key_share import resume as key_share_resume
 from siotls.iana import (
+    CertificateType,
     ContentType,
     ExtensionType,
     HandshakeType,
@@ -100,6 +101,8 @@ class ClientWaitServerHello(State):
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')
         negociate('heartbeat')
+        negociate('client_certificate_type')
+        negociate('server_certificate_type')
         return shared_key
 
     def _negociate_supported_versions(self, supported_versions_ext):
@@ -163,3 +166,21 @@ class ClientWaitServerHello(State):
                 heartbeat_ext.mode == HeartbeatMode.PEER_ALLOWED_TO_SEND
             )
             self.nconfig.can_echo_heartbeat = self.config.can_echo_heartbeat
+
+    def _negociate_client_certificate_type(self, ext):
+        if not ext:
+            self.nconfig.client_certificate_type = CertificateType.X509
+        elif ext.certificate_type in self.config.certificate_types:
+            self.nconfig.client_certificate_type = ext.certificate_type
+        else:
+            e = "the server-selected client certificate type wasn't offered"
+            raise alerts.IllegalParameter(e)
+
+    def _negociate_server_certificate_type(self, ext):
+        if not ext:
+            self.nconfig.server_certificate_type = CertificateType.X509
+        elif ext.certificate_type in self.config.peer_certificate_types:
+            self.nconfig.server_certificate_type = ext.certificate_type
+        else:
+            e = "the server-selected server certificate type wasn't offered"
+            raise alerts.IllegalParameter(e)
