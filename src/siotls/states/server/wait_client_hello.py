@@ -28,7 +28,7 @@ from siotls.iana import (
 )
 
 from .. import State
-from . import ServerWaitFlight2
+from . import ServerWaitFinished, ServerWaitFlight2
 
 
 class ServerWaitClientHello(State):
@@ -39,58 +39,49 @@ class ServerWaitClientHello(State):
         self._is_first_client_hello = True
 
     def process(self, client_hello):
+        self._check(client_hello)
+        if self._is_first_client_hello:
+            self._setup(client_hello)
+
+        server_extensions, shared_key = self._negociate(client_hello.extensions)
+        if not shared_key:
+            self._send_hello_retry_request(client_hello.legacy_session_id, server_extensions)
+            return
+        self._send_server_hello(client_hello.legacy_session_id, server_extensions, shared_key)
+
+        if self.config.require_peer_certificate:
+            self._request_user_certificate()
+
+        self._send_server_certificate()
+
+        self._send_finished()
+
+        server_finished_transcript_hash = self._transcript.digest()
+        if self.config.require_peer_certificate:
+            self._move_to_state(ServerWaitFlight2, server_finished_transcript_hash)
+        else:
+            self._move_to_state(ServerWaitFinished, server_finished_transcript_hash)
+
+    def _check(self, client_hello):
         if client_hello.content_type != ContentType.HANDSHAKE:
             e = "can only receive Handshake in this state"
             raise alerts.UnexpectedMessage(e)
         if client_hello.msg_type != HandshakeType.CLIENT_HELLO:
             e = "can only receive ClientHello in this state"
             raise alerts.UnexpectedMessage(e)
-
-        if self._is_first_client_hello:
+        if not self._is_first_client_hello:
             cipher_suite = self._find_common_cipher_suite(client_hello.cipher_suites)
-            self.nconfig = TLSNegociatedConfiguration(cipher_suite)
-            self._client_unique = client_hello.random
-            self._cipher = TLSCipherSuite[cipher_suite](
-                'server', self._client_unique, log_keys=self.config.log_keys)
-            self._transcript.post_init(self._cipher.digestmod)
-        else:
-            if cipher_suite != self.nconfig.cipher_suite:
-                e = "client's cipher suite cannot change in between Hellos"
-                raise alerts.IllegalParameter(e)
             if client_hello.random != self._client_unique:
                 e = "client's random cannot change in between Hellos"
                 raise alerts.IllegalParameter(e)
 
-        clear_extensions, encrypted_extensions, shared_key = (
-            self._negociate_extensions(client_hello.extensions))
-
-        if not shared_key:
-            if not self._is_first_client_hello:
-                e = "invalid KeyShare in second ClientHello"
-                raise alerts.IllegalParameter(e)
-            self._send_hello_retry_request(client_hello, clear_extensions)
-            self._is_first_client_hello = False
-            return
-
-        self._cipher.skip_early_secrets()
-
-        self._send_content(ServerHello(
-            self._server_unique,
-            client_hello.legacy_session_id,
-            self.nconfig.cipher_suite,
-            clear_extensions,
-        ))
-
-        if self._is_first_client_hello:
-            self._send_content(ChangeCipherSpec())
-
-        self._cipher.derive_handshake_secrets(shared_key, self._transcript.digest())
-
-        self._send_content(EncryptedExtensions(encrypted_extensions))
-        self._send_content(Certificate(...))
-        self._send_content(CertificateVerify(...))
-        self._send_content(Finished(...))
-        self._move_to_state(ServerWaitFlight2)
+    def _setup(self, client_hello):
+        cipher_suite = self._find_common_cipher_suite(client_hello.cipher_suites)
+        self.nconfig = TLSNegociatedConfiguration(cipher_suite)
+        self._client_unique = client_hello.random
+        self._cipher = TLSCipherSuite[cipher_suite](
+            'server', self._client_unique, log_keys=self.config.log_keys)
+        self._transcript.post_init(self._cipher.digestmod)
 
     def _find_common_cipher_suite(self, cipher_suites):
         for cipher_suite in self.config.cipher_suites:
@@ -99,23 +90,54 @@ class ServerWaitClientHello(State):
         e = "no common cipher suite found"
         raise alerts.HandshakeFailure(e)
 
-    def _send_hello_retry_request(self, client_hello, clear_extensions):
+    def _send_hello_retry_request(self, session_id, server_extensions):
+        if not self._is_first_client_hello:
+            e = "invalid KeyShare in second ClientHello"
+            raise alerts.IllegalParameter(e)
+        self._is_first_client_hello = False
+
         # make sure the client doesn't change its algorithms in between flights
         self.config = dataclasses.replace(self.config,
-            cipher_suites=[self.nconfig.cipher_suite],
+            cipher_suites=[self._cipher.iana_id],
             key_exchanges=[self.nconfig.key_exchange],
+            signature_algorithms=[self._signature.iana_id]
         )
 
+        clear_extensions, _ = server_extensions
         self._send_content(HelloRetryRequest(
             HelloRetryRequest.random,
-            client_hello.legacy_session_id,
-            self.nconfig.cipher_suite,
+            session_id,
+            self._cipher.iana_id,
             clear_extensions,
         ))
         self._transcript.do_hrr_dance()
         self._send_content(ChangeCipherSpec())
 
-    def _negociate_extensions(self, client_extensions):
+    def _send_server_hello(self, session_id, extensions, shared_key):
+        clear_extensions, encrypted_extensions = extensions
+
+        self._cipher.skip_early_secrets()
+        self._send_content(ServerHello(
+            self._server_unique,
+            session_id,
+            self._cipher.iana_id,
+            clear_extensions,
+        ))
+        if self._is_first_client_hello:
+            self._send_content(ChangeCipherSpec())
+        self._cipher.derive_handshake_secrets(shared_key, self._transcript.digest())
+        self._send_content(EncryptedExtensions(encrypted_extensions))
+
+    def _request_user_certificate(self):
+        ...
+
+    def _send_server_certificate(self):
+        ...
+
+    def _send_finished(self):
+        ...
+
+    def _negociate(self, client_extensions):
         clear_extensions = []
         encrypted_extensions = []
 
@@ -134,13 +156,13 @@ class ServerWaitClientHello(State):
 
         shared_key = negociate('key_share')
         if not shared_key:
-            return clear_extensions, encrypted_extensions, None
+            return (clear_extensions, encrypted_extensions), None
 
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')
         negociate('heartbeat')
 
-        return clear_extensions, encrypted_extensions, shared_key
+        return (clear_extensions, encrypted_extensions), shared_key
 
     def _negociate_supported_versions(self, supported_versions_ext):
         if not supported_versions_ext:
@@ -207,6 +229,7 @@ class ServerWaitClientHello(State):
                 return [], [ALPN([proto])]
         e = "no common application layer protocol found"
         raise alerts.NoApplicationProtocol(e)
+    _negociate_alpn = _negociate_application_layer_protocol_negotiation
 
     def _negociate_heartbeat(self, client_hb):
         if not client_hb:
