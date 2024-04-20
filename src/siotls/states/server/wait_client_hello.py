@@ -195,7 +195,9 @@ class ServerWaitClientHello(State):
         ))
 
     def _send_finished(self):
-        ...
+        self._send_content(Finished(
+            self._cipher.sign_finish(self._transcript.digest())
+        ))
 
     def _negociate(self, client_extensions):
         clear_extensions = []

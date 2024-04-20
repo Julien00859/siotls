@@ -2,6 +2,7 @@
 # ruff: noqa: N801, S101
 import enum
 import functools
+import hmac
 import hashlib
 from typing import ClassVar
 
@@ -158,6 +159,30 @@ class TLSCipherSuite(metaclass=RegistryMeta):
         return nonce.to_bytes(self.nonce_length, 'big')
 
     # ------------------------------------------------------------------
+    # Finished integrity
+    # ------------------------------------------------------------------
+
+    def sign_finish(self, transcript_hash):
+        key = (
+            self._client_finished_key
+            if self._side == 'client' else
+            self._server_finished_key
+        )
+        return hmac.digest(key, transcript_hash, self.digestmod)
+
+    def verify_finish(self, transcript_hash, other_verify_data):
+        other_key = (
+            self._server_finished_key
+            if self._side == 'client' else
+            self._client_finished_key
+        )
+        verify_data = hmac.digest(other_key, transcript_hash, self.digestmod)
+        if not hmac.compare_digest(verify_data, other_verify_data):
+            e = "invalid signature"
+            raise ValueError(e)
+
+
+    # ------------------------------------------------------------------
     # Key Derivation
     # ------------------------------------------------------------------
 
@@ -201,6 +226,11 @@ class TLSCipherSuite(metaclass=RegistryMeta):
         client_handshake_traffic, server_handshake_traffic = (
             self._secrets.derive_handshake_secrets(
                 shared_key, server_hello_transcript_hash))
+
+        self._client_finished_key = derive_secret(
+            self.digestmod, client_handshake_traffic, b"finished", b"")
+        self._server_finished_key =  derive_secret(
+            self.digestmod, server_handshake_traffic, b"finished", b"")
 
         client_key, client_iv = self._derive_key_and_iv(client_handshake_traffic)
         server_key, server_iv = self._derive_key_and_iv(server_handshake_traffic)
@@ -254,6 +284,10 @@ class TLSCipherSuite(metaclass=RegistryMeta):
             self._read_cipher = self._ciphermod(client_key)
             self._read_iv = int.from_bytes(client_iv, 'big')
             self._read_seq = peekable(iter(range(self.usage_limit)))
+
+        # not necessary anymore
+        self._client_finished_key = None
+        self._server_finished_key = None
 
         if self._client_unique_hex:
             key_logger.info("CLIENT_TRAFFIC_SECRET_0 %s %s",

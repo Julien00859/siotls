@@ -9,7 +9,7 @@ from siotls.iana import AlertLevel, ContentType, TLSVersion
 from siotls.serial import SerialIO, TLSBufferError, TooMuchDataError
 
 from .contents import ApplicationData, Content, Handshake, alerts
-from .states import ClientStart, ServerStart
+from .states import ClientClosed, ServerClosed, ClientStart, ServerStart
 from .transcript import Transcript
 from .utils import try_cast
 
@@ -127,6 +127,12 @@ class TLSConnection:
 
     def rekey(self):
         raise NotImplementedError
+
+    def close_connection(self):
+        self._send_content(alerts.CloseNotify())
+        self._move_to_state(
+            ClientClosed if self.config.side == 'client' else ServerClosed
+        )
 
     # ------------------------------------------------------------------
     # Internal APIs

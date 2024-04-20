@@ -29,7 +29,7 @@ def serve(host, port, certificate_chain_path, private_key_path):
             client, client_info = server.accept()
             logger.info("new connection from %s", client_info[1])
             try:
-                handle_one(client, client_info, tls_config)
+                handle_one(client, tls_config)
             except Exception:
                 logger.exception("while parsing data from %s", client_info[1])
             logger.info("end of connection with %s", client_info[1])
@@ -42,7 +42,7 @@ def serve(host, port, certificate_chain_path, private_key_path):
         server.close()
 
 
-def handle_one(client, client_info, tls_config):
+def handle_one(client, tls_config):
     conn = TLSConnection(tls_config)
     conn.initiate_connection()
 
@@ -50,11 +50,13 @@ def handle_one(client, client_info, tls_config):
         input_data = client.recv(16384)
         if not input_data:
             break
-        logger.info("%s bytes from %s:\n%s", len(input_data), client_info[1], hexdump(input_data))
         conn.receive_data(input_data)
 
         output_data = conn.data_to_send()
         if not output_data:
             break
-        logger.info("%s bytes to %s:\n%s", len(output_data), client_info[1], hexdump(output_data))
         client.send(output_data)
+
+    conn.send_data(b"Hello from siotls!\n")
+    conn.close_connection()
+    client.send(conn.data_to_send())
