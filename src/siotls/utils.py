@@ -1,8 +1,14 @@
+import abc
 import binascii
 import itertools
 import math
 
 _sentinel = object()
+
+
+class RegistryMeta(abc.ABCMeta):
+    def __getitem__(cls, entry):
+        return cls._registry[entry]
 
 
 def hexdump(bytes_):
