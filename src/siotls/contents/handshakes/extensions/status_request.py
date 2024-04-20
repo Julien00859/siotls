@@ -14,7 +14,6 @@ class CertificateStatusRequest(Extension, SerializableBody):
     extension_type = ExtensionType.STATUS_REQUEST
     _handshake_types = (
         HandshakeType.CLIENT_HELLO,
-        HandshakeType.CERTIFICATE,
         HandshakeType.CERTIFICATE_REQUEST
     )
 
@@ -51,6 +50,7 @@ class CertificateStatusRequest(Extension, SerializableBody):
         ])
 
 
+@dataclasses.dataclass(init=False)
 class OCSPStatusRequest(CertificateStatusRequest):
     status_type = CertificateStatusType.OCSP
 
@@ -87,4 +87,68 @@ class OCSPStatusRequest(CertificateStatusRequest):
             serialized_responder_id_list,
             len(self.request_extension).to_bytes(2, 'big'),
             self.request_extensions,
+        ])
+
+
+
+_status_registry = {}
+
+@dataclasses.dataclass(init=False)
+class CertificateStatus(Extension, SerializableBody):
+    extension_type = ExtensionType.STATUS_REQUEST
+    _handshake_types = (
+        HandshakeType.CERTIFICATE,
+    )
+
+    _struct = textwrap.dedent("""
+        struct {
+            CertificateStatusType status_type;
+            select (status_type) {
+                case ocsp: OCSPResponse;
+            } response;
+        } CertificateStatus;
+    """).strip('\n')
+    status_type: CertificateStatusType
+
+    def __init_subclass__(cls, *, register=True, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if register and CertificateStatusRequest in cls.__bases__:
+            _status_request_registry[cls.extension_type] = cls
+
+    @classmethod
+    def parse_body(abc, stream):
+        status_type = stream.read_int(1)
+        try:
+            cls = _status_registry[CertificateStatusType(status_type)]
+        except ValueError as exc:
+            # Unlike for ServerName, nothing states how to process
+            # unknown certificate status types, crash for now
+            raise alerts.UnrecognizedName(*exc.args) from exc
+        return cls.parse_bodybody(stream)
+
+    def serialize_body(self):
+        return b''.join([
+            self.status_type.to_bytes(1, 'big'),
+            self.serialize_bodybody(),
+        ])
+
+class OCSPStatus(CertificateStatusRequest):
+    status_type = CertificateStatusType.OCSP
+
+    _struct = textwrap.dedent("""
+        opaque OCSPResponse<1..2^24-1>;
+    """).strip('\n')
+    ocsp_response: bytes
+
+    def __init__(self, ocsp_response):
+        self.ocsp_response = ocsp_response
+
+    @classmethod
+    def parse_bodybody(cls, stream):
+        return cls(stream.read_var(3))
+
+    def serialize_bodybody(self):
+        return b''.join([
+            len(self.ocsp_response).to_bytes(3, 'big'),
+            self.ocsp_response,
         ])

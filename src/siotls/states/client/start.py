@@ -6,6 +6,7 @@ from siotls.contents.handshakes.extensions import (
     Heartbeat,
     HostName,
     KeyShareRequest,
+    OCSPStatusRequest,
     ServerCertificateTypeRequest,
     ServerNameListRequest,
     SignatureAlgorithms,
@@ -48,6 +49,8 @@ class ClientStart(State):
             extensions.append(ClientCertificateTypeRequest(self.config.certificate_types))
         if self.config.trusted_public_keys:  # x509 assumed when extension missing
             extensions.append(ServerCertificateTypeRequest(self.config.peer_certificate_types))
+        if self.config.trust_store:
+            extensions.append(OCSPStatusRequest([], b''))
         if self._cookie:
             extensions.append(Cookie(self._cookie))
         extensions.append(KeyShareRequest(self._init_key_share()))

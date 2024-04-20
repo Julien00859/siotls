@@ -148,6 +148,7 @@ class TLSNegociatedConfiguration:
     max_fragment_length: MLFOctets | None
     client_certificate_type: CertificateType | None
     server_certificate_type: CertificateType | None
+    peer_want_ocsp_stapling: bool | None
 
     def __init__(self, cipher_suite):
         object.__setattr__(self, '_frozen', False)
@@ -160,6 +161,7 @@ class TLSNegociatedConfiguration:
         self.max_fragment_length = None
         self.client_certificate_type = None
         self.server_certificate_type = None
+        self.peer_want_ocsp_stapling = None
 
     def freeze(self):
         self._frozen = True

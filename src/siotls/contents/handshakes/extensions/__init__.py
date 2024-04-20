@@ -132,7 +132,12 @@ from .psk_key_exchange_modes import PskKeyExchangeModes
 from .server_name import HostName, ServerName, ServerNameListRequest, ServerNameResponse
 from .signature_algorithms import SignatureAlgorithms, SignatureAlgorithmsCert
 from .signed_certificate_timestamp import SignedCertificateTimestamp
-from .status_request import CertificateStatusRequest, OCSPStatusRequest
+from .status_request import (
+    CertificateStatus,
+    CertificateStatusRequest,
+    OCSPStatus,
+    OCSPStatusRequest,
+)
 from .supported_groups import SupportedGroups
 from .supported_versions import SupportedVersionsRequest, SupportedVersionsResponse
 from .use_srtp import UseSRTP

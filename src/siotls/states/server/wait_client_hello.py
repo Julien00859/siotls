@@ -21,6 +21,7 @@ from siotls.contents.handshakes.extensions import (
     Heartbeat,
     KeyShareResponse,
     KeyShareRetry,
+    OCSPStatus,
     ServerCertificateTypeResponse,
     SignatureAlgorithms,
     SignatureAlgorithmsCert,
@@ -28,8 +29,13 @@ from siotls.contents.handshakes.extensions import (
 )
 from siotls.crypto.ciphers import TLSCipherSuite
 from siotls.crypto.key_share import resume as key_share_resume
+from siotls.crypto.ocsp import (
+    get_ocsp_url,
+    make_ocsp_request,
+)
 from siotls.crypto.signatures import TLSSignatureSuite
 from siotls.iana import (
+    CertificateStatusType,
     CertificateType,
     ContentType,
     ExtensionType,
@@ -166,6 +172,19 @@ class ServerWaitClientHello(State):
                 in self.config.certificate_chain
             ])
 
+            if (
+                self.nconfig.peer_want_ocsp_stapling
+                and self.ocsp_callback
+                and len(self.config.certificate_chain) > 1
+            ):
+                ocsp_url = get_ocsp_url(self.config.certificate_chain[0])
+                ocsp_req = make_ocsp_request(
+                    self.config.certificate_chain[0],
+                    self.config.certificate_chain[1],
+                )
+                ocsp_res = self.ocsp_service(ocsp_url, ocsp_req)
+                certificate_list[0].extensions.append(OCSPStatus(ocsp_res))
+
         self._send_content(Certificate(b'', certificate_list))
         self._send_content(CertificateVerify(
             self._signature.iana_id,
@@ -205,6 +224,7 @@ class ServerWaitClientHello(State):
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')
         negociate('heartbeat')
+        negociate('status_request')
 
         return (clear_extensions, encrypted_extensions), shared_key
 
@@ -316,3 +336,12 @@ class ServerWaitClientHello(State):
             HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND
         )
         return [], [response]
+
+    def _negociate_status_request(self, status_request_ext):
+        if not status_request_ext:
+            self.nconfig.peer_want_ocsp_stapling = False
+        else:
+            self.nconfig.peer_want_ocsp_stapling = (
+                status_request_ext.status_type == CertificateStatusType.OCSP
+            )
+        return [], []
