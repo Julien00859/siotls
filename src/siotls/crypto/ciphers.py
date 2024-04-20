@@ -256,10 +256,12 @@ class TLSCipherSuite(metaclass=RegistryMeta):
             self._read_seq = peekable(iter(range(self.usage_limit)))
 
         if self._client_unique_hex:
-            key_logger.info("CLIENT_APPLICATION_TRAFFIC_SECRET %s %s",
+            key_logger.info("CLIENT_TRAFFIC_SECRET_0 %s %s",
                 self._client_unique_hex, client_application_traffic.hex())
-            key_logger.info("SERVER_APPLICATION_TRAFFIC_SECRET %s %s",
+            key_logger.info("SERVER_TRAFFIC_SECRET_0 %s %s",
                 self._client_unique_hex, server_application_traffic.hex())
+            key_logger.info("EXPORTER_SECRET %s %s",
+                self._client_unique_hex, exporter_master.hex())
 
         return exporter_master, resumption_master
 
