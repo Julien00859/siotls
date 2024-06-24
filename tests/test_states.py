@@ -1,5 +1,4 @@
 import dataclasses
-import logging
 
 from siotls import TLSConnection
 from siotls.contents import ApplicationData
@@ -86,9 +85,8 @@ class TestStateServerWaitClientHello(TestCase):
         ))
         client_hello_second_flight = client_conn.data_to_send()
 
-        m =(r".*siotls\.contents\.alerts\.HandshakeFailure: no common "
-            r"cipher suite found")
-        with self.assertLogs('siotls.connection', logging.ERROR, log_pattern=m):
+        e = "no common cipher suite found"
+        with self.assertRaises(HandshakeFailure, error_msg=e):
             server_conn.receive_data(client_hello_second_flight)
         self.assertEqual(
             tls_decode(client_conn, server_conn.data_to_send()),
@@ -142,9 +140,8 @@ class TestStateServerWaitClientHello(TestCase):
         ))
         client_hello_second_flight = client_conn.data_to_send()
 
-        m =(r".*siotls\.contents\.alerts\.IllegalParameter: client's "
-            r"random cannot change in between Hellos")
-        with self.assertLogs('siotls.connection', logging.ERROR, log_pattern=m):
+        e = "client's random cannot change in between Hellos"
+        with self.assertRaises(IllegalParameter, error_msg=e):
             server_conn.receive_data(client_hello_second_flight)
         self.assertEqual(
             tls_decode(client_conn, server_conn.data_to_send()),
