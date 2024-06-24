@@ -23,7 +23,11 @@ from siotls.iana import (
     NamedGroup,
     TLSVersion,
 )
-from siotls.states import ClientWaitServerHello, ServerWaitClientHello
+from siotls.states import (
+    ClientWaitEncryptedExtensions,
+    ClientWaitServerHello,
+    ServerWaitClientHello,
+)
 
 from . import TestCase
 from .config import client_config, server_config
@@ -359,7 +363,12 @@ class TestNegociationClient(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TLSConnection(client_config)
-        cls.client._state = ClientWaitServerHello(cls.client, {})
+        if cls.state_name == 'server hello':
+            cls.client._state = ClientWaitServerHello(cls.client, {}, b"")
+        elif cls.state_name == 'encrypted extension':
+            cls.client._state = ClientWaitEncryptedExtensions(cls.client)
+        else:
+            raise ValueError(cls.client._state)
 
     def setUp(self):
         self.client.nconfig = TLSNegotiatedConfiguration()
@@ -370,6 +379,8 @@ class TestNegociationClient(TestCase):
 
 
 class TestNegociationClientSupportedVersions(TestNegociationClient):
+    state_name = 'server hello'
+
     def test_negociation_client_supported_versions_missing(self):
         e = "the server doesn't support TLS 1.3"
         with self.assertRaises(alerts.ProtocolVersion, error_msg=e):
@@ -389,6 +400,8 @@ class TestNegociationClientSupportedVersions(TestNegociationClient):
 
 
 class TestNegociationClientKeyShare(TestNegociationClient):
+    state_name = 'server hello'
+
     def test_negociation_client_key_share_missing(self):
         we_dont_care = None  # used as placeholder
         with self.assertRaises(alerts.MissingExtension) as capture:
@@ -407,6 +420,8 @@ class TestNegociationClientKeyShare(TestNegociationClient):
             )
 
 class TestNegociationClientMaxFragmentLength(TestNegociationClient):
+    state_name = 'encrypted extension'
+
     def test_negociation_client_max_fragment_length_missing_not_offered(self):
         self.replace_config(max_fragment_length=MaxFragmentLengthOctets.MAX_16384)
         self.client._state._negociate_max_fragment_length(None)
@@ -451,6 +466,8 @@ class TestNegociationClientMaxFragmentLength(TestNegociationClient):
 
 
 class TestNegociationClientALPN(TestNegociationClient):
+    state_name = 'encrypted extension'
+
     def test_negociation_client_alpn_missing_not_offered(self):
         self.replace_config(alpn=[])
         self.client._state._negociate_alpn(None)
@@ -490,6 +507,7 @@ class TestNegociationClientALPN(TestNegociationClient):
 
 
 class TestNegociationClientHeartbeat(TestNegociationClient):
+    state_name = 'encrypted extension'
     # Note: we always send the Heartbeat extension
 
     def test_negociation_client_heartbeat_client_allows_server_pings(self):
