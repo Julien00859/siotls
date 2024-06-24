@@ -1,5 +1,6 @@
 # ruff: noqa: S603
 
+import dataclasses
 import errno
 import logging
 import os
@@ -7,12 +8,17 @@ import re
 import shutil
 import socket
 import subprocess as sp
-import tempfile
 import unittest
 from collections import namedtuple
+from os import fspath
 from threading import Thread
 
-from siotls import TLSConfiguration, TLSConnection
+from siotls import TLSConnection
+from siotls.iana import NamedGroup
+from siotls.utils import make_http11_response
+
+from . import TAG_INTEGRATION, TestCase
+from .config import server_config, test_temp_dir
 
 HOST = '127.0.0.2'
 PORT = 8446
@@ -30,11 +36,14 @@ def fix_curl_log(message):
         "TLS header, Unknown (21)", "TLS header, Alert (21)"
     ).replace(
         "TLS header, Certificate Status (22)", "TLS header, Handshake (22)"
+    ).replace(
+        "TLS header, Supplemental data (23)", "TLS header, Application Data (23)"
     )
 
 
+@unittest.skipUnless(TAG_INTEGRATION, "enable with SIOTLS_INTEGRATION=1")
 @unittest.skipUnless(CURL_PATH, "curl not found in path")
-class TestCURL(unittest.TestCase):
+class TestCURL(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -46,8 +55,7 @@ class TestCURL(unittest.TestCase):
         cls.socket.listen(1)
         cls.socket.settimeout(1)
 
-        cls.keylogfile = tempfile.NamedTemporaryFile(
-            mode='w+', prefix="siotls-keylogfile-")
+        cls.keylogfile = (test_temp_dir / 'keylogfile.txt').open('w+')
         cls.addClassCleanup(cls.keylogfile.close)
 
         cls.curl_pipe_r, cls.curl_pipe_w = os.pipe()
@@ -59,7 +67,11 @@ class TestCURL(unittest.TestCase):
     def run_curl_logging(cls, curl_logger):
         curl_log_re = re.compile(r'^(?:(\*)|== (\w+):) ', re.MULTILINE)
         buffer = ""
-        while read := os.read(cls.curl_pipe_r, 1024).decode(errors='ignore'):
+        while True:
+            try:
+                read = os.read(cls.curl_pipe_r, 1024).decode(errors='ignore')
+            except OSError:
+                break
             *messages, buffer = curl_log_re.split(buffer + read)
             for message, group1, group2 in zip(it:=iter(messages), it, it, strict=True):
                 if not message:
@@ -83,15 +95,18 @@ class TestCURL(unittest.TestCase):
         self.keylogfile.seek(0)
         self.keylogfile.truncate()
 
-    def curl(  # noqa: PLR0913
+    def curl(
         self,
         version='1.3',
         max_time=1,
-        insecure=True,  # noqa: FBT002
         tls_max='1.3',
         options=None,
     ):
-        args = [CURL_PATH, f'https://{HOST}:{PORT}', '--no-progress-meter']
+        args = [
+            CURL_PATH, f'https://{HOST}:{PORT}',
+            '--no-progress-meter',
+            '--cacert', fspath(test_temp_dir.joinpath('ca-cert.pem')),
+        ]
 
         loglevel = logger.getEffectiveLevel()
         if loglevel <= logging.DEBUG:
@@ -110,8 +125,6 @@ class TestCURL(unittest.TestCase):
         if max_time is not None:
             args.append('--max-time')
             args.append(str(max_time))
-        if insecure:
-            args.append('--insecure')
         if tls_max is not None:
             args.append('--tls-max')
             args.append(tls_max)
@@ -131,19 +144,25 @@ class TestCURL(unittest.TestCase):
     def test_curl_keylogfile(self):
         KeyLogFormat = namedtuple("KeyLogFormat", ["label", "client_random", "value"])
 
-        config = TLSConfiguration('server', log_keys=True)
+        config = dataclasses.replace(
+            server_config,
+            key_exchanges=[NamedGroup.ffdhe2048],
+            alpn=['http/1.1'],
+            log_keys=True
+        )
+        conn =  TLSConnection(config)
         proc, client = self.curl()
 
-        with self.assertLogs('siotls.keylog', level='INFO') as logs:
-            conn = TLSConnection(config)
-            conn.initiate_connection()
-            client_hello = client.recv(16384)
-            conn.receive_data(client_hello)
-            server_hello = conn.data_to_send()
-            client.sendall(server_hello)
-            client.shutdown(socket.SHUT_RDWR)
+        with self.assertLogs('siotls.keylog', level='INFO') as logs:  # noqa: SIM117
+            with conn.wrap(client) as sclient:
+                http_get = sclient.read()
+                self.assertEqual(
+                    http_get.partition(b'\r\n')[0],
+                    b"GET / HTTP/1.1"
+                )
+                sclient.write(make_http11_response(204, ""))
 
-        proc.terminate()
+        client.close()
         proc.wait(timeout=1)
 
         siotls_keylog = [
@@ -185,6 +204,5 @@ class TestCURL(unittest.TestCase):
         # Validate secret values
         siotls_keylog = {label: value for label, _, value in siotls_keylog}
         curl_keylog = {label: value for label, _, value in curl_keylog}
-        for label, curl_value in curl_keylog.items():
-            self.assertEqual(siotls_keylog[label], curl_value,
-                "siotls and curl must compute the same secrets")
+        self.assertEqual(set(siotls_keylog), set(curl_keylog))
+        self.assertEqual(siotls_keylog, curl_keylog)

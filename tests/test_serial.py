@@ -1,9 +1,4 @@
-from siotls.serial import (
-    MissingDataError,
-    SerialIO,
-    TLSBufferError,
-    TooMuchDataError,
-)
+from siotls.serial import MissingDataError, SerialIO, TLSBufferError, TooMuchDataError
 
 from . import TestCase
 
@@ -129,12 +124,11 @@ class TestSerial(TestCase):
     def test_serial_read_listvar(self):
         self.assertRaises(MissingDataError, SerialIO().read_listvar, 1, 1)
         self.assertEqual(SerialIO(b"\x01\x00").read_listvar(1, 1), [b""])
-        self.assertEqual(SerialIO(b"\x06\x00\x02ab\x01a").read_listvar(1, 1), [b"", b"ab", b"a"])
+        self.assertEqual(SerialIO(b"\x05\x00\x01a\x01a").read_listvar(1, 1), [b"", b"a", b"a"])
         self.assertRaises(MissingDataError, SerialIO(b"\x03\x00\x02").read_listvar, 1, 1)
         self.assertRaises(MissingDataError, SerialIO(b"\x02\x00\x02").read_listvar, 1, 1)
         self.assertEqual(SerialIO(b"\x00\x04\x00\x02ab").read_listvar(2, 1), [b"", b"ab"])
         self.assertEqual(SerialIO(b"\x00\x04\x00\x02ab").read_listvar(2, 2), [b"ab"])
-
 
     def test_serial_write_listvar(self):
         stream = SerialIO()

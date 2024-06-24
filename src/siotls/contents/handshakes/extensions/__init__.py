@@ -1,10 +1,25 @@
 import dataclasses
 import textwrap
+from collections import namedtuple
 
 from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType, HandshakeType_
 from siotls.serial import Serializable, SerializableBody
 from siotls.utils import try_cast
+
+
+def split_extensions(stream):
+    RawExtension = namedtuple("RawExtension", ('type', 'data'))
+    extensions = []
+    list_length = stream.read_int(2)
+    with stream.limit(list_length) as limit:
+        while stream.tell() < limit:
+            extensions.append(RawExtension(
+                type=try_cast(ExtensionType, stream.read_int(2)),
+                data=stream.read_var(2),
+            ))
+    stream.assert_eof()
+    return extensions
 
 _extension_registry = {}
 
@@ -58,7 +73,7 @@ class Extension(Serializable):
                     raise ValueError(e)
 
     @classmethod
-    def parse(abc, stream, *, handshake_type):
+    def parse(abc, stream, *, handshake_type, **kwargs):
         extension_type = try_cast(ExtensionType, stream.read_int(2))
 
         if registry := _extension_registry.get(extension_type):
@@ -78,7 +93,7 @@ class Extension(Serializable):
 
         extension_length = stream.read_int(2)
         with stream.limit(extension_length):
-            return cls.parse_body(stream)
+            return cls.parse_body(stream, **kwargs)
 
     def serialize(self):
         extension_data = self.serialize_body()
@@ -104,7 +119,7 @@ class UnknownExtension(SerializableBody):
         self.extension_data = extension_data
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         return cls(stream.read())
 
     def serialize_body(self):

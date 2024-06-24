@@ -19,7 +19,7 @@ class ColoredFormatter(logging.Formatter):
         logging.ERROR: (31, 49),  # red
         logging.CRITICAL: (37, 41),  # white on red
     }
-    def format(self, record):  # noqa: A003
+    def format(self, record):
         fg, bg = type(self).colors.get(record.levelno, (32, 49))
         record.levelname = f'\033[1;{fg}m\033[1;{bg}m{record.levelname}\033[0m'
         record.name = f'\033[1;29m\033[1;49m{record.name}\033[0m'
@@ -42,21 +42,23 @@ def main():
     parser.add_argument('-V', '--version', action='version',
         version=f'%(prog)s {siotls.__version__}')
     parser.add_argument('-v', '--verbose', action='count', default=0,
-        help="Increase logging verbosity (repeatable)")
+        help="increase logging verbosity (repeatable)")
     parser.add_argument('-s', '--silent', action='count', default=0,
-        help="Decrease logging verbosity (repeatable)")
+        help="decrease logging verbosity (repeatable)")
     parser.add_argument('side', action='store', choices=('client', 'server'))
     parser.add_argument('--host', action='store', default='localhost',
         help="IP address on which the server will listen / client will connect")
     parser.add_argument('--port', action='store', type=int, default=8446,
         help="TCP port number on which the server will listen / client will connect")
     parser.add_argument('--tlscert', '--sslcert', action='store', type=pathlib.Path,
-        help="Path to the SSL/TLS certificate file")
+        help="path to the SSL/TLS certificate file")
     parser.add_argument('--tlskey', '--sslkey', action='store', type=pathlib.Path,
-        help="Path to the SSL/TLS private key file")
+        help="path to the SSL/TLS private key file")
     parser.add_argument('--keylogfile', action='store', type=pathlib.Path,
-        help="Export TLS secrets to the specificed file for network analyzing "
-             "tools such as wireshark, use - to log on stderr.")
+        help="export TLS secrets to the specificed file for network analyzing "
+             "tools such as wireshark, use - to log on stderr")
+    parser.add_argument('--insecure', action='store_true',
+        help="skip verifying the remote certificate")
 
     options = parser.parse_args()
 
@@ -73,10 +75,10 @@ def main():
         siotls.key_logger.addHandler(logging.FileHandler(options.keylogfile, 'w'))
 
     # Check TLS cert/key
-    if not os.access(options.tlscert, os.R_OK):
+    if options.tlscert and not os.access(options.tlscert, os.R_OK):
         logging.critical("Cannot access TLS certificate file at %s", options.tlscert)
         return 1
-    if not os.access(options.tlskey, os.R_OK):
+    if options.tlskey and not os.access(options.tlskey, os.R_OK):
         logging.critical("Cannot access TLS private key file at %s", options.tlscert)
         return 1
 
@@ -95,6 +97,7 @@ def main():
             connect(
                 options.host,
                 options.port,
+                check_certificate=not options.insecure,
             )
     except Exception as exc:  # noqa: BLE001
         logger.critical("Fatal exception", exc_info=exc)

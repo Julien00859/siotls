@@ -52,17 +52,18 @@ from siotls.contents import alerts
 from siotls.iana import HandshakeType
 
 ORDER = [
-    ('client', HandshakeType.CLIENT_HELLO, True),
-    ('server', HandshakeType.SERVER_HELLO, True),
-    ('server', HandshakeType.ENCRYPTED_EXTENSIONS, True),
-    ('server', HandshakeType.CERTIFICATE_REQUEST, False),  # optional
-    ('server', HandshakeType.CERTIFICATE, True),
-    ('server', HandshakeType.CERTIFICATE_VERIFY, True),
-    ('server', HandshakeType.FINISHED, True),
-    ('client', HandshakeType.END_OF_EARLY_DATA, False),    # optional
-    ('client', HandshakeType.CERTIFICATE, False),          # optional
-    ('client', HandshakeType.CERTIFICATE_VERIFY, False),   # optional
-    ('client', HandshakeType.FINISHED, True),
+    ('server', HandshakeType.SERVER_HELLO, False),
+    ('client', HandshakeType.CLIENT_HELLO, False),
+    ('server', HandshakeType.SERVER_HELLO, False),
+    ('server', HandshakeType.ENCRYPTED_EXTENSIONS, False),
+    ('server', HandshakeType.CERTIFICATE_REQUEST, True),  # skippable
+    ('server', HandshakeType.CERTIFICATE, False),
+    ('server', HandshakeType.CERTIFICATE_VERIFY, False),
+    ('server', HandshakeType.FINISHED, False),
+    ('client', HandshakeType.END_OF_EARLY_DATA, True),    # skippable
+    ('client', HandshakeType.CERTIFICATE, True),          # skippable
+    ('client', HandshakeType.CERTIFICATE_VERIFY, True),   # skippable
+    ('client', HandshakeType.FINISHED, False),
 ]
 
 
@@ -72,7 +73,7 @@ class Transcript:
             e = "empty digestmods"
             raise ValueError(e)
         self._hashes = [dm() for dm in digestmods]
-        self._order_i = 0
+        self._order_i = 1
 
     def post_init(self, digestmod):
         name = digestmod().name
@@ -83,27 +84,37 @@ class Transcript:
         self._hashes.clear()
         self._hashes.append(hash_)
 
-    def do_hrr_dance(self):
-        if self._order_i != 2:  # noqa: PLR2004
-            e = "can only dance after receiving/sending HelloRetryRequest"
-            raise RuntimeError(e)
+    def do_hrr_dance(self, side, client_hello_transcript_hash):
+        """
+        Transcript-Hash(ClientHello1, HelloRetryRequest, ... Mn) =
+            Hash(message_hash ||        /* Handshake type */
+                 00 00 Hash.length  ||   /* Handshake message length (bytes) */
+                 Hash(ClientHello1) ||  /* Hash of ClientHello1 */
+                 HelloRetryRequest  || ... || Mn)
+        """
         self._hashes[0] = hashlib.new(self._hashes[0].name, b''.join([
             HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
             b'\x00\x00',
-            self.digest(),
+            self._hashes[0].digest_size.to_bytes(1, 'big'),
+            client_hello_transcript_hash,
         ]))
-        self._order_i = 0  # expect ClientHello
+        self._order_i = (side == 'client')
 
     def update(self, handshake_data, side, handshake_type):
         if self._order_i == len(ORDER):
             return
 
-        while (side, handshake_type) != ORDER[self._order_i][:2] and not ORDER[self._order_i][2]:
+        # extra safety net, the states should validate the incomming
+        # messages and by construction always send valid handshakes
+        expected_side, expected_handshake, is_skippable = ORDER[self._order_i]
+        while is_skippable and (side, handshake_type) != (expected_side, expected_handshake):
             self._order_i += 1
-        if (side, handshake_type) != ORDER[self._order_i][:2]:
-            e =(f"was expecting {ORDER[self._order_i]} but found "
-                f"{(side, handshake_type)} instead")
+            expected_side, expected_handshake, is_skippable = ORDER[self._order_i]
+        if (side, handshake_type) != (expected_side, expected_handshake):
+            e =(f"was expecting {(expected_side, expected_handshake)} "
+                f"but found {(side, handshake_type)} instead")
             raise alerts.UnexpectedMessage(e)
+
         for hash_ in self._hashes:
             hash_.update(handshake_data)
         self._order_i += 1

@@ -2,12 +2,7 @@ import dataclasses
 import textwrap
 
 from siotls.contents import alerts
-from siotls.iana import (
-    ExtensionType,
-    HandshakeType,
-    HandshakeType_,
-    TLSVersion,
-)
+from siotls.iana import ExtensionType, HandshakeType, HandshakeType_, TLSVersion
 from siotls.serial import SerializableBody
 from siotls.utils import try_cast
 
@@ -30,7 +25,7 @@ class SupportedVersionsRequest(Extension, SerializableBody):
         self.versions = versions
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         versions = [
             try_cast(TLSVersion, version)
             for version in stream.read_listint(1, 2)
@@ -67,7 +62,7 @@ class SupportedVersionsResponse(Extension, SerializableBody):
         self.selected_version = selected_version
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         try:
             selected_version = TLSVersion(stream.read_int(2))
         except ValueError as exc:

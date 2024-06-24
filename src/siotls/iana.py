@@ -207,15 +207,6 @@ class NamedGroup(Hex2Enum):
     ffdhe6144 = 0x0103
     ffdhe8192 = 0x0104
 
-    def is_sec(self):
-        return type(self).secp256r1 <= self <= type(self).secp521r1
-
-    def is_x(self):
-        return type(self).x25519 <= self <= type(self).x448
-
-    def is_ff(self):
-        return type(self).ffdhe2048 <= self <= type(self).ffdhe8192
-
 
 class NameType(Hex1Enum):
     HOST_NAME = 0

@@ -22,7 +22,7 @@ class Finished(Handshake, SerializableBody):
         self.verify_data = verify_data
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         return cls(stream.read())
         # would be nice:
         # return cls(stream.read_exactly(connection._cipher.digestmod.digest_size))

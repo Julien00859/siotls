@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "siotls"
-version = "0.0.1"
+version = "0.0.1a"
 description = "Sans-IO Python implementation of the TLS 1.3 (RFC 8446) protocol stack"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,7 +16,7 @@ keywords = [
 
 ]
 classifiers = [
-  "Development Status :: 1 - Planning",
+  "Development Status :: 2 - Alpha",
   "Environment :: No Input/Output (Daemon)",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
@@ -25,15 +25,17 @@ classifiers = [
 ]
 
 dependencies = [
-  "cryptography",
+  "cryptography>=43",
   "idna"
 ]
 
 [project.optional-dependencies]
 dev = [
   "coverage",
-  "isort",
-  "ruff",
+  "isort==5.13.2",  # keep me sync with .pre-commit-config.yaml
+  "parameterized",
+  "pre-commit",
+  "ruff==0.4.5",  # keep me sync with .pre-commit-config.yaml
 ]
 
 [project.urls]
@@ -52,16 +54,16 @@ siotls = "siotls.__main__:main"
 where = ["src"]
 
 
-
 [tool.ruff]
-line-length = 98
-select = ["ALL"]
-ignore = [
+line-length = 96  # github editor in split view
+lint.select = ["ALL"]
+lint.ignore = [
   "D",  # docstrings, for now
   "ANN",  # annotation
   "COM812",  # trailing comma, unusable for now
   "DJ",  # django
   "PT",  # pytest
+  "PTH", # pathlib
   "Q",  # quote, I like ' for technical strings and " for human text
   "D212",  # docstrings
   "ERA001",  # commented code
@@ -69,10 +71,11 @@ ignore = [
   "PYI024",  # collections.namedtuple
   "SIM102", "PLR5501", "RET505", "RET506",  # if/elif
   "TD", "FIX002",  # todo
+  "RET504",  # x = ...; return x
 ]
-exclude = ["src/siotls/_vendor.py"]
+lint.exclude = ["src/siotls/_vendor.py"]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = [
   "F401", "E402",  # imports
 ]
@@ -89,5 +92,15 @@ exclude = ["src/siotls/_vendor.py"]
   "SLF001",  # access private members
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 combine-as-imports = true
+known-first-party = ["siotls"]
+
+[tool.isort]
+src_paths = ["src", "tests"]
+skip = [".gitignore", ".dockerignore"]
+profile = "black"
+multi_line_output = 3
+line_length = 96  # github editor in split view
+known_first_party = ["siotls"]
+combine_as_imports = true

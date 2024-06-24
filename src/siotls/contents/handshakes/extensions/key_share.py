@@ -2,12 +2,7 @@ import dataclasses
 import textwrap
 
 from siotls.contents import alerts
-from siotls.iana import (
-    ExtensionType,
-    HandshakeType,
-    HandshakeType_,
-    NamedGroup,
-)
+from siotls.iana import ExtensionType, HandshakeType, HandshakeType_, NamedGroup
 from siotls.serial import SerialIO, SerializableBody
 from siotls.utils import try_cast
 
@@ -35,7 +30,7 @@ class KeyShareRequest(Extension, SerializableBody):
         self.client_shares = client_shares
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         client_shares = {}
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
@@ -78,7 +73,7 @@ class KeyShareRetry(Extension, SerializableBody):
         self.selected_group = selected_group
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         try:
             selected_group = NamedGroup(stream.read_int(2))
         except ValueError as exc:
@@ -112,7 +107,7 @@ class KeyShareResponse(Extension, SerializableBody):
         self.key_exchange = key_exchange
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         group = try_cast(NamedGroup, stream.read_int(2))
         key_exchange = stream.read_var(2)
         return cls(group, key_exchange)

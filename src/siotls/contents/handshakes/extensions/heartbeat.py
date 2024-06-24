@@ -27,7 +27,7 @@ class Heartbeat(Extension, SerializableBody):
         self.mode = mode
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         try:
             mode = HeartbeatMode(stream.read_int(1))
         except ValueError as exc:

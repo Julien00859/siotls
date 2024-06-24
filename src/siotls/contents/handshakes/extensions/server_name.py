@@ -36,7 +36,7 @@ class ServerName(Serializable):
             _server_name_registry[cls.name_type] = cls
 
     @classmethod
-    def parse(abc, stream):
+    def parse(abc, stream, **kwargs):
         name_type = stream.read_int(1)
         try:
             cls = _server_name_registry[NameType(name_type)]
@@ -46,7 +46,7 @@ class ServerName(Serializable):
             # should be configurable (should it?)
             raise alerts.UnrecognizedName(*exc.args) from exc
 
-        return cls.parse_body(stream)
+        return cls.parse_body(stream, **kwargs)
 
     def serialize(self):
         return b''.join([
@@ -67,7 +67,7 @@ class HostName(ServerName, SerializableBody):
         self.host_name = host_name
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         byte_host_name = stream.read_var(2)
         try:
             return cls(idna.decode(byte_host_name))
@@ -106,12 +106,12 @@ class ServerNameListRequest(Extension, SerializableBody):
         return self.server_names[NameType.HOST_NAME]
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):
         server_name_list = []
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
             with contextlib.suppress(UnicodeError):
-                server_name = ServerName.parse(list_stream)
+                server_name = ServerName.parse(list_stream, **kwargs)
                 server_name_list.append(server_name)
         return cls(server_name_list)
 
@@ -138,7 +138,7 @@ class ServerNameResponse(Extension, SerializableBody):
         pass
 
     @classmethod
-    def parse_body(cls, stream):  # noqa: ARG003
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003  # noqa: ARG003
         return cls()
 
     def serialize_body(self):

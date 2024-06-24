@@ -40,7 +40,7 @@ class Handshake(Content, Serializable):
             _handshake_registry[cls.msg_type] = cls
 
     @classmethod
-    def parse(abc, stream):
+    def parse(abc, stream, **kwargs):
         msg_type = stream.read_int(1)
         length = stream.read_int(3)
         try:
@@ -48,7 +48,7 @@ class Handshake(Content, Serializable):
         except ValueError as exc:
             raise alerts.IllegalParameter(*exc.args) from exc
         with stream.limit(length):
-            return cls.parse_body(stream)
+            return cls.parse_body(stream, **kwargs)
 
     def serialize(self):
         msg_data = self.serialize_body()

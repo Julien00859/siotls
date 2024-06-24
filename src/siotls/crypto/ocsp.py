@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.hashes import SHA1
@@ -20,10 +20,13 @@ OCSP = AuthorityInformationAccessOID.OCSP
 
 def get_ocsp_url(certificate):
     return next(
-        access_description.access_location.value
-        for access_description
-        in certificate.extensions.get_extension_for_oid(AIA).value
-        if access_description.access_method == OCSP
+        (
+            access_description.access_location.value
+            for access_description
+            in certificate.extensions.get_extension_for_oid(AIA).value
+            if access_description.access_method == OCSP
+        ),
+        None
     )
 
 def make_ocsp_request(certificate, issuer, digestmod=SHA1) -> bytes:
@@ -34,7 +37,7 @@ def make_ocsp_request(certificate, issuer, digestmod=SHA1) -> bytes:
         .public_bytes(Encoding.DER)
     )
 
-def validate_ocsp(issuer, ocsp_request: bytes, ocsp_response: bytes):
+def validate_ocsp(issuer, ocsp_request: bytes, ocsp_response: bytes):  # noqa: C901
     req = load_der_ocsp_request(ocsp_request)
     res = load_der_ocsp_response(ocsp_response)
 
@@ -58,11 +61,11 @@ def validate_ocsp(issuer, ocsp_request: bytes, ocsp_response: bytes):
         e = "request and response serial number mismatch"
         raise ValueError(e)
 
-    if res.this_update > datetime.utcnow():
+    if res.this_update > datetime.utcnow():  # noqa: DTZ003
         e = "response is not valid yet"
         raise ValueError(e)
 
-    if res.next_update < datetime.utcnow():
+    if res.next_update < datetime.utcnow():  # noqa: DTZ003
         e = "response is expired"
         raise ValueError(e)
 
@@ -75,9 +78,14 @@ def validate_ocsp(issuer, ocsp_request: bytes, ocsp_response: bytes):
         raise ValueError(e)
 
     try:
-        TLSSignatureSuite.from_cert(issuer).verify(
-            res.signature,
-            res.tbs_response_bytes,
-        )
+        Signature = TLSSignatureSuite.from_signature_oid(res.signature_algorithm_oid)  # noqa: N806
+    except KeyError as exc:
+        e = "unknown signature algorithm"
+        raise ValueError(e) from exc
+
+    try:
+        Signature(issuer.public_key()).verify(res.signature, res.tbs_response_bytes)
     except InvalidSignature as exc:
         raise ValueError(exc.args[0]) from exc
+
+    return res.next_update

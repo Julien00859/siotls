@@ -5,6 +5,7 @@ from siotls.contents.handshakes.extensions import (
     HostName,
     KeyShareRequest,
     MaxFragmentLength,
+    OCSPStatusRequest,
     PostHandshakeAuth,
     PskKeyExchangeModes,
     ServerNameListRequest,
@@ -168,3 +169,13 @@ class TestContentSupportedVersions(TestContentExtension):
         ext = self.parse_extension(payload)
         self.assertEqual(ext, SupportedVersionsRequest([TLSVersion.TLS_1_3]))
         self.assertEqual(ext.serialize(), payload)
+
+
+class TestContentStatusRequest(TestContentExtension):
+    def test_content_status_request_io(self):
+        payload = bytes.fromhex("000500050100000000")
+        ext = self.parse_extension(payload)
+        self.assertEqual(ext, OCSPStatusRequest(
+            responder_id_list=[],
+            request_extensions=b"",
+        ))

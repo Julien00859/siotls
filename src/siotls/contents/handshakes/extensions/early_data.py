@@ -22,7 +22,7 @@ class EarlyData(Extension, SerializableBody):
         pass
 
     @classmethod
-    def parse_body(cls, stream):  # noqa: ARG003
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         return cls()
 
     def serialize_body(self):
@@ -45,7 +45,7 @@ class NewSessionEarlyData(Extension, SerializableBody):
         self.max_early_data_size = max_early_data_size
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         max_early_data_size = stream.read_int(4)
         return cls(max_early_data_size)
 

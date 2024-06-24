@@ -21,7 +21,7 @@ class ApplicationData(Content, Serializable):
         self.content_data = data
 
     @classmethod
-    def parse(cls, stream):
+    def parse(cls, stream, **kwargs):  # noqa: ARG003
         return cls(stream.read())
 
     def serialize(self):

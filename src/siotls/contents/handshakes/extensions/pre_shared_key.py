@@ -39,7 +39,7 @@ class PreSharedKeyRequest(Extension, SerializableBody):
         self.binders = binders
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         identities = []
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
@@ -84,7 +84,7 @@ class PreSharedKeyResponse(Extension, SerializableBody):
         self.selected_identity = selected_identity
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         selected_identity = stream.read_int(2)
         return cls(selected_identity)
 

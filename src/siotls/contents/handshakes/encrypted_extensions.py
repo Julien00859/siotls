@@ -27,11 +27,11 @@ class EncryptedExtensions(Handshake, SerializableBody):
         self.extensions = {ext.extension_type: ext for ext in extensions}
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):
         extensions = []
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
-            extension = Extension.parse(list_stream, handshake_type=cls.msg_type)
+            extension = Extension.parse(list_stream, handshake_type=cls.msg_type, **kwargs)
             extensions.append(extension)
 
         return cls(extensions)

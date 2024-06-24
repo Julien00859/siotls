@@ -24,7 +24,7 @@ class PskKeyExchangeModes(Extension, SerializableBody):
         self.ke_modes = ke_modes
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         ke_modes = [
             try_cast(PskKeyExchangeMode, ke_mode)
             for ke_mode in stream.read_listint(1, 1)

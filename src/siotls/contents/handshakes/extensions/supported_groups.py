@@ -28,7 +28,7 @@ class SupportedGroups(Extension, SerializableBody):
         self.named_group_list = named_group_list
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         named_group_list = [
             try_cast(NamedGroup, named_group)
             for named_group in stream.read_listint(2, 2)

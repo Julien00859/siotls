@@ -34,7 +34,7 @@ class UseSRTP(Extension, SerializableBody):
         self.mki = mki
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         # cannot use read_listint as the type in uint8[2], not uint16
         it = iter(stream.read_var(2))
         protection_profiles = list(zip(it, it, strict=True))

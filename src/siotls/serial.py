@@ -3,10 +3,12 @@ import contextlib
 import io
 import logging
 
+from siotls import TLSError
+
 logger = logging.getLogger(__name__)
 
 
-class TLSBufferError(BufferError):
+class TLSBufferError(TLSError, BufferError):
     pass
 
 
@@ -22,7 +24,7 @@ class Serializable(metaclass=abc.ABCMeta):
     _struct: str
 
     @abc.abstractclassmethod
-    def parse(cls, stream):  # pragma: no cover
+    def parse(cls, stream, **kwargs):  # pragma: no cover
         pass
 
     @abc.abstractmethod
@@ -34,7 +36,7 @@ class SerializableBody(metaclass=abc.ABCMeta):
     _struct: str
 
     @abc.abstractclassmethod
-    def parse_body(cls, stream):  # pragma: no cover
+    def parse_body(cls, stream, **kwargs):  # pragma: no cover
         pass
 
     @abc.abstractmethod

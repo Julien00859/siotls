@@ -28,7 +28,7 @@ class ALPN(Extension, SerializableBody):
         self.protocol_name_list = protocol_name_list
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         protocol_name_list = [
             try_cast(ALPNProtocol, protocol.decode())
             for protocol in stream.read_listvar(2, 1)

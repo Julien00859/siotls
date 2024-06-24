@@ -1,0 +1,10 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.5  # keep me sync with pyproject.toml
+    hooks:
+      - id: ruff
+        args: [ --fix ]
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2  # keep me sync with pyproject.toml
+    hooks:
+      - id: isort

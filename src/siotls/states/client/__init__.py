@@ -30,8 +30,6 @@
 #                       CONNECTED
 
 # isort: skip_file
-from .closed import ClientClosed
-from .connected import ClientConnected
 from .wait_finished import ClientWaitFinished
 from .wait_certificate_verify import ClientWaitCertificateVerify
 from .wait_certificate import ClientWaitCertificate

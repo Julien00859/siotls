@@ -37,7 +37,7 @@ class Heartbeat(Content, Serializable):
         self.padding = padding
 
     @classmethod
-    def parse(cls, stream):
+    def parse(cls, stream, **kwargs):  # noqa: ARG003
         try:
             heartbeat_type = HeartbeatMessageType(stream.read_int(1))
         except ValueError as exc:

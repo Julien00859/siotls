@@ -26,7 +26,7 @@ class CertificateVerify(Handshake, SerializableBody):
         self.signature = signature
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         algorithm = try_cast(SignatureScheme, stream.read_int(2))
         signature = stream.read_var(2)
         return cls(algorithm, signature)

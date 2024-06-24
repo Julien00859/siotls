@@ -52,7 +52,7 @@ class MaxFragmentLength(Extension, SerializableBody):
         return self._max_fragment_length.to_octets()
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         try:
             max_fragment_length = MaxFragmentLengthCode(stream.read_int(1))
         except ValueError as exc:

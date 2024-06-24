@@ -3,13 +3,7 @@ import logging
 import textwrap
 
 from siotls.contents import alerts
-from siotls.iana import (
-    CipherSuites,
-    ExtensionType,
-    HandshakeType,
-    HandshakeType_,
-    TLSVersion,
-)
+from siotls.iana import CipherSuites, ExtensionType, HandshakeType, HandshakeType_, TLSVersion
 from siotls.serial import SerialIO, SerializableBody
 from siotls.utils import try_cast
 
@@ -45,7 +39,13 @@ class ServerHello(Handshake, SerializableBody):
     legacy_compression_methods: int = dataclasses.field(default=0, repr=False)
     extensions: dict[ExtensionType | int, Extension]
 
-    def __init__(self, random, legacy_session_id_echo, cipher_suite, extensions: list[Extension]):
+    def __init__(
+        self,
+        random,
+        legacy_session_id_echo,
+        cipher_suite,
+        extensions: list[Extension]
+    ):
         self.legacy_version = type(self).legacy_version
         self.random = random
         self.legacy_session_id_echo = legacy_session_id_echo
@@ -54,7 +54,7 @@ class ServerHello(Handshake, SerializableBody):
         self.extensions = {ext.extension_type: ext for ext in extensions}
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):
         legacy_version = stream.read_int(2)
         if legacy_version != TLSVersion.TLS_1_2:
             e = f"expected {TLSVersion.TLS_1_2} but {legacy_version} found"
@@ -77,7 +77,7 @@ class ServerHello(Handshake, SerializableBody):
         extensions = []
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
-            extension = Extension.parse(list_stream, handshake_type=cls.msg_type)
+            extension = Extension.parse(list_stream, handshake_type=cls.msg_type, **kwargs)
             extensions.append(extension)
 
         return cls(random, legacy_session_id_echo, cipher_suite, extensions)

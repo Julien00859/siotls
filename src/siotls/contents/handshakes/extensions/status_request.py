@@ -30,10 +30,10 @@ class CertificateStatusRequest(Extension, SerializableBody):
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and CertificateStatusRequest in cls.__bases__:
-            _status_request_registry[cls.extension_type] = cls
+            _status_request_registry[cls.status_type] = cls
 
     @classmethod
-    def parse_body(abc, stream):
+    def parse_body(abc, stream, **kwargs):
         status_type = stream.read_int(1)
         try:
             cls = _status_request_registry[CertificateStatusType(status_type)]
@@ -41,7 +41,7 @@ class CertificateStatusRequest(Extension, SerializableBody):
             # Unlike for ServerName, nothing states how to process
             # unknown certificate status types, crash for now
             raise alerts.UnrecognizedName(*exc.args) from exc
-        return cls.parse_bodybody(stream)
+        return cls.parse_bodybody(stream, **kwargs)
 
     def serialize_body(self):
         return b''.join([
@@ -71,7 +71,7 @@ class OCSPStatusRequest(CertificateStatusRequest):
         self.request_extensions = request_extensions
 
     @classmethod
-    def parse_bodybody(cls, stream):
+    def parse_bodybody(cls, stream, **kwargs):  # noqa: ARG003
         responder_id_list = stream.read_listvar(2, 2)
         request_extension = stream.read_var(2)
         return cls(responder_id_list, request_extension)
@@ -85,7 +85,7 @@ class OCSPStatusRequest(CertificateStatusRequest):
         return b''.join([
             len(serialized_responder_id_list).to_bytes(2, 'big'),
             serialized_responder_id_list,
-            len(self.request_extension).to_bytes(2, 'big'),
+            len(self.request_extensions).to_bytes(2, 'big'),
             self.request_extensions,
         ])
 
@@ -112,11 +112,11 @@ class CertificateStatus(Extension, SerializableBody):
 
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if register and CertificateStatusRequest in cls.__bases__:
-            _status_request_registry[cls.extension_type] = cls
+        if register and CertificateStatus in cls.__bases__:
+            _status_registry[cls.status_type] = cls
 
     @classmethod
-    def parse_body(abc, stream):
+    def parse_body(abc, stream, **kwargs):
         status_type = stream.read_int(1)
         try:
             cls = _status_registry[CertificateStatusType(status_type)]
@@ -124,7 +124,7 @@ class CertificateStatus(Extension, SerializableBody):
             # Unlike for ServerName, nothing states how to process
             # unknown certificate status types, crash for now
             raise alerts.UnrecognizedName(*exc.args) from exc
-        return cls.parse_bodybody(stream)
+        return cls.parse_bodybody(stream, **kwargs)
 
     def serialize_body(self):
         return b''.join([
@@ -132,7 +132,7 @@ class CertificateStatus(Extension, SerializableBody):
             self.serialize_bodybody(),
         ])
 
-class OCSPStatus(CertificateStatusRequest):
+class OCSPStatus(CertificateStatus):
     status_type = CertificateStatusType.OCSP
 
     _struct = textwrap.dedent("""

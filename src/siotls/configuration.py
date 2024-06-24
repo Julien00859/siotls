@@ -3,14 +3,10 @@ import functools
 import logging
 import typing
 
-from cryptography.hazmat.primitives.asymmetric.types import (
-    PrivateKeyTypes,
-    PublicKeyTypes,
-)
-from cryptography.x509 import Certificate
-from cryptography.x509.verification import Store
+from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes, PublicKeyTypes
+from cryptography.x509 import Certificate, CertificateRevocationList
+from cryptography.x509.verification import PolicyBuilder, Store
 
-from siotls.crypto.signatures import TLSSignatureSuite
 from siotls.iana import (
     ALPNProtocol,
     CertificateType,
@@ -56,6 +52,8 @@ class TLSConfiguration:
         ].copy)
 
     trust_store: Store | None = None
+    revocation_list: CertificateRevocationList | None = None
+    max_chain_depth: int = 5
     trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
 
     private_key: PrivateKeyTypes | None = None
@@ -66,13 +64,13 @@ class TLSConfiguration:
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384
     can_echo_heartbeat: bool = True
     alpn: list[ALPNProtocol] = dataclasses.field(default_factory=list)
-    hostnames: list[str] = dataclasses.field(default_factory=list)
+    server_hostnames: list[str] = dataclasses.field(default_factory=list)
 
     # extra
     log_keys: bool = False
 
     @property
-    def require_peer_certificate(self):
+    def require_peer_authentication(self):
         return bool(self.trust_store or self.trusted_public_keys)
 
     @functools.cached_property
@@ -92,6 +90,14 @@ class TLSConfiguration:
         if self.trusted_public_keys:
             types.append(CertificateType.RAW_PUBLIC_KEY)
         return types
+
+    @functools.cached_property
+    def policy_builder(self):
+        return (
+            PolicyBuilder()
+            .store(self.trust_store)
+            .max_chain_depth(self.max_chain_depth)
+        )
 
     @property
     def other_side(self):
@@ -125,21 +131,26 @@ class TLSConfiguration:
         if not (self.certificate_chain or self.public_key):
             e = "a certificate or a public key is mandatory server side"
             raise ValueError(e)
-        if self.require_peer_certificate:
+        if self.require_peer_authentication:
             m =("a trust store and/or a list of trusted public keys is "
                 "provided, client certificates will be requested")
             logger.info(m)
 
     def _check_client_settings(self):
-        if not (self.trust_store or self.trusted_public_keys):
-            w =("no trust store or trusted public keys provided, "
-                "server certificate validation disabled")
+        if not self.require_peer_authentication:
+            w =("missing trust store or list of trusted public keys, "
+                "will not verify the peer's authenticity")
             logger.warning(w)
+        if self.server_hostnames:
+            e =("the configuration's (plural) server_hostnames is "
+                "meant for the server side, maybe you intended to use "
+                "the connection's (singular) server_hostname instead")
+            raise ValueError(e)
 
 
 @dataclasses.dataclass(init=False)
-class TLSNegociatedConfiguration:
-    cipher_suite: CipherSuites
+class TLSNegotiatedConfiguration:
+    cipher_suite: CipherSuites | None
     key_exchange: NamedGroup | None
     signature_algorithm: SignatureScheme | None
     alpn: ALPNProtocol | None | type(...)
@@ -149,10 +160,12 @@ class TLSNegociatedConfiguration:
     client_certificate_type: CertificateType | None
     server_certificate_type: CertificateType | None
     peer_want_ocsp_stapling: bool | None
+    peer_certificate: Certificate | None
+    peer_public_key: PublicKeyTypes | None
 
-    def __init__(self, cipher_suite):
+    def __init__(self):
         object.__setattr__(self, '_frozen', False)
-        self.cipher_suite = cipher_suite
+        self.cipher_suite = None
         self.key_exchange = None
         self.signature_algorithm = None
         self.alpn = ...  # None is part of the domain, using Ellipsis as "not set" value
@@ -162,6 +175,8 @@ class TLSNegociatedConfiguration:
         self.client_certificate_type = None
         self.server_certificate_type = None
         self.peer_want_ocsp_stapling = None
+        self.peer_certificate = None
+        self.peer_public_key = None
 
     def freeze(self):
         self._frozen = True

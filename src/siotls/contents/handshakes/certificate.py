@@ -47,14 +47,18 @@ class CertificateEntry(Serializable):
             _certificate_entry_registry[cls.certificate_type] = cls
 
     @classmethod
-    def parse(cls, stream):
+    def parse(cls, stream, **kwargs):
         data = stream.read_var(3)
         certificate = cls._parse_certificate(data)
 
         extensions = []
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
-            extension = Extension.parse(list_stream, handshake_type=HandshakeType.CERTIFICATE)
+            extension = Extension.parse(
+                list_stream,
+                handshake_type=HandshakeType.CERTIFICATE,
+                **kwargs
+            )
             extensions.append(extension)
 
         return cls(certificate, extensions)
@@ -126,9 +130,13 @@ class Certificate(Handshake, SerializableBody):
         self.certificate_list = certificate_list
 
     @classmethod
-    def parse_body(cls, stream, *, certificate_type):
+    def parse_body(cls, stream, *, config, nconfig, **kwargs):
         try:
-            Entry = _certificate_entry_registry[certificate_type]  # noqa: N806
+            Entry = _certificate_entry_registry[  # noqa: N806
+                nconfig.client_certificate_type
+                if config.other_side == 'client' else
+                nconfig.server_certificate_type
+            ]
         except IndexError as exc:
             raise alerts.CertificateUnknown(*exc.args) from exc
 
@@ -137,7 +145,7 @@ class Certificate(Handshake, SerializableBody):
         certificate_list = []
         with stream.limit(stream.read_int(3)) as limit:
             while stream.tell() < limit:
-                certificate = Entry.parse(stream)
+                certificate = Entry.parse(stream, **kwargs)
                 certificate_list.append(certificate)
 
         try:

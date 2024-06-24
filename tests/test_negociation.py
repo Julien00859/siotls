@@ -1,8 +1,6 @@
 import dataclasses
-import unittest
-import unittest.mock
 
-from siotls.configuration import TLSConfiguration, TLSNegociatedConfiguration
+from siotls.configuration import TLSNegotiatedConfiguration
 from siotls.connection import TLSConnection
 from siotls.contents import alerts
 from siotls.contents.handshakes.extensions import (
@@ -12,23 +10,23 @@ from siotls.contents.handshakes.extensions import (
     KeyShareResponse,
     KeyShareRetry,
     MaxFragmentLength,
-    SignatureAlgorithms,
     SupportedGroups,
     SupportedVersionsRequest,
     SupportedVersionsResponse,
 )
+from siotls.crypto import TLSKeyExchange
 from siotls.iana import (
     CipherSuites,
     ExtensionType,
     HeartbeatMode,
     MaxFragmentLengthOctets,
     NamedGroup,
-    SignatureScheme,
     TLSVersion,
 )
 from siotls.states import ClientWaitServerHello, ServerWaitClientHello
 
 from . import TestCase
+from .config import client_config, server_config
 
 # ----------------------------------------------------------------------
 # Server-side, upon receiving ClientHello
@@ -37,13 +35,11 @@ from . import TestCase
 class TestNegociationServer(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.server = TLSConnection(TLSConfiguration('server'))
+        cls.server = TLSConnection(server_config)
         cls.server._state = ServerWaitClientHello(cls.server)
 
     def setUp(self):
-        self.server.nconfig = TLSNegociatedConfiguration(
-            self.server.config.cipher_suites[0]
-        )
+        self.server.nconfig = TLSNegotiatedConfiguration()
 
     @classmethod
     def replace_config(cls, **kwargs):
@@ -136,9 +132,9 @@ class TestNegociationServerSupportedGroups(TestNegociationServer):
         cls.replace_config(key_exchanges=[NamedGroup.x25519, NamedGroup.secp256r1])
 
     def test_negociation_server_supported_groups_missing(self):
-        e = ExtensionType.SUPPORTED_GROUPS
-        with self.assertRaises(alerts.MissingExtension, error_msg=e):
+        with self.assertRaises(alerts.MissingExtension) as capture:
             self.server._state._negociate_supported_groups(None)
+        self.assertEqual(capture.exception.args, (ExtensionType.SUPPORTED_GROUPS,))
 
     def test_negociation_server_supported_groups_empty(self):
         e = "no common key exchange found"
@@ -173,58 +169,6 @@ class TestNegociationServerSupportedGroups(TestNegociationServer):
         self.assertEqual(self.server.nconfig.key_exchange, NamedGroup.x25519)
 
 
-class TestNegociationServerSignatureAlgorithms(TestNegociationServer):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.replace_config(signature_algorithms=[
-            SignatureScheme.ed25519,
-            SignatureScheme.ecdsa_secp256r1_sha256,
-        ])
-
-    def test_negociation_server_signature_algorithms_missing(self):
-        e = ExtensionType.SIGNATURE_ALGORITHMS
-        with self.assertRaises(alerts.MissingExtension, error_msg=e):
-            self.server._state._negociate_signature_algorithms(None)
-
-    def test_negociation_server_signature_algorithms_empty(self):
-        e = "no common digital signature found"
-        with self.assertRaises(alerts.HandshakeFailure, error_msg=e):
-            self.server._state._negociate_signature_algorithms(
-                SignatureAlgorithms([])
-            )
-
-    def test_negociation_server_signature_algorithms_no_match(self):
-        e = "no common digital signature found"
-        with self.assertRaises(alerts.HandshakeFailure, error_msg=e):
-            self.server._state._negociate_signature_algorithms(
-                SignatureAlgorithms([SignatureScheme.ed448]),
-            )
-
-    def test_negociation_server_signature_algorithms_pick_single_match(self):
-        clears, crypts = self.server._state._negociate_signature_algorithms(
-            SignatureAlgorithms([
-                SignatureScheme.ed448,
-                SignatureScheme.ed25519
-            ]),
-        )
-        self.assertEqual(clears, [])
-        self.assertEqual(crypts, [])
-        self.assertEqual(self.server.nconfig.signature_algorithm, SignatureScheme.ed25519)
-
-    def test_negociation_server_signature_algorithms_pick_server_best(self):
-        clears, crypts = self.server._state._negociate_signature_algorithms(
-            SignatureAlgorithms([
-                SignatureScheme.ed448,
-                SignatureScheme.ecdsa_secp256r1_sha256,
-                SignatureScheme.ed25519
-            ]),
-        )
-        self.assertEqual(clears, [])
-        self.assertEqual(crypts, [])
-        self.assertEqual(self.server.nconfig.signature_algorithm, SignatureScheme.ed25519)
-
-
 class TestNegociationServerKeyShare(TestNegociationServer):
     def test_negociation_server_key_share_missing_extension(self):
         self.server.nconfig.key_exchange = NamedGroup.x25519
@@ -245,17 +189,20 @@ class TestNegociationServerKeyShare(TestNegociationServer):
         self.assertEqual(crypts, [])
         self.assertFalse(shared_key)
 
-    @unittest.mock.patch("siotls.states.server.wait_client_hello.key_share_resume")
-    def test_negociation_server_key_share_mocked_share(self, key_share_resume):
-        key_share_resume.return_value = (b'shared key', b'server share')
-        self.server.nconfig.key_exchange = NamedGroup.x25519
-        clears, crypts, shared_key = self.server._state._negociate_key_share(
-            KeyShareRequest({NamedGroup.x25519: b'client share'})
-        )
-        key_share_resume.assert_called_once_with(NamedGroup.x25519, None, b'client share')
-        self.assertEqual(clears, [KeyShareResponse(NamedGroup.x25519, b'server share')])
-        self.assertEqual(crypts, [])
-        self.assertEqual(shared_key, b'shared key')
+    def test_negociation_server_key_share_good(self):
+        for named_group in NamedGroup:
+            with self.subTest(named_group=named_group):
+                self.server.nconfig.key_exchange = named_group
+                client_pk, client_share = TLSKeyExchange[named_group].init()
+                clears, crypts, shared_key1 = self.server._state._negociate_key_share(
+                    KeyShareRequest({named_group: client_share})
+                )
+                self.assertEqual([type(ext) for ext in clears], [KeyShareResponse])
+                self.assertEqual(clears[0].group, named_group)
+
+                server_exchange = clears[0].key_exchange
+                shared_key2 = TLSKeyExchange[named_group].resume(client_pk, server_exchange)
+                self.assertEqual(shared_key1, shared_key2)
 
     def test_negociation_server_key_share_corrupted_x(self):
         self.server.nconfig.key_exchange = NamedGroup.x25519
@@ -411,13 +358,11 @@ class TestNegociationServerHeartbeat(TestNegociationServer):
 class TestNegociationClient(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TLSConnection(TLSConfiguration('client'))
+        cls.client = TLSConnection(client_config)
         cls.client._state = ClientWaitServerHello(cls.client, {})
 
     def setUp(self):
-        self.client.nconfig = TLSNegociatedConfiguration(
-            self.client.config.cipher_suites[0]
-        )
+        self.client.nconfig = TLSNegotiatedConfiguration()
 
     @classmethod
     def replace_config(cls, **kwargs):
@@ -446,11 +391,11 @@ class TestNegociationClientSupportedVersions(TestNegociationClient):
 class TestNegociationClientKeyShare(TestNegociationClient):
     def test_negociation_client_key_share_missing(self):
         we_dont_care = None  # used as placeholder
-        e = ExtensionType.KEY_SHARE
-        with self.assertRaises(alerts.MissingExtension, error_msg=e):
+        with self.assertRaises(alerts.MissingExtension) as capture:
             self.client._state._negociate_key_share(None, {
                 NamedGroup.x25519: we_dont_care
             })
+        self.assertEqual(capture.exception.args, (ExtensionType.KEY_SHARE,))
 
     def test_negociation_client_key_share_not_offered(self):
         we_dont_care = None  # used as placeholder
@@ -460,28 +405,6 @@ class TestNegociationClientKeyShare(TestNegociationClient):
                 KeyShareResponse(NamedGroup.x448, we_dont_care),
                 {NamedGroup.x25519: we_dont_care},
             )
-
-    @unittest.mock.patch("siotls.states.client.wait_server_hello.key_share_resume")
-    def test_negociation_client_key_share_bad_key(self, key_share_resume):
-        key_share_resume.side_effect = ValueError()
-        e = "error while resuming key share"
-        with self.assertRaises(alerts.IllegalParameter, error_msg=e):
-            self.client._state._negociate_key_share(
-                KeyShareResponse(NamedGroup.x25519, b'srv pub'),
-                {NamedGroup.x25519: b'cli priv'},
-            )
-        key_share_resume.assert_called_once_with(NamedGroup.x25519, b'cli priv', b'srv pub')
-
-    @unittest.mock.patch("siotls.states.client.wait_server_hello.key_share_resume")
-    def test_negociation_client_key_share_good_key(self, key_share_resume):
-        key_share_resume.return_value = (b'shared key', None)
-        shared_key = self.client._state._negociate_key_share(
-            KeyShareResponse(NamedGroup.x25519, b'srv pub'),
-            {NamedGroup.x25519: b'cli priv'},
-        )
-        key_share_resume.assert_called_once_with(NamedGroup.x25519, b'cli priv', b'srv pub')
-        self.assertEqual(shared_key, b'shared key')
-
 
 class TestNegociationClientMaxFragmentLength(TestNegociationClient):
     def test_negociation_client_max_fragment_length_missing_not_offered(self):

@@ -20,7 +20,7 @@ class ChangeCipherSpec(Content, Serializable):
         pass
 
     @classmethod
-    def parse(cls, stream):
+    def parse(cls, stream, **kwargs):  # noqa: ARG003
         data = stream.read_exactly(1)
         if data != b'\x01':
             e = f"invalid {ContentType.CHANGE_CIPHER_SPEC} value: {data}"

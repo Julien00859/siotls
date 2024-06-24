@@ -22,7 +22,7 @@ class _CertificateTypeRequest(SerializableBody):
         self.certificate_types = certificate_types
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         certificate_types = [
             try_cast(CertificateType, ct)
             for ct in stream.read_listint(1, 1)
@@ -48,7 +48,7 @@ class _CertificateTypeResponse(SerializableBody):
         self.certificate_type = certificate_type
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         try:
             certificate_type = CertificateType(stream.read_int(1))
         except ValueError as exc:

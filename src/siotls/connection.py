@@ -3,13 +3,14 @@ import secrets
 import struct
 import types
 
-from siotls import key_logger
+from siotls import TLSError, key_logger
 from siotls.crypto.ciphers import TLSCipherSuite
 from siotls.iana import AlertLevel, ContentType, TLSVersion
 from siotls.serial import SerialIO, TLSBufferError, TooMuchDataError
+from siotls.wrapper import WrappedSocket
 
-from .contents import ApplicationData, Content, Handshake, alerts
-from .states import ClientClosed, ServerClosed, ClientStart, ServerStart
+from . import states
+from .contents import ApplicationData, Content, alerts
 from .transcript import Transcript
 from .utils import try_cast
 
@@ -25,11 +26,10 @@ def startswith_change_cipher_spec(data):
 
 
 class TLSConnection:
-    def __init__(self, config, ocsp_service=None):
+    def __init__(self, config, server_hostname=None, ocsp_service=None):
         self.config = config
         self.ocsp_service = ocsp_service
         self.nconfig = None
-        self.state = (ClientStart if config.side == 'client' else ServerStart)(self)
         self._cipher = cipher_plaintext
         self._signature = None
 
@@ -41,13 +41,28 @@ class TLSConnection:
         self._input_data = bytearray()
         self._input_handshake = bytearray()
         self._output_data = bytearray()
+        self._application_data = bytearray()
 
         if config.side == 'client':
+            if server_hostname is None and config.require_peer_authentication:
+                w =("missing server_hostname, will not verify the "
+                    "peer's certificate CN and SAN entries")
+                logger.warning(w)
+            self.server_hostname = server_hostname
             self._client_unique = secrets.token_bytes(32)
             self._server_unique = None
+            self._state = states.ClientStart(self)
         else:
+            if server_hostname:
+                e =("the connection's (singular) server_hostname is "
+                    "meant for the client side, maybe you intended to "
+                    "use the configuration's (plural) server_hostnames "
+                    "instead")
+                raise ValueError(e)
+            self.server_hostname = None
             self._client_unique = None
             self._server_unique = secrets.token_bytes(32)
+            self._state = states.ServerStart(self)
 
     # ------------------------------------------------------------------
     # Public APIs
@@ -60,59 +75,57 @@ class TLSConnection:
                 for handler in key_logger.handlers
             )
             if is_key_logger_enabled:
-                logger.info("Key log enabled for current connection.")
+                logger.info("key log enabled for current connection.")
             else:
                 logger.warning(
-                    "Key log was requested for current connection but no "
+                    "key log was requested for current connection but no "
                     "logging.Handler seems setup on the %r logger. You must "
                     "setup one.\nlogging.getLogger(%r).addHandler(logging."
                     "FileHandler(path_to_keylogfile, %r))",
                     key_logger.name, key_logger.name, "w")
 
-        self.state.initiate_connection()
+        self._state.initiate_connection()
 
     def receive_data(self, data):
         if not data:
-            return
+            e = f"empty data: {data}"
+            raise ValueError(e)
+        if not self._state.can_receive:
+            e = f"cannot receive new messages in state {self._state.name()}"
+            raise alerts.UnexpectedMessage(e)
         self._input_data += data
 
-        while next_content := self._read_next_content():
-            content_type, content_data = next_content
-            content_type = try_cast(ContentType, content_type)
-            stream = SerialIO(content_data)
+        while True:
             try:
+                next_content = self._read_next_content()
+                if not next_content:
+                    break
+                content_type, content_data = next_content
+                content_type = try_cast(ContentType, content_type)
+                content_name = content_type
+                stream = SerialIO(content_data)
                 try:
-                    content = Content.get_parser(content_type).parse(stream)
+                    content = Content.get_parser(content_type).parse(
+                        stream,
+                        config=self.config,
+                        nconfig=self.nconfig,
+                    )
+                    content_name = type(content).__name__
                     stream.assert_eof()
                 except TLSBufferError as exc:
                     raise alerts.DecodeError(*exc.args) from exc
-                logger.info("received %s", type(content).__name__)
-                match content:
-                    case alerts.Alert(level=AlertLevel.WARNING):
-                        logger.warning(content.description)
-                    case alerts.Alert(level=AlertLevel.FATAL):
-                        logger.error(content.description)
-                        break  # TODO: close
-                    case Handshake():
-                        self._transcript.update(
-                            content_data,
-                            self.config.other_side,
-                            content.msg_type
-                        )
-                        self.state.process(content)
-                    case _:
-                        self.state.process(content)
-            except alerts.Alert as alert:
-                if alert.level == AlertLevel.WARNING:
-                    logger.warning("while processing %s: %s", content_type, alert)
-                else:
-                    logger.exception("while processing %s", content_type)
-                self._send_content(alert)
-                break  # TODO: close
+                logger.debug("received %s", content_name)
+                if content_type == ContentType.HANDSHAKE:
+                    self._transcript.update(
+                        content_data, self.config.other_side, content.msg_type
+                    )
+                self._state.process(content)
+            except alerts.TLSFatalAlert as alert:
+                self._fail(alert)
+                raise
             except Exception:
-                logger.exception("while processing %s", content_type)
-                self._send_content(alerts.InternalError())
-                break  # TODO: close
+                self._fail(alerts.InternalError())
+                raise
 
         if self._cipher.should_rekey:
             self.rekey()
@@ -120,29 +133,69 @@ class TLSConnection:
     def send_data(self, data: bytes):
         self._send_content(ApplicationData(data))
 
+    def data_to_read(self):
+        application_data = self._application_data
+        self._application_data = bytearray()
+        return application_data
+
     def data_to_send(self):
         output = self._output_data
         self._output_data = bytearray()
         return output
 
     def rekey(self):
+        if not self._state.can_send:
+            e = f"cannot rekey in state {self._state.name()}"
+            raise TLSError(e)
         raise NotImplementedError
 
-    def close_connection(self):
-        self._send_content(alerts.CloseNotify())
-        self._move_to_state(
-            ClientClosed if self.config.side == 'client' else ServerClosed
-        )
+    def close_receiving_end(self):
+        if not self.is_post_handshake():
+            logger.warning("EOF or CloseNotify alert during handshake")
+            self._fail()
+            return
+        if type(self._state) != states.Closed:
+            self._move_to_state(states.Closed)
+        self._state.can_receive = False
+
+    def close_sending_end(self):
+        if not isinstance(self._state, states.Closed | states.Failed):
+            self._move_to_state(states.Closed)
+        if self._state.can_send:
+            self._send_content(alerts.CloseNotify())
+            self._state.can_send = False
+
+    def _fail(self, fatal_alert=None):
+        if fatal_alert:
+            if fatal_alert.level != AlertLevel.FATAL:
+                e =("can only fail with a fatal alert which "
+                    f"{fatal_alert!r} is not")
+                raise ValueError(e)
+            self._send_content(fatal_alert)
+        self._move_to_state(states.Failed)
+
+    def is_post_handshake(self):
+        return isinstance(self._state, states.Connected | states.Closed | states.Failed)
+
+    def is_connected(self):
+        if isinstance(self._state, states.Closed):
+            # considere half-closed to be "connected" when it is still
+            # ok to receive data
+            return self._state.can_receive
+        return isinstance(self._state, states.Connected)
+
+    def wrap(self, tcp_socket):
+        return WrappedSocket(self, tcp_socket)
 
     # ------------------------------------------------------------------
     # Internal APIs
     # ------------------------------------------------------------------
 
     def _move_to_state(self, state_type, *args, **kwargs):
-        self.state = state_type(self, *args, **kwargs)
+        self._state = state_type(self, *args, **kwargs)
 
     @property
-    def _max_fragment_length(self):
+    def max_fragment_length(self):
         if self.nconfig and self.nconfig.max_fragment_length is not None:
             return self.nconfig.max_fragment_length
         return self.config.max_fragment_length
@@ -157,7 +210,7 @@ class TLSConnection:
         content_type, _legacy_version, content_length = \
             struct.unpack('!BHH', self._input_data[:5])
 
-        max_fragment_length = self._max_fragment_length
+        max_fragment_length = self.max_fragment_length
         if self._cipher.must_decrypt:
             max_fragment_length += 256
         if content_length > max_fragment_length:
@@ -234,13 +287,25 @@ class TLSConnection:
         return content_type, content_data
 
     def _send_content(self, content: Content):
-        logger.info("will send %s", type(content).__name__)
+        if (content.content_type == ContentType.APPLICATION_DATA
+            and not self._state.can_send_application_data):
+            e = f"cannot send application data in state {self._state.name()}"
+            raise TLSError(e)
+        if not self._state.can_send:
+            e = f"cannot send content in state {self._state.name()}"
+            raise TLSError(e)
+        if (content.content_type == ContentType.HEARTBEAT
+            and (not self.config.can_send_heartbeat
+                 or self.nconfig and not self.nconfig.can_send_heartbeat)):
+            e = "cannot send heartbeat on this connection"
+
+        logger.debug("will send %s", type(content).__name__)
         data = content.serialize()
 
         if content.content_type == ContentType.HANDSHAKE:
             self._transcript.update(data, self.config.side, content.msg_type)
 
-        fragment_length = self._max_fragment_length
+        fragment_length = self.max_fragment_length
         if self._cipher.must_encrypt:
             # room for content-type and aead's additionnal data
             fragment_length -= 1 + self._cipher.tag_length
@@ -260,7 +325,11 @@ class TLSConnection:
 
         if self._cipher.must_encrypt:
             record_type = ContentType.APPLICATION_DATA
-            fragments = self._encrypt(content.content_type, fragments, self._max_fragment_length)
+            fragments = self._encrypt(
+                content.content_type,
+                fragments,
+                self.max_fragment_length
+            )
         else:
             record_type = content.content_type
 

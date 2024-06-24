@@ -1,34 +1,32 @@
 import logging
-from socket import socket
+import socket
 
-from siotls import TLSConfiguration, TLSConnection
-from siotls.utils import hexdump
+from siotls import TLSConfiguration, TLSConnection, ocsp_over_http
+from siotls.trust_store import get_system_store
+from siotls.utils import make_http11_request
 
 logger = logging.getLogger(__name__)
 
-def connect(host, port):
-    config = TLSConfiguration('client')
-    conn = TLSConnection(config)
-    conn.initiate_connection()
+def connect(host, port, check_certificate):
+    options = {}
+    if check_certificate:
+        options['trust_store'] = get_system_store()
+    config = TLSConfiguration('client', alpn=['http/1.1', 'http/1.0'], **options)
 
-    client = socket()
-    try:
-        client.connect((host, port))
-        logger.info("connected to %s port %s", host, port)
+    with socket.create_connection((host, port), timeout=5) as sock:
+        logger.info("connection with %s:%s established", host, port)
 
-        while True:
-            output_data = conn.data_to_send()
-            if not output_data:
-                break
-            logger.info("send %s bytes:\n%s", len(output_data), hexdump(output_data))
-            client.send(output_data)
+        conn = TLSConnection(config, server_hostname=host, ocsp_service=ocsp_over_http)
+        with conn.wrap(sock) as ssock:
+            logger.info("connection with %s:%s secured", host, port)
 
-            input_data = client.recv(16384)
-            if not input_data:
-                break
-            logger.info("recv %s bytes:\n%s", len(input_data), hexdump(input_data))
-            conn.receive_data(input_data)
+            http_req = make_http11_request(host, 'GET', '/', '')
+            if logger.isEnabledFor(logging.DEBUG):
+                print(http_req)  # noqa: T201
+            ssock.write(http_req.encode())
 
-        logger.info("connection to %s port %s ended", host, port)
-    finally:
-        client.close()
+            http_res = ssock.read().decode(errors='replace')
+            if logger.isEnabledFor(logging.INFO):
+                print(http_res)  # noqa: T201
+
+    logger.info("connection with %s:%s ended", host, port)

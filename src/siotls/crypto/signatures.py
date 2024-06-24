@@ -5,23 +5,16 @@ from typing import ClassVar
 
 from cryptography.hazmat._oid import PublicKeyAlgorithmOID, SignatureAlgorithmOID
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import (
-    ec,
-    ed448,
-    ed25519,
-    padding,
-    rsa,
-    types,
-)
+from cryptography.hazmat.primitives.asymmetric import ec, padding, types
 
 from siotls.iana import SignatureScheme
 from siotls.utils import RegistryMeta
 
 
 class TLSSignatureSuite(metaclass=RegistryMeta):
+    _pubkey_registry: ClassVar = {}
     _registry: ClassVar = {}
-    _key_registry: ClassVar = {}
-    _oid_registry: ClassVar = {}
+    _sign_registry: ClassVar = {}
 
     iana_id: SignatureScheme
     pubkey_oid: PublicKeyAlgorithmOID
@@ -33,29 +26,17 @@ class TLSSignatureSuite(metaclass=RegistryMeta):
         super().__init_subclass__(**kwargs)
         if TLSSignatureSuite not in cls.__bases__:
             return
-        key_type = cls.iana_id.name.partition('_')[0]
+        cls._pubkey_registry.setdefault(cls.pubkey_oid, {})[cls.iana_id] = cls
         cls._registry[cls.iana_id] = cls
-        cls._key_registry.setdefault(key_type, {})[cls.iana_id] = cls
-        cls._oid_registry.setdefault(cls.pubkey_oid, {})[cls.iana_id] = cls
+        cls._sign_registry[cls.sign_oid] = cls
 
     @classmethod
-    def for_certificate(cls, certificate):
-        return cls._oid_registry[certificate.public_key_algorithm_oid]
+    def from_signature_oid(cls, signature_oid):
+        return cls._sign_registry[signature_oid]
 
     @classmethod
-    def for_key(cls, key):
-        match key:
-            case rsa.RSAPublicKey() | rsa.RSAPrivateKey():
-                return cls._key_registry['rsa']
-            case ec.EllipticCurvePublicKey() | ec.EllipticCurvePrivateKey():
-                return cls._key_registry['ecdsa']
-            case ed25519.Ed25519PublicKey() | ed25519.Ed25519PrivateKey():
-                return cls._key_registry['ed25519']
-            case ed448.Ed448PublicKey() | ed448.Ed448PrivateKey():
-                return cls._key_registry['ed448']
-            case _:
-                e = f"{key!r} object is not a valid key"
-                raise TypeError(e)
+    def for_public_key_oid(cls, public_key_oid):
+        return cls._pubkey_registry[public_key_oid]
 
     def __init__(self, key):
         self.key = key
@@ -144,7 +125,7 @@ class _ECDSAMixin:
     digestmod: hashes.Hash
 
     def sign(self, message):
-        return self.key.sign(message, self.digestmod)
+        return self.key.sign(message, ec.ECDSA(self.digestmod))
 
     def verify(self, signature, message):
         self.key.verify(signature, message, ec.ECDSA(self.digestmod))

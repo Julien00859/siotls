@@ -1,11 +1,12 @@
 from siotls.contents import alerts
 from siotls.iana import ContentType, HandshakeType
 
-from .. import State
-from . import ServerConnected
+from .. import Connected, State
 
 
 class ServerWaitFinished(State):
+    can_receive = True
+    can_send = True
     can_send_application_data = True
 
     def __init__(self, connection, server_finished_transcript_hash):
@@ -13,17 +14,22 @@ class ServerWaitFinished(State):
         self._server_finished_transcript_hash = server_finished_transcript_hash
 
     def process(self, finished):
-        if finished.content_type != ContentType.HANDSHAKE:
-            e = "can only receive Handshake in this state"
-            raise alerts.UnexpectedMessage(e)
-        if finished.msg_type != HandshakeType.FINISHED:
-            e = "can only receive ClientHello in this state"
-            raise alerts.UnexpectedMessage(e)
+        if (finished.content_type != ContentType.HANDSHAKE
+            or finished.msg_type != HandshakeType.FINISHED):
+            super().process(finished)
+            return
 
-        self._cipher.verify_finish(self._server_finished_transcript_hash, finished.verify_data)
+        try:
+            self._cipher.verify_finish(
+                self._server_finished_transcript_hash,
+                finished.verify_data
+            )
+        except ValueError as exc:
+            raise alerts.DecryptError from exc
+
         self._cipher.derive_master_secrets(
             self._server_finished_transcript_hash,
             self._transcript.digest(),
         )
 
-        self._move_to_state(ServerConnected)
+        self._move_to_state(Connected)

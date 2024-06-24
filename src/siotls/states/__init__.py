@@ -1,4 +1,15 @@
-class State:
+import abc
+import logging
+
+from siotls.contents.alerts import Alert, UnexpectedMessage
+from siotls.iana import AlertDescription, AlertLevel, ContentType
+
+logger = logging.getLogger('siotls.connection')
+
+
+class State(metaclass=abc.ABCMeta):
+    can_recveive: bool
+    can_send: bool
     can_send_application_data: bool
 
     def __init__(self, connection):
@@ -12,18 +23,40 @@ class State:
             setattr(self.connection, name, value)
         super().__setattr__(name, value)
 
+    @classmethod
+    def name(cls):
+        return cls.__name__
+
     def initiate_connection(self):
-        e = "cannot initiate connection in this state"
+        e = f"cannot initiate connection in state {self.name()}"
         raise NotImplementedError(e)
 
-    def process(self, content):  # noqa: ARG002
-        e = "cannot process content in this state"
-        raise NotImplementedError(e)
+    @abc.abstractmethod
+    def process(self, content):
+        if content.content_type == ContentType.ALERT:
+            alert = content
+            if alert.description == AlertDescription.CLOSE_NOTIFY:
+                self._move_to_state(Closed)
+                self._state.recv_closed = True
+                logger.debug("%s closed its sending side", self.config.other_side)
+            elif alert.level == AlertLevel.WARNING:
+                logger.debug("warning alert from %s: %s",
+                     self.config.other_side, content.description.name)
+            else:
+                e = f"fatal alert from {self.config.other_side}"
+                raise Alert[alert.description](e)
+        elif content.content_type == ContentType.HEARTBEAT:
+            raise NotImplementedError
+        else:
+            e =(f"cannot process {type(content).__name__} in state "
+                f"{self.name()}")
+            raise UnexpectedMessage(e)
 
-
+# isort: off
+from .closed import Closed
+from .connected import Connected
+from .failed import Failed
 from .client import (
-    ClientClosed,
-    ClientConnected,
     ClientStart,
     ClientWaitCertCr,
     ClientWaitCertificate,
@@ -33,8 +66,6 @@ from .client import (
     ClientWaitServerHello,
 )
 from .server import (
-    ServerClosed,
-    ServerConnected,
     ServerStart,
     ServerWaitCertificate,
     ServerWaitCertificateVerify,

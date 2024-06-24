@@ -34,7 +34,7 @@ class OIDFilters(Extension, SerializableBody):
         self.filters = filters
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         filters = []
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():

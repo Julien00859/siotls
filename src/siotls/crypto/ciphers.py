@@ -2,13 +2,15 @@
 # ruff: noqa: N801, S101
 import enum
 import functools
-import hmac
 import hashlib
+import hmac
 from typing import ClassVar
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers import aead
 
 from siotls import key_logger
+from siotls.contents import alerts
 from siotls.crypto.hkdf import derive_secret, hkdf_expand_label, hkdf_extract
 from siotls.iana import CipherSuites
 from siotls.utils import RegistryMeta, peekable
@@ -145,7 +147,10 @@ class TLSCipherSuite(metaclass=RegistryMeta):
             self._write_seq.peek() >= self.usage_limit - REKEY_THRESHOLD)
 
     def decrypt(self, data, associated_data):
-        return self._read_cipher.decrypt(self._next_read_nonce(), data, associated_data)
+        try:
+            return self._read_cipher.decrypt(self._next_read_nonce(), data, associated_data)
+        except InvalidTag as exc:
+            raise alerts.DecryptError from exc
 
     def _next_read_nonce(self):
         nonce = self._read_iv ^ next(self._read_seq)
@@ -194,7 +199,7 @@ class TLSCipherSuite(metaclass=RegistryMeta):
     def _derive_key_and_iv(self, secret):
         dm = self.digestmod
         return (
-            hkdf_expand_label(dm, secret, b'key', b'', dm().digest_size),
+            hkdf_expand_label(dm, secret, b'key', b'', self.key_length),
             hkdf_expand_label(dm, secret, b'iv', b'', self.iv_length),
         )
 
@@ -329,7 +334,7 @@ class TLS_CHACHA20_POLY1305_SHA256(TLSCipherSuite):
     _ciphermod = aead.ChaCha20Poly1305
     digestmod = hashlib.sha256
     block_size = 16
-    key_length = 16
+    key_length = 32
     tag_length = 16
     nonce_length = 12
     usage_limit = 1 << 64
@@ -340,7 +345,7 @@ class TLS_AES_128_CCM_SHA256(TLSCipherSuite):
     iana_id = CipherSuites.TLS_AES_128_CCM_SHA256
     _ciphermod = aead.AESCCM
     digestmod = hashlib.sha256
-    cipher_block_size = 16
+    block_size = 16
     key_length = 16
     tag_length = 16
     nonce_length = 12

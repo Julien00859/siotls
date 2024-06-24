@@ -80,7 +80,7 @@ class ClientHello(Handshake, SerializableBody):
 
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):
         legacy_version = stream.read_int(2)
         if legacy_version != TLSVersion.TLS_1_2:
             e = f"expected {TLSVersion.TLS_1_2} but {legacy_version} found"
@@ -103,7 +103,7 @@ class ClientHello(Handshake, SerializableBody):
         extensions = []
         list_stream = SerialIO(stream.read_var(2))
         while not list_stream.is_eof():
-            extension = Extension.parse(list_stream, handshake_type=cls.msg_type)
+            extension = Extension.parse(list_stream, handshake_type=cls.msg_type, **kwargs)
             extensions.append(extension)
 
         try:

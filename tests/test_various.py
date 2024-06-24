@@ -1,8 +1,5 @@
 from siotls.contents.handshakes.extensions import Extension
-from siotls.iana import (
-    ExtensionType,
-    HandshakeType,
-)
+from siotls.iana import ExtensionType, HandshakeType
 
 from . import TestCase
 

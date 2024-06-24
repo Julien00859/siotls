@@ -28,7 +28,7 @@ class CertificateAuthorities(Extension, SerializableBody):
         self.autorities = autorities
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         autorities = stream.read_listvar(2, 2)
         return cls(autorities)
 

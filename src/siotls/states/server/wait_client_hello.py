@@ -1,6 +1,7 @@
 import dataclasses
+import logging
 
-from siotls.configuration import TLSNegociatedConfiguration
+from siotls.configuration import TLSNegotiatedConfiguration
 from siotls.contents import ChangeCipherSpec, alerts
 from siotls.contents.handshakes import (
     Certificate,
@@ -11,10 +12,7 @@ from siotls.contents.handshakes import (
     HelloRetryRequest,
     ServerHello,
 )
-from siotls.contents.handshakes.certificate import (
-    X509,
-    RawPublicKey,
-)
+from siotls.contents.handshakes.certificate import X509, RawPublicKey
 from siotls.contents.handshakes.extensions import (
     ALPN,
     ClientCertificateTypeResponse,
@@ -24,16 +22,10 @@ from siotls.contents.handshakes.extensions import (
     OCSPStatus,
     ServerCertificateTypeResponse,
     SignatureAlgorithms,
-    SignatureAlgorithmsCert,
     SupportedVersionsResponse,
 )
-from siotls.crypto.ciphers import TLSCipherSuite
-from siotls.crypto.key_share import resume as key_share_resume
-from siotls.crypto.ocsp import (
-    get_ocsp_url,
-    make_ocsp_request,
-)
-from siotls.crypto.signatures import TLSSignatureSuite
+from siotls.crypto import TLSCipherSuite, TLSKeyExchange, TLSSignatureSuite
+from siotls.crypto.ocsp import get_ocsp_url, make_ocsp_request, validate_ocsp
 from siotls.iana import (
     CertificateStatusType,
     CertificateType,
@@ -53,8 +45,12 @@ CERTIFICATE_VERIFY_SERVER = b"".join([
     b"\x00",
 ])
 
+logger = logging.getLogger('siotls.connection')
+
 
 class ServerWaitClientHello(State):
+    can_receive = True
+    can_send = True
     can_send_application_data = False
 
     def __init__(self, connection):
@@ -62,7 +58,17 @@ class ServerWaitClientHello(State):
         self._is_first_client_hello = True
 
     def process(self, client_hello):
-        self._check(client_hello)
+        if (client_hello.content_type != ContentType.HANDSHAKE
+            or client_hello.msg_type != HandshakeType.CLIENT_HELLO):
+            super().process(client_hello)
+            return
+
+        if not self._is_first_client_hello:
+            self._find_common_cipher_suite(client_hello.cipher_suites)
+            if client_hello.random != self._client_unique:
+                e = "client's random cannot change in between Hellos"
+                raise alerts.IllegalParameter(e)
+
         if self._is_first_client_hello:
             self._setup(client_hello)
 
@@ -72,7 +78,7 @@ class ServerWaitClientHello(State):
             return
         self._send_server_hello(client_hello.legacy_session_id, server_extensions, shared_key)
 
-        if self.config.require_peer_certificate:
+        if self.config.require_peer_authentication:
             self._request_user_certificate()
 
         self._send_server_certificate()
@@ -80,29 +86,16 @@ class ServerWaitClientHello(State):
         self._send_finished()
 
         server_finished_transcript_hash = self._transcript.digest()
-        if self.config.require_peer_certificate:
+        if self.config.require_peer_authentication:
             self._move_to_state(ServerWaitFlight2, server_finished_transcript_hash)
         else:
             self._move_to_state(ServerWaitFinished, server_finished_transcript_hash)
 
-    def _check(self, client_hello):
-        if client_hello.content_type != ContentType.HANDSHAKE:
-            e = "can only receive Handshake in this state"
-            raise alerts.UnexpectedMessage(e)
-        if client_hello.msg_type != HandshakeType.CLIENT_HELLO:
-            e = "can only receive ClientHello in this state"
-            raise alerts.UnexpectedMessage(e)
-        if not self._is_first_client_hello:
-            cipher_suite = self._find_common_cipher_suite(client_hello.cipher_suites)
-            if client_hello.random != self._client_unique:
-                e = "client's random cannot change in between Hellos"
-                raise alerts.IllegalParameter(e)
-
     def _setup(self, client_hello):
-        cipher_suite = self._find_common_cipher_suite(client_hello.cipher_suites)
-        self.nconfig = TLSNegociatedConfiguration(cipher_suite)
+        self.nconfig = TLSNegotiatedConfiguration()
+        self.nconfig.cipher_suite = self._find_common_cipher_suite(client_hello.cipher_suites)
         self._client_unique = client_hello.random
-        self._cipher = TLSCipherSuite[cipher_suite](
+        self._cipher = TLSCipherSuite[self.nconfig.cipher_suite](
             'server', self._client_unique, log_keys=self.config.log_keys)
         self._transcript.post_init(self._cipher.digestmod)
 
@@ -127,13 +120,13 @@ class ServerWaitClientHello(State):
         )
 
         clear_extensions, _ = server_extensions
+        self._transcript.do_hrr_dance(self.config.side, self._transcript.digest())
         self._send_content(HelloRetryRequest(
             HelloRetryRequest.random,
             session_id,
             self._cipher.iana_id,
             clear_extensions,
         ))
-        self._transcript.do_hrr_dance()
         self._send_content(ChangeCipherSpec())
 
     def _send_server_hello(self, session_id, extensions, shared_key):
@@ -174,24 +167,33 @@ class ServerWaitClientHello(State):
 
             if (
                 self.nconfig.peer_want_ocsp_stapling
-                and self.ocsp_callback
+                and self.ocsp_service
                 and len(self.config.certificate_chain) > 1
             ):
-                ocsp_url = get_ocsp_url(self.config.certificate_chain[0])
-                ocsp_req = make_ocsp_request(
-                    self.config.certificate_chain[0],
-                    self.config.certificate_chain[1],
-                )
-                ocsp_res = self.ocsp_service(ocsp_url, ocsp_req)
-                certificate_list[0].extensions.append(OCSPStatus(ocsp_res))
+                subject, issuer = self.config.certificate_chain[:2]
+                ocsp_url = get_ocsp_url(subject)
+                ocsp_req = make_ocsp_request(subject, issuer)
+                ocsp_res = self.ocsp_service.request(ocsp_url, ocsp_req)
+                try:
+                    valid_until = validate_ocsp(issuer, ocsp_req, ocsp_res)
+                except ValueError as exc:
+                    self.ocsp_service.uncache(ocsp_req)
+                    w =("error while validating the online status of "
+                        "this server certificate, client likely to "
+                        "reject this connection: %s")
+                    logger.warning(w, exc.args[0])
+                else:
+                    self.ocsp_service.cache(valid_until, ocsp_req, ocsp_res)
+                    certificate_list[0].extensions[
+                        ExtensionType.STATUS_REQUEST
+                    ] = OCSPStatus(ocsp_res)
 
         self._send_content(Certificate(b'', certificate_list))
         self._send_content(CertificateVerify(
             self._signature.iana_id,
-            self._signature.sign(b''.join([
-                CERTIFICATE_VERIFY_SERVER,
-                self._transcript.digest(),
-            ]))
+            self._signature.sign(
+                CERTIFICATE_VERIFY_SERVER + self._transcript.digest(),
+            )
         ))
 
     def _send_finished(self):
@@ -250,7 +252,7 @@ class ServerWaitClientHello(State):
         raise alerts.HandshakeFailure(e)
 
     def _negociate_client_certificate_type(self, cct_ext):
-        if not self.config.require_peer_certificate:
+        if not self.config.require_peer_authentication:
             return [], []
         client_cert_types = cct_ext.certificate_types if cct_ext else [CertificateType.X509]
         for cert_type in self.config.peer_certificate_types:
@@ -276,7 +278,8 @@ class ServerWaitClientHello(State):
     def _negociate_signature_algorithms(self, sa_ext):
         if not sa_ext:
             raise alerts.MissingExtension(ExtensionType.SIGNATURE_ALGORITHMS)
-        suites = TLSSignatureSuite.for_certificate(self.config.certificate_chain[0])
+        pubkey_oid = self.config.certificate_chain[0].public_key_algorithm_oid
+        suites = TLSSignatureSuite.for_public_key_oid(pubkey_oid)
         for server_suite in self.config.signature_algorithms:
             if server_suite in suites and server_suite in sa_ext.supported_signature_algorithms:
                 self._signature = suites[server_suite](self.config.private_key)
@@ -288,14 +291,15 @@ class ServerWaitClientHello(State):
         key_exchange = self.nconfig.key_exchange
         if key_share_ext and key_exchange in key_share_ext.client_shares:
             # possible to resume key share => ServerHello
-            peer_exchange = key_share_ext.client_shares[key_exchange]
+            client_exchange = key_share_ext.client_shares[key_exchange]
+            KeyExchange = TLSKeyExchange[key_exchange]  # noqa: N806
             try:
-                shared_key, my_exchange = key_share_resume(
-                    key_exchange, None, peer_exchange)
+                private_key, server_exchange = KeyExchange.init()
+                shared_key = KeyExchange.resume(private_key, client_exchange)
             except ValueError as exc:
                 e = "error while resuming key share"
                 raise alerts.HandshakeFailure(e) from exc
-            response = KeyShareResponse(key_exchange, my_exchange)
+            response = KeyShareResponse(key_exchange, server_exchange)
         else:
             # impossible to resume key share => HelloRetryRequest
             shared_key = None

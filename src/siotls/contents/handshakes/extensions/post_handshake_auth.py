@@ -18,7 +18,7 @@ class PostHandshakeAuth(Extension, SerializableBody):
         pass
 
     @classmethod
-    def parse_body(cls, stream):  # noqa: ARG003
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003  # noqa: ARG003
         return cls()
 
     def serialize_body(self):

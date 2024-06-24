@@ -27,7 +27,7 @@ class Cookie(Extension, SerializableBody):
         self.cookie = cookie
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         cookie = stream.read_var(2)
         return cls(cookie)
 

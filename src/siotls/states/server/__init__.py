@@ -40,8 +40,6 @@
 #                            CONNECTED
 
 # isort: skip_file
-from .closed import ServerClosed
-from .connected import ServerConnected
 from .wait_finished import ServerWaitFinished
 from .wait_certificate_verify import ServerWaitCertificateVerify
 from .wait_certificate import ServerWaitCertificate

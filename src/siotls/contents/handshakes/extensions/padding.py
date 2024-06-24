@@ -23,7 +23,7 @@ class Padding(Extension, SerializableBody):
         self.zeros_count = zeros_count
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         return cls(len(stream.read()))
 
     def serialize_body(self):

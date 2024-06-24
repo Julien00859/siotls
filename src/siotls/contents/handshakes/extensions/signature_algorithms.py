@@ -19,7 +19,7 @@ class _SignAlgoMixin(SerializableBody):
         self.supported_signature_algorithms = supported_signature_algorithms
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         supported_signature_algorithms = [
             try_cast(SignatureScheme, signature_scheme)
             for signature_scheme in stream.read_listint(2, 2)

@@ -30,7 +30,7 @@ class CertificateRequest(Handshake, SerializableBody):
             raise ValueError(e)
 
     @classmethod
-    def parse_body(cls, stream):
+    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
         certificate_request_context = stream.read_var(1)
 
         extensions = []
