@@ -107,9 +107,6 @@ class ServerWaitClientHello(State):
         raise alerts.HandshakeFailure(e)
 
     def _send_hello_retry_request(self, session_id, server_extensions):
-        if not self._is_first_client_hello:
-            e = "invalid KeyShare in second ClientHello"
-            raise alerts.IllegalParameter(e)
         self._is_first_client_hello = False
 
         # make sure the client doesn't change its algorithms in between flights
