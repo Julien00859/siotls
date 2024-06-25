@@ -11,7 +11,7 @@ def connect(host, port, check_certificate):
     options = {}
     if check_certificate:
         options['trust_store'] = get_system_store()
-    config = TLSConfiguration('client', alpn=['http/1.1', 'http/1.0'], **options)
+    config = TLSConfiguration('client', alpn=['http/1.1', 'http/1.0'], log_keys=1, **options)
 
     with socket.create_connection((host, port), timeout=5) as sock:
         logger.info("connection with %s:%s established", host, port)

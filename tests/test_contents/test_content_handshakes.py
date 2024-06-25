@@ -1,8 +1,16 @@
 import contextlib
 import logging
+from datetime import datetime, timedelta, timezone
+
+from freezegun import freeze_time
 
 from siotls.contents import alerts
-from siotls.contents.handshakes import ClientHello, EncryptedExtensions, Handshake
+from siotls.contents.handshakes import (
+    ClientHello,
+    EncryptedExtensions,
+    Handshake,
+    NewSessionTicket,
+)
 from siotls.contents.handshakes.extensions import (
     Cookie,
     Heartbeat,
@@ -260,5 +268,35 @@ class TestContentHandshakeEncryptedExtensions(TestContentHandshake):
         ]
         with self.neuter_extension(handshake):
             self.assertEqual(handshake, ee)
+
+        self.assertEqual(handshake.serialize(), payload)
+
+
+class TestContentHandshakeNewSessionTicket(TestContentHandshake):
+    @freeze_time("2024-06-25 13:00:00")
+    def test_content_new_session_ticket_io(self):
+        payload = bytes.fromhex("""
+            040001050000012c61e0fa6808000000000000000100f0c71bf2a7b648cc0b55ca
+            3e62b94e34c3814754d623e25cefeeb32af4fec33e0652f67a4a384f215e2c534d
+            03b577820a1f990e90843931403dce2f7e53aa57c82282490f09b5f3796fb85083
+            4aeaa4c5a7c53294d51db63ca095f3e817a180527a41523cc7726ea94394e4ced6
+            d49ff7f733c4d28c4f6185cf98f0663736393532febbdf2fbbee83ed8df061f8c1
+            bda47eef4785604b976ad386da64a043b3f2162ce961c13680ed70e8b95543b1ad
+            fd24427a8f2629d1efc8704533628c9e5eb7a4d088472875cf2a6baf9bbb1eb500
+            2a722cba4338864ff87f605bd0341b5aa0dacaa2d91e59fb7e5fea044a0e749800
+            00
+        """)
+        stream = SerialIO(payload)
+        handshake = NewSessionTicket.parse(stream)
+        self.assertTrue(stream.is_eof())
+
+        new_session_ticket = NewSessionTicket(
+            ticket_expires=datetime.now(timezone.utc) + timedelta(minutes=5),
+            ticket_age_add=1642134120,
+            ticket_nonce=(1).to_bytes(8, 'big'),
+            ticket=payload[23:23+240],
+            extensions=[],
+        )
+        self.assertEqual(handshake, new_session_ticket)
 
         self.assertEqual(handshake.serialize(), payload)

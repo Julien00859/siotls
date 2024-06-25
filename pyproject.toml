@@ -33,6 +33,7 @@ dependencies = [
 dev = [
   "coverage",
   "isort==5.13.2",  # keep me sync with .pre-commit-config.yaml
+  "freezegun",
   "parameterized",
   "pre-commit",
   "ruff==0.4.5",  # keep me sync with .pre-commit-config.yaml
