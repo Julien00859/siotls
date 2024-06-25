@@ -107,6 +107,9 @@ class ServerWaitClientHello(State):
         raise alerts.HandshakeFailure(e)
 
     def _send_hello_retry_request(self, session_id, server_extensions):
+        if not self._is_first_client_hello:
+            e = "invalid KeyShare in second ClientHello"
+            raise alerts.HandshakeFailure(e)
         self._is_first_client_hello = False
 
         # make sure the client doesn't change its algorithms in between flights
@@ -280,6 +283,7 @@ class ServerWaitClientHello(State):
         for server_suite in self.config.signature_algorithms:
             if server_suite in suites and server_suite in sa_ext.supported_signature_algorithms:
                 self._signature = suites[server_suite](self.config.private_key)
+                self.nconfig.signature_algorithm = server_suite
                 return [], []
         e = "no common signature algorithm found"
         raise alerts.HandshakeFailure(e)

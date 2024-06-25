@@ -128,3 +128,8 @@ class peekable:  # noqa: N801
                     raise
                 return default
         return self._peeked
+
+
+def submap(mapping, keys):
+    keys = frozenset(keys)
+    return {key: mapping[key] for key in mapping if key in keys}

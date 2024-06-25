@@ -192,3 +192,19 @@ class TLSNegotiatedConfiguration:
             e = f"cannot delete attribute {attr!r}: frozen instance"
             raise TypeError(e)
         super().__delattr__(attr)
+
+    def copy(self):
+        copy = type(self)()
+        copy.cipher_suite = self.cipher_suite
+        copy.key_exchange = self.key_exchange
+        copy.signature_algorithm = self.signature_algorithm
+        copy.alpn = self.alpn
+        copy.can_send_heartbeat = self.can_send_heartbeat
+        copy.can_echo_heartbeat = self.can_echo_heartbeat
+        copy.max_fragment_length = self.max_fragment_length
+        copy.client_certificate_type = self.client_certificate_type
+        copy.server_certificate_type = self.server_certificate_type
+        copy.peer_want_ocsp_stapling = self.peer_want_ocsp_stapling
+        copy.peer_certificate = self.peer_certificate
+        copy.peer_public_key = self.peer_public_key
+        return copy
