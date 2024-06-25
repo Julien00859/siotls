@@ -22,6 +22,7 @@ RFC-8446 and the documents it references, we also studied:
 * https://safecurves.cr.yp.to/
 * https://www.enisa.europa.eu/publications/algorithms-key-size-and-parameters-report-2014
 * https://latacora.micro.blog/2018/04/03/cryptographic-right-answers.html
+* https://cabforum.org/working-groups/server/baseline-requirements/documents/
 
 Installation
 ------------
