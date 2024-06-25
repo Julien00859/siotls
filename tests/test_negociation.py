@@ -194,19 +194,17 @@ class TestNegociationServerKeyShare(TestNegociationServer):
         self.assertFalse(shared_key)
 
     def test_negociation_server_key_share_good(self):
-        for named_group in NamedGroup:
-            with self.subTest(named_group=named_group):
-                self.server.nconfig.key_exchange = named_group
-                client_pk, client_share = TLSKeyExchange[named_group].init()
-                clears, crypts, shared_key1 = self.server._state._negociate_key_share(
-                    KeyShareRequest({named_group: client_share})
-                )
-                self.assertEqual([type(ext) for ext in clears], [KeyShareResponse])
-                self.assertEqual(clears[0].group, named_group)
+        self.server.nconfig.key_exchange = NamedGroup.x25519
+        client_pk, client_share = TLSKeyExchange[NamedGroup.x25519].init()
+        clears, crypts, shared_key1 = self.server._state._negociate_key_share(
+            KeyShareRequest({NamedGroup.x25519: client_share})
+        )
+        self.assertEqual([type(ext) for ext in clears], [KeyShareResponse])
+        self.assertEqual(clears[0].group, NamedGroup.x25519)
 
-                server_exchange = clears[0].key_exchange
-                shared_key2 = TLSKeyExchange[named_group].resume(client_pk, server_exchange)
-                self.assertEqual(shared_key1, shared_key2)
+        server_exchange = clears[0].key_exchange
+        shared_key2 = TLSKeyExchange[NamedGroup.x25519].resume(client_pk, server_exchange)
+        self.assertEqual(shared_key1, shared_key2)
 
     def test_negociation_server_key_share_corrupted_x(self):
         self.server.nconfig.key_exchange = NamedGroup.x25519

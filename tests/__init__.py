@@ -25,6 +25,7 @@ test_temp_dir = Path(tempfile.mkdtemp(prefix='siotls-test-'))
 atexit.register(shutil.rmtree, fspath(test_temp_dir), ignore_errors=True)
 
 TAG_INTEGRATION = getenv('SIOTLS_INTEGRATION') == '1'
+TAG_SLOW = getenv('SIOTLS_SLOW') == '1'
 
 
 class TestCase(unittest.TestCase):
