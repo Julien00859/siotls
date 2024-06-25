@@ -37,7 +37,7 @@ class State(metaclass=abc.ABCMeta):
             alert = content
             if alert.description == AlertDescription.CLOSE_NOTIFY:
                 self._move_to_state(Closed)
-                self._state.recv_closed = True
+                self._state.can_receive = False
                 logger.debug("%s closed its sending side", self.config.other_side)
             elif alert.level == AlertLevel.WARNING:
                 logger.debug("warning alert from %s: %s",

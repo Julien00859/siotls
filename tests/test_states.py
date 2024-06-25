@@ -1,8 +1,7 @@
 import dataclasses
 
 from siotls import TLSConnection
-from siotls.contents import ApplicationData
-from siotls.contents.alerts import HandshakeFailure, IllegalParameter, UnexpectedMessage
+from siotls.contents import ApplicationData, alerts
 from siotls.contents.handshakes import ClientHello, Finished, HelloRetryRequest
 from siotls.contents.handshakes.extensions import (
     KeyShareRetry,
@@ -23,7 +22,7 @@ class TestStateServerWaitClientHello(TestCase):
         server_conn.initiate_connection()
 
         e = "cannot process ApplicationData in state ServerWaitClientHello"
-        with self.assertRaises(UnexpectedMessage, error_msg=e):
+        with self.assertRaises(alerts.UnexpectedMessage, error_msg=e):
             server_conn._state.process(ApplicationData(b""))
 
     def test_state_server_wait_client_hello_bad_msg_type(self):
@@ -31,8 +30,16 @@ class TestStateServerWaitClientHello(TestCase):
         server_conn.initiate_connection()
 
         e = "cannot process Finished in state ServerWaitClientHello"
-        with self.assertRaises(UnexpectedMessage, error_msg=e):
+        with self.assertRaises(alerts.UnexpectedMessage, error_msg=e):
             server_conn._state.process(Finished(b""))
+
+    def test_state_server_wait_client_hello_close_notify(self):
+        server_conn = TLSConnection(server_config)
+        server_conn.initiate_connection()
+
+        server_conn._state.process(alerts.CloseNotify())
+        self.assertTrue(server_conn.is_post_handshake())
+        self.assertFalse(server_conn.is_connected())
 
     def test_state_server_wait_client_hello_hrr_cipher_changed(self):
         server_conn = TLSConnection(server_config)
@@ -86,11 +93,11 @@ class TestStateServerWaitClientHello(TestCase):
         client_hello_second_flight = client_conn.data_to_send()
 
         e = "no common cipher suite found"
-        with self.assertRaises(HandshakeFailure, error_msg=e):
+        with self.assertRaises(alerts.HandshakeFailure, error_msg=e):
             server_conn.receive_data(client_hello_second_flight)
         self.assertEqual(
             tls_decode(client_conn, server_conn.data_to_send()),
-            [HandshakeFailure()]
+            [alerts.HandshakeFailure()]
         )
 
     def test_state_server_wait_client_hello_hrr_client_unique_changed(self):
@@ -141,9 +148,9 @@ class TestStateServerWaitClientHello(TestCase):
         client_hello_second_flight = client_conn.data_to_send()
 
         e = "client's random cannot change in between Hellos"
-        with self.assertRaises(IllegalParameter, error_msg=e):
+        with self.assertRaises(alerts.IllegalParameter, error_msg=e):
             server_conn.receive_data(client_hello_second_flight)
         self.assertEqual(
             tls_decode(client_conn, server_conn.data_to_send()),
-            [IllegalParameter()]
+            [alerts.IllegalParameter()]
         )
