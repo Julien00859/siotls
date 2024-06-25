@@ -4,13 +4,23 @@ from siotls import TLSConnection
 from siotls.contents import ApplicationData, alerts
 from siotls.contents.handshakes import ClientHello, Finished, HelloRetryRequest
 from siotls.contents.handshakes.extensions import (
+    KeyShareRequest,
     KeyShareRetry,
     SignatureAlgorithms,
     SupportedGroups,
     SupportedVersionsRequest,
     SupportedVersionsResponse,
 )
-from siotls.iana import TLSVersion
+from siotls.crypto import TLSKeyExchange
+from siotls.iana import (
+    CertificateType,
+    CipherSuites,
+    MaxFragmentLengthOctets,
+    NamedGroup,
+    SignatureScheme,
+    TLSVersion,
+)
+from siotls.utils import submap
 
 from . import TestCase, tls_decode
 from .config import client_config, server_config
@@ -41,20 +51,17 @@ class TestStateServerWaitClientHello(TestCase):
         self.assertTrue(server_conn.is_post_handshake())
         self.assertFalse(server_conn.is_connected())
 
-    def test_state_server_wait_client_hello_hrr_cipher_changed(self):
+    def _test_state_server_wait_client_hello_hrr(self):
         server_conn = TLSConnection(server_config)
         server_conn.initiate_connection()
 
-        cipher_suites_first_flight = [client_config.cipher_suites[0]]
-        cipher_suites_second_flight = [client_config.cipher_suites[1]]
-
         # first flight
         client_conn = TLSConnection(dataclasses.replace(client_config,
-            cipher_suites=cipher_suites_first_flight,
+            cipher_suites=[client_config.cipher_suites[0]],
         ))
         client_conn._send_content(ClientHello(
-            random=client_conn._client_unique,
-            cipher_suites=cipher_suites_first_flight,
+            random=b'a' * 32,
+            cipher_suites=[client_config.cipher_suites[0]],
             extensions=[
                 SupportedVersionsRequest([TLSVersion.TLS_1_3]),
                 SignatureAlgorithms(client_conn.config.signature_algorithms),
@@ -68,22 +75,38 @@ class TestStateServerWaitClientHello(TestCase):
             [HelloRetryRequest(
                 random=HelloRetryRequest.random,
                 legacy_session_id_echo=b"",
-                cipher_suite=cipher_suites_first_flight[0],
+                cipher_suite=client_config.cipher_suites[0],
                 extensions=[
                     SupportedVersionsResponse(TLSVersion.TLS_1_3),
-                    KeyShareRetry(server_config.key_exchanges[0])
+                    KeyShareRetry(server_config.key_exchanges[0]),
                 ],
             )]
         )
 
-        # second flight
-        # use a new connection to not tamper with the transcript
+        _, exchange = TLSKeyExchange[server_config.key_exchanges[0]].init()
+        server_state = server_conn._state
+        server_transcript = server_conn._transcript.copy()
+        server_nconfig = server_conn.nconfig.copy()
+
+        for subtest in (
+            self._test_state_server_wait_client_hello_hrr_bad_cipher,
+            self._test_state_server_wait_client_hello_hrr_bad_client_random,
+            self._test_state_server_wait_client_hello_hrr_missing_key_share,
+        ):
+            name = subtest.__func__.__name__.split('_', 8)[-1]
+            with self.subTest(subtest=name):
+                server_conn._state = server_state
+                server_conn._transcript = server_transcript.copy()
+                server_conn.nconfig = server_nconfig
+                subtest(server_conn, exchange)
+
+    def _test_state_server_wait_client_hello_hrr_bad_cipher(self, server_conn, _exchange):
         client_conn = TLSConnection(dataclasses.replace(client_config,
-            cipher_suites=cipher_suites_second_flight,
+            cipher_suites=[client_config.cipher_suites[1]],  # bad cipher
         ))
         client_conn._send_content(ClientHello(
-            random=client_conn._client_unique,
-            cipher_suites=cipher_suites_second_flight,
+            random=b'a' * 32,
+            cipher_suites=[client_config.cipher_suites[1]],  # bad cipher
             extensions=[
                 SupportedVersionsRequest([TLSVersion.TLS_1_3]),
                 SignatureAlgorithms(client_conn.config.signature_algorithms),
@@ -100,49 +123,16 @@ class TestStateServerWaitClientHello(TestCase):
             [alerts.HandshakeFailure()]
         )
 
-    def test_state_server_wait_client_hello_hrr_client_unique_changed(self):
-        server_conn = TLSConnection(server_config)
-        server_conn.initiate_connection()
-
-        client_unique_first_flight = b"a" * 32
-        client_unique_second_flight = b"b" * 32
-
-        # first flight
+    def _test_state_server_wait_client_hello_hrr_bad_client_random(self, server_conn, exchange):
         client_conn = TLSConnection(client_config)
         client_conn._send_content(ClientHello(
-            random=client_unique_first_flight,
+            random=b'b' * 32,  # bad client unique
             cipher_suites=client_conn.config.cipher_suites,
             extensions=[
                 SupportedVersionsRequest([TLSVersion.TLS_1_3]),
                 SignatureAlgorithms(client_conn.config.signature_algorithms),
-                SupportedGroups(client_conn.config.key_exchanges),
-            ]
-        ))
-        client_hello_first_flight = client_conn.data_to_send()
-        server_conn.receive_data(client_hello_first_flight)
-        self.assertEqual(
-            tls_decode(client_conn, server_conn.data_to_send()),
-            [HelloRetryRequest(
-                random=HelloRetryRequest.random,
-                legacy_session_id_echo=b"",
-                cipher_suite=server_conn.config.cipher_suites[0],
-                extensions=[
-                    SupportedVersionsResponse(TLSVersion.TLS_1_3),
-                    KeyShareRetry(server_config.key_exchanges[0])
-                ],
-            )]
-        )
-
-        # second flight
-        # use a new connection to not tamper with the transcript
-        client_conn = TLSConnection(client_config)
-        client_conn._send_content(ClientHello(
-            random=client_unique_second_flight,
-            cipher_suites=client_conn.config.cipher_suites,
-            extensions=[
-                SupportedVersionsRequest([TLSVersion.TLS_1_3]),
-                SignatureAlgorithms(client_conn.config.signature_algorithms),
-                SupportedGroups(client_conn.config.key_exchanges),
+                SupportedGroups([server_config.key_exchanges[0]]),
+                KeyShareRequest({server_config.key_exchanges[0]: exchange}),
             ]
         ))
         client_hello_second_flight = client_conn.data_to_send()
@@ -153,4 +143,49 @@ class TestStateServerWaitClientHello(TestCase):
         self.assertEqual(
             tls_decode(client_conn, server_conn.data_to_send()),
             [alerts.IllegalParameter()]
+        )
+
+    def _test_state_server_wait_client_hello_hrr_missing_key_share(self, server_conn, _):
+        client_conn = TLSConnection(client_config)
+        client_conn._send_content(ClientHello(
+            random=b'a' * 32,
+            cipher_suites=client_conn.config.cipher_suites,
+            extensions=[
+                SupportedVersionsRequest([TLSVersion.TLS_1_3]),
+                SignatureAlgorithms(client_conn.config.signature_algorithms),
+                SupportedGroups([server_config.key_exchanges[0]]),
+            ]
+        ))
+        client_hello_second_flight = client_conn.data_to_send()
+
+        e = "invalid KeyShare in second ClientHello"
+        with self.assertRaises(alerts.HandshakeFailure, error_msg=e):
+            server_conn.receive_data(client_hello_second_flight)
+        self.assertEqual(
+            tls_decode(client_conn, server_conn.data_to_send()),
+            [alerts.HandshakeFailure()]
+        )
+
+    def test_state_server_wait_client_hello_good(self):
+        server_conn = TLSConnection(server_config)
+        server_conn.initiate_connection()
+
+        client_conn = TLSConnection(client_config)
+        client_conn.initiate_connection()
+
+        server_conn.receive_data(client_conn.data_to_send())
+        self.assertEqual(
+            second=(keys:={
+                'alpn': None,
+                'can_echo_heartbeat': True,
+                'can_send_heartbeat': True,
+                'cipher_suite': CipherSuites.TLS_CHACHA20_POLY1305_SHA256,
+                'client_certificate_type': None,
+                'key_exchange': NamedGroup.x25519,
+                'max_fragment_length': MaxFragmentLengthOctets.MAX_16384,
+                'peer_want_ocsp_stapling': True,
+                'server_certificate_type': CertificateType.X509,
+                'signature_algorithm': SignatureScheme.ecdsa_secp256r1_sha256
+            }),
+            first=submap(dataclasses.asdict(server_conn.nconfig), keys),
         )

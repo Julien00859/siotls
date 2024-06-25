@@ -125,5 +125,12 @@ class Transcript:
     def hexdigest(self):
         return self._hashes[0].hexdigest()
 
-    def clone(self):
-        return self._hashes[0].close()
+    def copy(self):
+        dummy = bool
+        copy = type(self)([dummy])
+        copy._hashes = [  # noqa: SLF001
+            h.copy() for h in self._hashes
+        ]
+        copy._order_i = self._order_i  # noqa: SLF001
+        return copy
+
