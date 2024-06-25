@@ -160,7 +160,7 @@ class TestCURL(TestCase):
                     http_get.partition(b'\r\n')[0],
                     b"GET / HTTP/1.1"
                 )
-                sclient.write(make_http11_response(204, ""))
+                sclient.write(make_http11_response(204, "").encode())
 
         client.close()
         proc.wait(timeout=1)
