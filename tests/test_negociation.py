@@ -1,21 +1,29 @@
+import collections
 import dataclasses
+
+from parameterized import parameterized
 
 from siotls.configuration import TLSNegotiatedConfiguration
 from siotls.connection import TLSConnection
 from siotls.contents import alerts
 from siotls.contents.handshakes.extensions import (
     ALPN,
+    ClientCertificateTypeRequest,
+    ClientCertificateTypeResponse,
     Heartbeat,
     KeyShareRequest,
     KeyShareResponse,
     KeyShareRetry,
     MaxFragmentLength,
+    ServerCertificateTypeRequest,
+    ServerCertificateTypeResponse,
     SupportedGroups,
     SupportedVersionsRequest,
     SupportedVersionsResponse,
 )
 from siotls.crypto import TLSKeyExchange
 from siotls.iana import (
+    CertificateType,
     CipherSuites,
     ExtensionType,
     HeartbeatMode,
@@ -30,7 +38,15 @@ from siotls.states import (
 )
 
 from . import TestCase
-from .config import client_config, server_config
+from .config import (
+    ca_cert,
+    client_config,
+    server_cert,
+    server_config,
+    server_pubkey,
+    test_trust_store,
+    test_trusted_public_keys,
+)
 
 # ----------------------------------------------------------------------
 # Server-side, upon receiving ClientHello
@@ -171,6 +187,102 @@ class TestNegociationServerSupportedGroups(TestNegociationServer):
         self.assertEqual(clears, [])
         self.assertEqual(crypts, [])
         self.assertEqual(self.server.nconfig.key_exchange, NamedGroup.x25519)
+
+
+class TestNegociationServerClientCertificateType(TestNegociationServer):
+    Case = collections.namedtuple("Case", (
+        'trust_store', 'trusted_pubkey', 'user_types', 'type_', 'response'))
+    CT_X509 = CertificateType.X509
+    CT_RPK = CertificateType.RAW_PUBLIC_KEY
+    ALERT_UC = alerts.UnsupportedCertificate
+
+    @parameterized.expand([
+        # trust  trusted
+        # store, pubkey, user types,          type,     response
+        ( False, False,  None,                None,     False),
+        ( False, False,  [CT_X509],           None,     False),
+        ( False, False,  [CT_RPK],            None,     False),
+        ( False, False,  [CT_X509, CT_RPK],   None,     False),
+        ( False, False,  [CT_RPK, CT_X509],   None,     False),
+
+        ( True,  False,  None,                CT_X509,  False),
+        ( True,  False,  [CT_X509],           CT_X509,  True),
+        ( True,  False,  [CT_RPK],            ALERT_UC, False),
+        ( True,  False,  [CT_X509, CT_RPK],   CT_X509,  True),
+        ( True,  False,  [CT_RPK, CT_X509],   CT_X509,  True),
+
+        ( False, True,   None,                ALERT_UC, False),
+        ( False, True,   [CT_X509],           ALERT_UC, False),
+        ( False, True,   [CT_RPK],            CT_RPK,   True),
+        ( False, True,   [CT_X509, CT_RPK],   CT_RPK,   True),
+        ( False, True,   [CT_RPK, CT_X509],   CT_RPK,   True),
+
+        ( True,  True,   None,                CT_X509,  False),
+        ( True,  True,   [CT_X509],           CT_X509,  True),
+        ( True,  True,   [CT_RPK],            CT_RPK,   True),
+        ( True,  True,   [CT_X509, CT_RPK],   CT_X509,  True),
+        ( True,  True,   [CT_RPK, CT_X509],   CT_X509,  True),
+    ])
+    def test_negociation_server_client_certificate_type(  # noqa: PLR0913
+        self, trust_store, trusted_pubkey, user_types, type_, response,
+    ):
+        self.replace_config(
+            trust_store=test_trust_store if trust_store else None,
+            trusted_public_keys=test_trusted_public_keys if trusted_pubkey else None,
+        )
+        ext = None if user_types is None else ClientCertificateTypeRequest(user_types)
+
+        if type_ == alerts.UnsupportedCertificate:
+            with self.assertRaises(alerts.UnsupportedCertificate):
+                self.server._state._negociate_client_certificate_type(ext)
+        else:
+            clears, crypts = self.server._state._negociate_client_certificate_type(ext)
+            self.assertEqual(clears, [])
+            self.assertEqual(crypts, [ClientCertificateTypeResponse(type_)] if response else [])
+            self.assertEqual(self.server.nconfig.client_certificate_type, type_)
+
+
+class TestNegociationServerServerCertificateType(TestNegociationServer):
+    Case = collections.namedtuple("Case", (
+        'cert', 'pubkey', 'user_types', 'type_', 'response'))
+    CT_X509 = CertificateType.X509
+    CT_RPK = CertificateType.RAW_PUBLIC_KEY
+    ALERT_UC = alerts.UnsupportedCertificate
+
+    @parameterized.expand([
+        # cert,  pubkey, user types,          type,     response
+        ( True,  False,  None,                CT_X509,  False),
+        ( True,  False,  [CT_X509],           CT_X509,  True),
+        ( True,  False,  [CT_RPK],            ALERT_UC, False),
+        ( True,  False,  [CT_X509, CT_RPK],   CT_X509,  True),
+
+        ( False, True,   None,                ALERT_UC, False),
+        ( False, True,   [CT_X509],           ALERT_UC, False),
+        ( False, True,   [CT_RPK],            CT_RPK,   True),
+        ( False, True,   [CT_X509, CT_RPK],   CT_RPK,   True),
+
+        ( True,  True,   None,                CT_X509,  False),
+        ( True,  True,   [CT_X509],           CT_X509,  True),
+        ( True,  True,   [CT_RPK],            CT_RPK,   True),
+        ( True,  True,   [CT_X509, CT_RPK],   CT_X509,  True),
+    ])
+    def test_negociation_server_server_certificate_type(  # noqa: PLR0913
+        self, cert, pubkey, user_types, type_, response,
+    ):
+        self.replace_config(
+            certificate_chain=[server_cert, ca_cert] if cert else None,
+            public_key=server_pubkey if pubkey else None,
+        )
+        ext = None if user_types is None else ServerCertificateTypeRequest(user_types)
+
+        if type_ == alerts.UnsupportedCertificate:
+            with self.assertRaises(alerts.UnsupportedCertificate):
+                self.server._state._negociate_server_certificate_type(ext)
+        else:
+            clears, crypts = self.server._state._negociate_server_certificate_type(ext)
+            self.assertEqual(clears, [])
+            self.assertEqual(crypts, [ServerCertificateTypeResponse(type_)] if response else [])
+            self.assertEqual(self.server.nconfig.server_certificate_type, type_)
 
 
 class TestNegociationServerKeyShare(TestNegociationServer):

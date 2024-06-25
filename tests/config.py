@@ -137,6 +137,9 @@ client_cert = (
     Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
 (test_temp_dir/'client-cert.pem').write_bytes(client_cert.public_bytes(Encoding.PEM))
 
+test_trust_store = Store([ca_cert])
+test_trusted_public_keys = [client_pubkey, server_pubkey]
+
 #
 # Configurations
 #
@@ -148,5 +151,5 @@ server_config = TLSConfiguration(
 )
 client_config = TLSConfiguration(
     'client',
-    trust_store=Store([ca_cert]),
+    trust_store=test_trust_store,
 )
