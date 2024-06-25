@@ -136,3 +136,6 @@ compile_commands.json
 
 # Wireshark files
 *.pcapng
+
+# py-spy with speedscope
+python-20*-*-*T*:*:*.json
