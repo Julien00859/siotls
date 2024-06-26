@@ -36,6 +36,7 @@ x_key_usage_ca = x509.ExtendedKeyUsage([
 ])
 x_key_usage_client = x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH])
 x_key_usage_server = x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.SERVER_AUTH])
+constraint_ca_ko = x509.BasicConstraints(ca=False, path_length=None)
 
 #
 # CA
@@ -90,6 +91,7 @@ server_cert = (
     .serial_number(x509.random_serial_number())
     .not_valid_before(now)
     .not_valid_after(now + VALIDITY)
+    .add_extension(constraint_ca_ko, critical=True)
     .add_extension(key_usage_tls, critical=True)
     .add_extension(x_key_usage_server, critical=False)
     .add_extension(
@@ -125,6 +127,7 @@ client_cert = (
     .serial_number(x509.random_serial_number())
     .not_valid_before(now)
     .not_valid_after(now + VALIDITY)
+    .add_extension(constraint_ca_ko, critical=True)
     .add_extension(key_usage_tls, critical=True)
     .add_extension(x_key_usage_client, critical=False)
     .add_extension(ca_aki, critical=False)
