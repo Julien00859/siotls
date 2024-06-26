@@ -1,3 +1,7 @@
+![pypi version badge](https://img.shields.io/pypi/v/siotls)
+![coverage badge](./coverage-badge.svg)
+![tests badge](./tests-badge.svg)
+
 siotls
 ======
 
