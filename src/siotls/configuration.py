@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes, Pub
 from cryptography.x509 import Certificate, CertificateRevocationList
 from cryptography.x509.verification import PolicyBuilder, Store
 
+from siotls.crypto import TLSSignatureSuite
 from siotls.iana import (
     ALPNProtocol,
     CertificateType,
@@ -110,6 +111,11 @@ class TLSConfiguration:
         else:
             self._check_client_settings()
 
+        if self.certificate_chain:
+            self._check_certificate_chain()
+        if self.public_key:
+            self._check_public_key()
+
     def _check_mandatory_settings(self):
         if not self.cipher_suites:
             e = "at least one cipher suite must be provided"
@@ -146,6 +152,38 @@ class TLSConfiguration:
                 "meant for the server side, maybe you intended to use "
                 "the connection's (singular) server_hostname instead")
             raise ValueError(e)
+
+    def _check_certificate_chain(self):
+        if not self.private_key:
+            e = "certificate chain provided but private key missing"
+            raise ValueError(e)
+        if self.private_key.public_key() != self.certificate_chain[0].public_key():
+            e =("the public key extracted from the certificate "
+                "doesn't match the private key")
+            raise ValueError(e)
+
+        suites = TLSSignatureSuite.for_certificate(self.certificate_chain[0])
+        if set(suites).isdisjoint(self.signature_algorithms):
+            e =("the public key extracted from the certificate can "
+                "be used with the following signature algorithms: "
+                f"{sorted(suites)} but none of them is found in "
+                "the configured signature algorithms: "
+                f"{sorted(self.signature_algorithms)}")
+
+    def _check_public_key(self):
+        if not self.private_key:
+            e = "public key provided but private key missing"
+            raise ValueError(e)
+        if self.private_key.public_key() != self.public_key:
+            e = "the public key doesn't match the private key"
+            raise ValueError(e)
+
+        suites = TLSSignatureSuite.for_key(self.public_key)
+        if set(suites).isdisjoint(self.signature_algorithms):
+            e =("the public key can be used with the following "
+                f"signature algorithms: {sorted(suites)} but none "
+                "of them is found in the configured signature "
+                f"algorithms: {sorted(self.signature_algorithms)}")
 
 
 @dataclasses.dataclass(init=False)
