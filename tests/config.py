@@ -61,8 +61,7 @@ ca_cert = (
 #    .add_extension(x_key_usage_ca, critical=False)
     .add_extension(
         x509.SubjectAlternativeName([x509.DNSName(ca_domain)]),
-        critical=False,
-    )
+        critical=False)
     .add_extension(ca_ski, critical=False)
     .sign(ca_privkey, hashes.SHA256())
 )
@@ -73,14 +72,12 @@ ca_aki = x509.AuthorityKeyIdentifier(
     ca_ski.digest, [x509.DNSName(ca_domain)], ca_cert.serial_number
 )
 
-
 #
 # Server
 #
 server_domain = 'server.siotls.localhost'
 server_privkey = ec.generate_private_key(ec.SECP256R1())
 server_pubkey = server_privkey.public_key()
-server_ski = x509.SubjectKeyIdentifier.from_public_key(server_pubkey)
 server_cert = (
     x509.CertificateBuilder()
     .subject_name(x509.Name([
@@ -99,10 +96,11 @@ server_cert = (
             x509.DNSName(server_domain),
             x509.IPAddress(ipaddress.IPv4Address('127.0.0.2')),
         ]),
-         critical=False,
-    )
+        critical=False)
     .add_extension(ca_aki, critical=False)
-    .add_extension(server_ski, critical=False)
+    .add_extension(
+        x509.SubjectKeyIdentifier.from_public_key(server_pubkey),
+        critical=False)
     .sign(ca_privkey, hashes.SHA256())
 )
 (test_temp_dir/'server-privkey.pem').write_bytes(server_privkey.private_bytes(
@@ -116,7 +114,6 @@ server_cert = (
 #
 client_privkey = ec.generate_private_key(ec.SECP256R1())
 client_pubkey = client_privkey.public_key()
-client_ski = x509.SubjectKeyIdentifier.from_public_key(server_pubkey)
 client_cert = (
     x509.CertificateBuilder()
     .subject_name(x509.Name([
@@ -131,7 +128,9 @@ client_cert = (
     .add_extension(key_usage_tls, critical=True)
     .add_extension(x_key_usage_client, critical=False)
     .add_extension(ca_aki, critical=False)
-    .add_extension(client_ski, critical=False)
+    .add_extension(
+        x509.SubjectKeyIdentifier.from_public_key(server_pubkey),
+        critical=False)
     .sign(ca_privkey, hashes.SHA256())
 )
 (test_temp_dir/'client-privkey.pem').write_bytes(client_privkey.private_bytes(
