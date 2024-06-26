@@ -1,4 +1,5 @@
 import dataclasses
+import unittest
 
 from siotls import TLSConnection
 from siotls.contents import ApplicationData, alerts
@@ -22,7 +23,7 @@ from siotls.iana import (
 )
 from siotls.utils import submap
 
-from . import TestCase, tls_decode
+from . import TAG_INTEGRATION, TestCase, tls_decode
 from .config import client_config, server_config
 
 
@@ -166,6 +167,7 @@ class TestStateServerWaitClientHello(TestCase):
             [alerts.HandshakeFailure()]
         )
 
+    @unittest.skipUnless(TAG_INTEGRATION, "enable with SIOTLS_INTEGRATION=1")
     def test_state_server_wait_client_hello_good(self):
         server_conn = TLSConnection(server_config)
         server_conn.initiate_connection()
