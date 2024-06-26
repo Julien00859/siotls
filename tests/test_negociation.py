@@ -284,6 +284,11 @@ class TestNegociationServerServerCertificateType(TestNegociationServer):
             self.assertEqual(crypts, [ServerCertificateTypeResponse(type_)] if response else [])
             self.assertEqual(self.server.nconfig.server_certificate_type, type_)
 
+class TestNegociationServerSignatureAlgorithm(TestNegociationServer):
+    def test_negociation_server_signature_algorithm_missing(self):
+        with self.assertRaises(alerts.MissingExtension) as capture:
+            self.server._state._negociate_signature_algorithms(None)
+        self.assertEqual(capture.exception.args[0], ExtensionType.SIGNATURE_ALGORITHMS)
 
 class TestNegociationServerKeyShare(TestNegociationServer):
     def test_negociation_server_key_share_missing_extension(self):

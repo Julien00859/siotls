@@ -216,6 +216,7 @@ class ServerWaitClientHello(State):
 
         negociate('supported_versions')
         negociate('supported_groups')
+        negociate('server_certificate_type')
         negociate('signature_algorithms')
 
         shared_key = negociate('key_share')
@@ -223,7 +224,6 @@ class ServerWaitClientHello(State):
             return (clear_extensions, encrypted_extensions), None
 
         negociate('client_certificate_type')
-        negociate('server_certificate_type')
 
         negociate('max_fragment_length')
         negociate('application_layer_protocol_negotiation')
@@ -278,8 +278,11 @@ class ServerWaitClientHello(State):
     def _negociate_signature_algorithms(self, sa_ext):
         if not sa_ext:
             raise alerts.MissingExtension(ExtensionType.SIGNATURE_ALGORITHMS)
-        pubkey_oid = self.config.certificate_chain[0].public_key_algorithm_oid
-        suites = TLSSignatureSuite.for_public_key_oid(pubkey_oid)
+        suites = {sa.iana_id: sa for sa in (
+            TLSSignatureSuite.for_certificate(self.config.certificate_chain[0])
+            if self.nconfig.server_certificate_type == CertificateType.X509 else
+            TLSSignatureSuite.for_key(self.config.public_key)
+        )}
         for server_suite in self.config.signature_algorithms:
             if server_suite in suites and server_suite in sa_ext.supported_signature_algorithms:
                 self._signature = suites[server_suite](self.config.private_key)
