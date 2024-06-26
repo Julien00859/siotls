@@ -9,7 +9,7 @@ from parameterized import parameterized
 from siotls import TLSConnection
 from siotls.iana import CipherSuites, NamedGroup
 
-from . import TAG_INTEGRATION, TestCase, test_temp_dir
+from . import TAG_INTEGRATION, TestCase, test_pem_dir
 from .config import client_config, server_config
 
 
@@ -17,7 +17,7 @@ from .config import client_config, server_config
 class TestOpenSSL(TestCase):
     def _test_openssl_client(self, cipher, key_exchange):
         context = ssl.create_default_context(
-            cafile=fspath(test_temp_dir.joinpath('ca-cert.pem'))
+            cafile=fspath(test_pem_dir.joinpath('ca-cert.pem'))
         )
         openssl_in = siotls_out = ssl.MemoryBIO()
         openssl_out = siotls_in = ssl.MemoryBIO()
@@ -79,11 +79,11 @@ class TestOpenSSL(TestCase):
     def _test_openssl_server(self, cipher, key_exchange):
         context = ssl.create_default_context(
             purpose=ssl.Purpose.CLIENT_AUTH,
-            cafile=fspath(test_temp_dir.joinpath('ca-cert.pem'))
+            cafile=fspath(test_pem_dir.joinpath('ca-cert.pem'))
         )
         context.load_cert_chain(
-            fspath(test_temp_dir.joinpath('server-cert.pem')),
-            fspath(test_temp_dir.joinpath('server-privkey.pem')),
+            fspath(test_pem_dir.joinpath('server-cert.pem')),
+            fspath(test_pem_dir.joinpath('server-privkey.pem')),
         )
         openssl_in = siotls_out = ssl.MemoryBIO()
         openssl_out = siotls_in = ssl.MemoryBIO()

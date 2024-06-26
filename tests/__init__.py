@@ -21,6 +21,7 @@ options, _ = parser.parse_known_args()
 logging.basicConfig()
 setup_logging(logging.ERROR - 10 * options.verbosity)
 
+test_pem_dir = Path(__file__).parent.joinpath('pem')
 test_temp_dir = Path(tempfile.mkdtemp(prefix='siotls-test-'))
 atexit.register(shutil.rmtree, fspath(test_temp_dir), ignore_errors=True)
 
