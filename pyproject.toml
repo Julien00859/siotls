@@ -40,9 +40,9 @@ dev = [
 ]
 
 [project.urls]
-# Download =
+Download = "https://pypi.org/project/siotls/"
 # Homepage =
-# Repository =
+Repository = "https://github.com/Julien00859/siotls"
 # Changelog =
 # Documentation =
 # Bug Tracker =
