@@ -17,8 +17,8 @@ from siotls import TLSConnection
 from siotls.iana import NamedGroup
 from siotls.utils import make_http11_response
 
-from . import TAG_INTEGRATION, TestCase
-from .config import server_config, test_temp_dir
+from . import TAG_INTEGRATION, TestCase, test_temp_dir
+from .config import server_config
 
 HOST = '127.0.0.2'
 PORT = 8446
