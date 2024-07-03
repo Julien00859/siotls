@@ -1,6 +1,7 @@
 import dataclasses
 import textwrap
 
+from siotls.crypto import TLSCipherSuite
 from siotls.iana import HandshakeType
 from siotls.serial import SerializableBody
 
@@ -22,10 +23,9 @@ class Finished(Handshake, SerializableBody):
         self.verify_data = verify_data
 
     @classmethod
-    def parse_body(cls, stream, **kwargs):  # noqa: ARG003
-        return cls(stream.read())
-        # would be nice:
-        # return cls(stream.read_exactly(connection._cipher.digestmod.digest_size))
+    def parse_body(cls, stream, nconfig, **kwargs):  # noqa: ARG003
+        cipher = TLSCipherSuite[nconfig.cipher_suite]
+        return cls(stream.read_exactly(cipher.digestmod().digest_size))
 
     def serialize_body(self):
         return self.verify_data

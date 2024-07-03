@@ -9,8 +9,8 @@ from typing import ClassVar
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers import aead
 
+import siotls
 from siotls import key_logger
-from siotls.contents import alerts
 from siotls.crypto.hkdf import derive_secret, hkdf_expand_label, hkdf_extract
 from siotls.iana import CipherSuites
 from siotls.utils import RegistryMeta, peekable
@@ -150,7 +150,7 @@ class TLSCipherSuite(metaclass=RegistryMeta):
         try:
             return self._read_cipher.decrypt(self._next_read_nonce(), data, associated_data)
         except InvalidTag as exc:
-            raise alerts.DecryptError from exc
+            raise siotls.contents.alerts.DecryptError from exc
 
     def _next_read_nonce(self):
         nonce = self._read_iv ^ next(self._read_seq)

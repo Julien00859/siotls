@@ -3,7 +3,7 @@ from typing import ClassVar
 from cryptography.hazmat.primitives.asymmetric import dh, ec, x448, x25519
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
-from siotls.contents import alerts
+import siotls
 from siotls.iana import NamedGroup
 from siotls.utils import RegistryMeta
 
@@ -95,7 +95,7 @@ class _FFDHEMixin:
     def resume(cls, private_key, peer_key_share):
         if len(peer_key_share.lstrip(b'\x00')) < cls.min_key_length:
             e = "the peer's key is too short"
-            raise alerts.InsufficientSecurity(e)
+            raise siotls.contents.alerts.InsufficientSecurity(e)
 
         y = int.from_bytes(peer_key_share, 'big')
         if not (1 < y < cls.p - 1):
