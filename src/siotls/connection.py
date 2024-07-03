@@ -26,9 +26,8 @@ def startswith_change_cipher_spec(data):
 
 
 class TLSConnection:
-    def __init__(self, config, server_hostname=None, ocsp_service=None):
+    def __init__(self, config, server_hostname=None):
         self.config = config
-        self.ocsp_service = ocsp_service
         self.nconfig = None
         self._cipher = cipher_plaintext
         self._signature = None

@@ -59,10 +59,13 @@ def hexdump(bytes_):
         xd.pop()  # ditch last \n
     return xd.decode()
 
+
+USER_AGENT = f"python-siotls/{siotls.__version__}"
+
 HTTP11_REQUEST = f"""\
 {{method}} {{path}} HTTP/1.1\r
 Host: {{host}}\r
-User-Agent: siotls/{siotls.__version__}\r
+User-Agent: {USER_AGENT}\r
 Connection: close\r
 Content-Type: text/plain; charset=utf-8\r
 Content-Length: {{length}}\r

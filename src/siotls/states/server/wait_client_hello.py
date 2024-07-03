@@ -167,23 +167,23 @@ class ServerWaitClientHello(State):
 
             if (
                 self.nconfig.peer_want_ocsp_stapling
-                and self.ocsp_service
+                and self.config.ocsp_service
                 and len(self.config.certificate_chain) > 1
             ):
                 subject, issuer = self.config.certificate_chain[:2]
                 ocsp_url = get_ocsp_url(subject)
                 ocsp_req = make_ocsp_request(subject, issuer)
-                ocsp_res = self.ocsp_service.request(ocsp_url, ocsp_req)
+                ocsp_res = self.config.ocsp_service.request(ocsp_url, ocsp_req)
                 try:
                     valid_until = validate_ocsp(issuer, ocsp_req, ocsp_res)
                 except ValueError as exc:
-                    self.ocsp_service.uncache(ocsp_req)
+                    self.config.ocsp_service.uncache(ocsp_req)
                     w =("error while validating the online status of "
                         "this server certificate, client likely to "
                         "reject this connection: %s")
                     logger.warning(w, exc.args[0])
                 else:
-                    self.ocsp_service.cache(valid_until, ocsp_req, ocsp_res)
+                    self.config.ocsp_service.cache(valid_until, ocsp_req, ocsp_res)
                     certificate_list[0].extensions[
                         ExtensionType.STATUS_REQUEST
                     ] = OCSPStatus(ocsp_res)

@@ -109,16 +109,16 @@ class ClientWaitCertificate(State):
                     validate_ocsp(issuer.certificate, ocsp_req, ocsp_res)
                 except ValueError as exc:
                     raise alerts.BadCertificate from exc
-            elif self.ocsp_service and (ocsp_url := get_ocsp_url(entry.certificate)):
+            elif self.config.ocsp_service and (ocsp_url := get_ocsp_url(entry.certificate)):
                 ocsp_req = make_ocsp_request(entry.certificate, issuer.certificate)
-                ocsp_res = self.ocsp_service.request(ocsp_url, ocsp_req)
+                ocsp_res = self.config.ocsp_service.request(ocsp_url, ocsp_req)
                 try:
                     valid_until = validate_ocsp(issuer.certificate, ocsp_req, ocsp_res)
                 except ValueError as exc:
-                    self.ocsp_service.uncache(ocsp_req)
+                    self.config.ocsp_service.uncache(ocsp_req)
                     raise alerts.BadCertificate from exc
                 else:
-                    self.ocsp_service.cache(valid_until, ocsp_req, ocsp_res)
+                    self.config.ocsp_service.cache(valid_until, ocsp_req, ocsp_res)
 
     def _process_raw_public_key(self, content):
         public_key = content.certificate_list[0].public_key

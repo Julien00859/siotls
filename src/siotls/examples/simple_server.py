@@ -5,7 +5,8 @@ from datetime import datetime
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.x509 import load_pem_x509_certificates
 
-from siotls import TLSConfiguration, TLSConnection, ocsp_over_http
+from siotls import TLSConfiguration, TLSConnection
+from siotls.ocsp_over_http import OcspOverHttp
 from siotls.utils import make_http11_response
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ def serve(host, port, certificate_chain_path, private_key_path):
             private_key=load_pem_private_key(private_key_file.read(), None),
             certificate_chain=load_pem_x509_certificates(certificate_chain_file.read()),
             alpn=['http/1.1', 'http/1.0'],
+            ocsp_service=OcspOverHttp(),  # ocsp stapling
         )
 
     server = socket.socket()
@@ -48,7 +50,7 @@ def serve(host, port, certificate_chain_path, private_key_path):
 
 
 def handle_one(client, client_info, tls_config):
-    conn = TLSConnection(tls_config, ocsp_service=ocsp_over_http)
+    conn = TLSConnection(tls_config)
 
     with conn.wrap(client) as sclient:
         logger.info("connection with %s:%s secured", client_info[0], client_info[1])

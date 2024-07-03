@@ -1,7 +1,8 @@
 import logging
 import socket
 
-from siotls import TLSConfiguration, TLSConnection, ocsp_over_http
+from siotls import TLSConfiguration, TLSConnection
+from siotls.ocsp_over_http import OcspOverHttp
 from siotls.trust_store import get_system_store
 from siotls.utils import make_http11_request
 
@@ -11,12 +12,13 @@ def connect(host, port, check_certificate):
     options = {}
     if check_certificate:
         options['trust_store'] = get_system_store()
+        options['ocsp_service'] = OcspOverHttp()
     config = TLSConfiguration('client', alpn=['http/1.1', 'http/1.0'], log_keys=1, **options)
 
     with socket.create_connection((host, port), timeout=5) as sock:
         logger.info("connection with %s:%s established", host, port)
 
-        conn = TLSConnection(config, server_hostname=host, ocsp_service=ocsp_over_http)
+        conn = TLSConnection(config, server_hostname=host)
         with conn.wrap(sock) as ssock:
             logger.info("connection with %s:%s secured", host, port)
 

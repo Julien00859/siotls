@@ -16,6 +16,7 @@ from siotls.iana import (
     NamedGroup,
     SignatureScheme,
 )
+from siotls.ocsp_over_http import OCSPService
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ class TLSConfiguration:
 
     trust_store: Store | None = None
     revocation_list: CertificateRevocationList | None = None
+    ocsp_service: OCSPService | None = None
     max_chain_depth: int = 5
     trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
 
@@ -116,6 +118,14 @@ class TLSConfiguration:
         if self.public_key:
             self._check_public_key()
 
+        if (self.require_peer_authentication
+            and not self.revocation_list
+            and not self.ocsp_service
+        ):
+            w =("missing revocation list or ocsp service, will not "
+                "verify that the peer's certificate is not revoked")
+            logger.warning(w)
+
     def _check_mandatory_settings(self):
         if not self.cipher_suites:
             e = "at least one cipher suite must be provided"
@@ -145,7 +155,7 @@ class TLSConfiguration:
     def _check_client_settings(self):
         if not self.require_peer_authentication:
             w =("missing trust store or list of trusted public keys, "
-                "will not verify the peer's authenticity")
+                "will not verify the peer's certificate")
             logger.warning(w)
         if self.server_hostnames:
             e =("the configuration's (plural) server_hostnames is "

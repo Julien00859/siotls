@@ -15,6 +15,7 @@ from siotls.contents.handshakes.extensions import (
     KeyShareResponse,
     KeyShareRetry,
     MaxFragmentLength,
+    OCSPStatusRequest,
     ServerCertificateTypeRequest,
     ServerCertificateTypeResponse,
     SupportedGroups,
@@ -468,6 +469,21 @@ class TestNegociationServerHeartbeat(TestNegociationServer):
         self.assertEqual(crypts, [Heartbeat(HeartbeatMode.PEER_NOT_ALLOWED_TO_SEND)])
         self.assertFalse(self.server.nconfig.can_echo_heartbeat)
         self.assertFalse(self.server.nconfig.can_send_heartbeat)
+
+
+class TestNegociationServerStatusRequest(TestNegociationServer):
+    def test_negociation_server_status_request_missing(self):
+        clears, crypts = self.server._state._negociate_status_request(None)
+        self.assertFalse(clears)
+        self.assertFalse(crypts)
+        self.assertFalse(self.server.nconfig.peer_want_ocsp_stapling)
+
+    def test_negociation_server_status_request_ocsp(self):
+        req = OCSPStatusRequest([], b'')
+        clears, crypts = self.server._state._negociate_status_request(req)
+        self.assertFalse(clears)
+        self.assertFalse(crypts)
+        self.assertTrue(self.server.nconfig.peer_want_ocsp_stapling)
 
 
 # ----------------------------------------------------------------------
