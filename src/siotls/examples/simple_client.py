@@ -8,12 +8,17 @@ from siotls.utils import make_http11_request
 
 logger = logging.getLogger(__name__)
 
-def connect(host, port, check_certificate):
+def connect(host, port, check_certificate, log_keys):
     options = {}
     if check_certificate:
         options['trust_store'] = get_system_store()
         options['ocsp_service'] = OcspOverHttp()
-    config = TLSConfiguration('client', alpn=['http/1.1', 'http/1.0'], log_keys=1, **options)
+    config = TLSConfiguration(
+        'client',
+        alpn=['http/1.1', 'http/1.0'],
+        log_keys=log_keys,
+        **options,
+    )
 
     with socket.create_connection((host, port), timeout=5) as sock:
         logger.info("connection with %s:%s established", host, port)

@@ -91,6 +91,7 @@ def main():
                 options.port,
                 os.fspath(options.tlscert),
                 os.fspath(options.tlskey),
+                log_keys=bool(options.keylogfile),
             )
         else:
             from siotls.examples.simple_client import connect
@@ -98,6 +99,7 @@ def main():
                 options.host,
                 options.port,
                 check_certificate=not options.insecure,
+                log_keys=bool(options.keylogfile),
             )
     except Exception as exc:  # noqa: BLE001
         logger.critical("Fatal exception", exc_info=exc)

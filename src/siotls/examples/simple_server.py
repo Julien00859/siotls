@@ -12,7 +12,7 @@ from siotls.utils import make_http11_response
 logger = logging.getLogger(__name__)
 
 
-def serve(host, port, certificate_chain_path, private_key_path):
+def serve(host, port, certificate_chain_path, private_key_path, log_keys):
     with open(certificate_chain_path, 'rb') as certificate_chain_file, \
          open(private_key_path, 'rb') as private_key_file:
         tls_config = TLSConfiguration(
@@ -21,6 +21,7 @@ def serve(host, port, certificate_chain_path, private_key_path):
             certificate_chain=load_pem_x509_certificates(certificate_chain_file.read()),
             alpn=['http/1.1', 'http/1.0'],
             ocsp_service=OcspOverHttp(),  # ocsp stapling
+            log_keys=log_keys,
         )
 
     server = socket.socket()
