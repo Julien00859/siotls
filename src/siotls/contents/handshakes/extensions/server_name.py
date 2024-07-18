@@ -2,20 +2,24 @@ import contextlib
 import dataclasses
 import logging
 import textwrap
+import typing
 
 import idna
 
 from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType, NameType
 from siotls.serial import SerialIO, Serializable, SerializableBody
+from siotls.utils import RegistryMeta
 
 from . import Extension
 
 logger = logging.getLogger(__name__)
-_server_name_registry = {}
 
 @dataclasses.dataclass(init=False)
-class ServerName(Serializable):
+class ServerName(Serializable, metaclass=RegistryMeta):
+    _registry_key = '_server_name_registry'
+    _server_name_registry: typing.ClassVar = {}
+
     _struct = textwrap.dedent("""
         struct {
             NameType name_type;
@@ -33,13 +37,13 @@ class ServerName(Serializable):
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and ServerName in cls.__bases__:
-            _server_name_registry[cls.name_type] = cls
+            cls._server_name_registry[cls.name_type] = cls
 
     @classmethod
     def parse(abc, stream, **kwargs):
         name_type = stream.read_int(1)
         try:
-            cls = _server_name_registry[NameType(name_type)]
+            cls = abc[NameType(name_type)]
         except ValueError as exc:
             # unknown type, can choice to either crash or ignore
             # this extension, crash for now.

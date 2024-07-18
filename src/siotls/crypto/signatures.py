@@ -13,16 +13,16 @@ from siotls.utils import RegistryMeta
 
 
 class TLSSignatureSuite(metaclass=RegistryMeta):
-    _registry: ClassVar = {}
+    _registry_key = '_cipher_registry'
+    _cipher_registry: ClassVar = {}
 
     iana_id: SignatureScheme
     key: types.PublicKeyTypes | types.PrivateKeyTypes
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if TLSSignatureSuite not in cls.__bases__:
-            return
-        cls._registry[cls.iana_id] = cls
+        if register and TLSSignatureSuite in cls.__bases__:
+            cls._cipher_registry[cls.iana_id] = cls
 
     @classmethod
     def for_certificate(cls, certificate):
@@ -56,8 +56,6 @@ class TLSSignatureSuite(metaclass=RegistryMeta):
         e = f"unknown key: {key!r}"
         raise ValueError(e)
 
-
-
     def __init__(self, key):
         self.key = key
 
@@ -77,12 +75,11 @@ class _RSAMixin:
     digestmod: hashes.Hash
     padding: Any
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if _RSAMixin not in cls.__bases__:
-            return
-        cls.pubkey_oid_index[None] += (cls,)
-        cls.pubkey_oid_index[cls.pubkey_oid] += (cls,)
+        if register and _RSAMixin in cls.__bases__:
+            cls.pubkey_oid_index[None] += (cls,)
+            cls.pubkey_oid_index[cls.pubkey_oid] += (cls,)
 
     def sign(self, message):
         return self.key.sign(message, self.padding, self.digestmod)
@@ -147,14 +144,14 @@ class TLS_RSA_PSS_PSS_SHA512(_RSAMixin, TLSSignatureSuite):
 
 class _ECDSAMixin:
     curve_name_index: ClassVar = {}
+
     digestmod: hashes.Hash
     curve_name: str
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if _ECDSAMixin not in cls.__bases__:
-            return
-        cls.curve_name_index[cls.curve_name] = cls
+        if register and _ECDSAMixin in cls.__bases__:
+            cls.curve_name_index[cls.curve_name] = cls
 
     def sign(self, message):
         return self.key.sign(message, ec.ECDSA(self.digestmod))

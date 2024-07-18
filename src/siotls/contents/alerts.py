@@ -12,7 +12,9 @@ from . import Content
 
 @dataclasses.dataclass(init=False)
 class Alert(Content, Serializable, metaclass=RegistryMeta):
-    _registry: typing.ClassVar = {}
+    _registry_key = '_alert_registry'
+    _alert_registry: typing.ClassVar = {}
+
     content_type = ContentType.ALERT
     can_fragment = False
 
@@ -59,7 +61,7 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if Alert in cls.__bases__:
-            cls._registry[cls.description] = cls
+            cls._alert_registry[cls.description] = cls
 
     def __init__(self, *args, level=None):
         super().__init__(*args)

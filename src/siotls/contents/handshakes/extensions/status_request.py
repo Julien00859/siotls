@@ -1,16 +1,20 @@
 import dataclasses
 import textwrap
+import typing
 
 from siotls.contents import alerts
 from siotls.iana import CertificateStatusType, ExtensionType, HandshakeType
 from siotls.serial import SerializableBody
+from siotls.utils import RegistryMeta
 
 from . import Extension
 
-_status_request_registry = {}
 
 @dataclasses.dataclass(init=False)
-class CertificateStatusRequest(Extension, SerializableBody):
+class CertificateStatusRequest(Extension, SerializableBody, metaclass=RegistryMeta):
+    _registry_key = '_status_request_registry'
+    _status_request_registry: typing.ClassVar = {}
+
     extension_type = ExtensionType.STATUS_REQUEST
     _handshake_types = (
         HandshakeType.CLIENT_HELLO,
@@ -30,13 +34,13 @@ class CertificateStatusRequest(Extension, SerializableBody):
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and CertificateStatusRequest in cls.__bases__:
-            _status_request_registry[cls.status_type] = cls
+            cls._status_request_registry[cls.status_type] = cls
 
     @classmethod
     def parse_body(abc, stream, **kwargs):
         status_type = stream.read_int(1)
         try:
-            cls = _status_request_registry[CertificateStatusType(status_type)]
+            cls = abc[CertificateStatusType(status_type)]
         except ValueError as exc:
             # Unlike for ServerName, nothing states how to process
             # unknown certificate status types, crash for now
@@ -90,11 +94,11 @@ class OCSPStatusRequest(CertificateStatusRequest):
         ])
 
 
-
-_status_registry = {}
-
 @dataclasses.dataclass(init=False)
-class CertificateStatus(Extension, SerializableBody):
+class CertificateStatus(Extension, SerializableBody, metaclass=RegistryMeta):
+    _registry_key = '_status_registry'
+    _status_registry: typing.ClassVar = {}
+
     extension_type = ExtensionType.STATUS_REQUEST
     _handshake_types = (
         HandshakeType.CERTIFICATE,
@@ -113,13 +117,13 @@ class CertificateStatus(Extension, SerializableBody):
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and CertificateStatus in cls.__bases__:
-            _status_registry[cls.status_type] = cls
+            cls._status_registry[cls.status_type] = cls
 
     @classmethod
     def parse_body(abc, stream, **kwargs):
         status_type = stream.read_int(1)
         try:
-            cls = _status_registry[CertificateStatusType(status_type)]
+            cls = abc[CertificateStatusType(status_type)]
         except ValueError as exc:
             # Unlike for ServerName, nothing states how to process
             # unknown certificate status types, crash for now

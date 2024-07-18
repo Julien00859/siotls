@@ -1,16 +1,20 @@
 import dataclasses
 import textwrap
+import typing
 
 from siotls.contents import alerts
 from siotls.iana import ContentType, HandshakeType
 from siotls.serial import Serializable
+from siotls.utils import RegistryMeta
 
 from .. import Content  # noqa: TID252
 
-_handshake_registry = {}
 
 @dataclasses.dataclass(init=False)
 class Handshake(Content, Serializable):
+    _registry_key = '_handshake_registry'
+    _handshake_registry: typing.ClassVar = {}
+
     content_type = ContentType.HANDSHAKE
     can_fragment = True
 
@@ -37,14 +41,14 @@ class Handshake(Content, Serializable):
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and Handshake in cls.__bases__:
-            _handshake_registry[cls.msg_type] = cls
+            cls._handshake_registry[cls.msg_type] = cls
 
     @classmethod
     def parse(abc, stream, **kwargs):
         msg_type = stream.read_int(1)
         length = stream.read_int(3)
         try:
-            cls = _handshake_registry[HandshakeType(msg_type)]
+            cls = abc[HandshakeType(msg_type)]
         except ValueError as exc:
             raise alerts.IllegalParameter(*exc.args) from exc
         with stream.limit(length):

@@ -1,5 +1,6 @@
 import dataclasses
 import textwrap
+import typing
 
 from cryptography.hazmat.primitives.asymmetric.types import PublicKeyTypes
 from cryptography.hazmat.primitives.serialization import (
@@ -12,15 +13,17 @@ from cryptography.x509 import Certificate, load_der_x509_certificate
 from siotls.contents import alerts
 from siotls.iana import CertificateType, ExtensionType, HandshakeType
 from siotls.serial import SerialIO, Serializable, SerializableBody
+from siotls.utils import RegistryMeta
 
 from . import Handshake
 from .extensions import Extension
 
-_certificate_entry_registry = {}
-
 
 @dataclasses.dataclass(init=False)
-class CertificateEntry(Serializable):
+class CertificateEntry(Serializable, metaclass=RegistryMeta):
+    _registry_key = '_certificate_entry_registry'
+    _certificate_entry_registry: typing.ClassVar = {}
+
     _struct = textwrap.dedent("""
         enum {
             X509(0),
@@ -44,7 +47,7 @@ class CertificateEntry(Serializable):
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and CertificateEntry in cls.__bases__:
-            _certificate_entry_registry[cls.certificate_type] = cls
+            cls._certificate_entry_registry[cls.certificate_type] = cls
 
     @classmethod
     def parse(cls, stream, **kwargs):
@@ -131,21 +134,16 @@ class Certificate(Handshake, SerializableBody):
 
     @classmethod
     def parse_body(cls, stream, *, config, nconfig, **kwargs):
-        try:
-            Entry = _certificate_entry_registry[  # noqa: N806
-                nconfig.client_certificate_type
-                if config.other_side == 'client' else
-                nconfig.server_certificate_type
-            ]
-        except IndexError as exc:
-            raise alerts.CertificateUnknown(*exc.args) from exc
-
         certificate_request_context = stream.read_var(1)
 
         certificate_list = []
         with stream.limit(stream.read_int(3)) as limit:
             while stream.tell() < limit:
-                certificate = Entry.parse(stream, **kwargs)
+                certificate = CertificateEntry[
+                    nconfig.client_certificate_type
+                    if config.other_side == 'client' else
+                    nconfig.server_certificate_type
+                ].parse(stream, **kwargs)
                 certificate_list.append(certificate)
 
         try:

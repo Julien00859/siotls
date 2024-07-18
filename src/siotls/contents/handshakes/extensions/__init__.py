@@ -1,11 +1,12 @@
 import dataclasses
 import textwrap
+import typing
 from collections import namedtuple
 
 from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType, HandshakeType_
 from siotls.serial import Serializable, SerializableBody
-from siotls.utils import try_cast
+from siotls.utils import RegistryMeta, try_cast
 
 
 def split_extensions(stream):
@@ -21,10 +22,12 @@ def split_extensions(stream):
     stream.assert_eof()
     return extensions
 
-_extension_registry = {}
 
 @dataclasses.dataclass(init=False)
-class Extension(Serializable):
+class Extension(Serializable, metaclass=RegistryMeta):
+    _registry_key = '_extension_registry'
+    _extension_registry: typing.ClassVar = {}
+
     _handshake_types: tuple[HandshakeType | HandshakeType_] = dataclasses.field(repr=False)
     _struct = textwrap.dedent("""
         struct {
@@ -62,7 +65,7 @@ class Extension(Serializable):
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and Extension in cls.__bases__:
-            registry = _extension_registry.setdefault(cls.extension_type, {})
+            registry = cls._extension_registry.setdefault(cls.extension_type, {})
             for handshake_type in cls._handshake_types:
                 htname = handshake_type.name
                 existing_cls = registry.setdefault(htname, cls)
@@ -76,7 +79,8 @@ class Extension(Serializable):
     def parse(abc, stream, *, handshake_type, **kwargs):
         extension_type = try_cast(ExtensionType, stream.read_int(2))
 
-        if registry := _extension_registry.get(extension_type):
+        try:
+            registry = abc[extension_type]
             try:
                 cls = registry.get(HandshakeType_.ANY.name) or registry[handshake_type.name]
             except KeyError as exc:
@@ -84,7 +88,7 @@ class Extension(Serializable):
                      f"with handshake {handshake_type.name}")
                 raise alerts.IllegalParameter(e) from exc
 
-        else:
+        except KeyError:
             cls = type(
                 f'UnkonwnExtension{extension_type}',
                 (UnknownExtension, Extension),

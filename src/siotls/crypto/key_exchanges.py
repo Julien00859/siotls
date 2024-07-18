@@ -9,13 +9,15 @@ from siotls.utils import RegistryMeta
 
 
 class TLSKeyExchange(metaclass=RegistryMeta):
-    _registry: ClassVar = {}
+    _registry_key = '_key_exchange_registry'
+    _key_exchange_registry: ClassVar = {}
+
     iana_id: NamedGroup
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if TLSKeyExchange in cls.__bases__:
-            cls._registry[cls.iana_id] = cls
+        if register and TLSKeyExchange in cls.__bases__:
+            cls._key_exchange_registry[cls.iana_id] = cls
 
     @classmethod
     def init(cls):

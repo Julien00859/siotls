@@ -101,12 +101,13 @@ class _TLSSecrets:
 
 
 class TLSCipherSuite(metaclass=RegistryMeta):
-    _registry: ClassVar = {}
+    _registry_key = '_cipher_registry'
+    _cipher_registry: ClassVar = {}
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if TLSCipherSuite in cls.__bases__:
-            cls._registry[cls.iana_id] = cls
+        if register and TLSCipherSuite in cls.__bases__:
+            cls._cipher_registry[cls.iana_id] = cls
 
     iana_id: CipherSuites
     # digestmod: hashlib._Hash

@@ -14,7 +14,7 @@ _sentinel = object()
 
 class RegistryMeta(abc.ABCMeta):
     def __getitem__(cls, entry):
-        return cls._registry[entry]
+        return getattr(cls, cls._registry_key)[entry]
 
 
 def hexdump(bytes_):
