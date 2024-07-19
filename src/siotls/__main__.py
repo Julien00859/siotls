@@ -79,7 +79,7 @@ def main():
         logging.critical("Cannot access TLS certificate file at %s", options.tlscert)
         return 1
     if options.tlskey and not os.access(options.tlskey, os.R_OK):
-        logging.critical("Cannot access TLS private key file at %s", options.tlscert)
+        logging.critical("Cannot access TLS private key file at %s", options.tlskey)
         return 1
 
     # Run
