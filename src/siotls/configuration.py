@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 @dataclasses.dataclass(frozen=True)
 class TLSConfiguration:
     side: typing.Literal['client', 'server']
+    """
+    Whether this configuration will be used by a client connection or a
+    server one
+    """
     _: dataclasses.KW_ONLY
 
     # mandatory
@@ -31,11 +35,30 @@ class TLSConfiguration:
             CipherSuites.TLS_AES_256_GCM_SHA384,
             CipherSuites.TLS_AES_128_GCM_SHA256,
         ].copy)
+    """
+    The list of allowed cipher suites. All connections can only be
+    established when both peer support and allow a same cipher suite.
+    The ciphers should be ordered server side in decreasing preference
+    order, i.e. the prefered cipher suite should be first in the list.
+
+    Default: Chacha > AES GCM 256 > AES GCM 128.
+    """
+
     key_exchanges: list[NamedGroup] = \
         dataclasses.field(default_factory=[
             NamedGroup.x25519,
             NamedGroup.secp256r1,
         ].copy)
+    """
+    The list of allowed key exchange algorithm. New connections can only
+    be established when both peer support and allow a same key exchange
+    algorithm. The algorithms should be ordered server side in
+    decreasing preference order, i.e. the prefered algorithm should be
+    first in the list.
+
+    Default: x25519 > secp256r1.
+    """
+
     signature_algorithms: list[NamedGroup] = \
         dataclasses.field(default_factory=[
             SignatureScheme.ed25519,
@@ -50,15 +73,82 @@ class TLSConfiguration:
             SignatureScheme.rsa_pss_rsae_sha384,
             SignatureScheme.rsa_pss_rsae_sha512,
         ].copy)
+    """
+    The list of allowed signature algorithms. The algorithms should be
+    ordered in decreasing preference order, i.e. the prefered algorithm
+    should be in the list. The order matters when the server and/or
+    client holds several certificates for a same Subject but with
+    different Subject Public Key Info.
+
+    Default: EdDSA > ECDSA > RSA-PSS (pss) > RSA-PSS (rsaEncryption),
+    each time sha256 > sha384 > sha512.
+    """
 
     trust_store: Store | None = None
+    """
+    The trust store to use when validating peer x509 certificates, or
+    ``None`` to disable x509 validation (unsafe unless
+    :attr:`trusted_public_keys` is non empty). The module
+    :mod:`siotls.trust_store` provides several functions to facilitate
+    building such store.
+    """
+
     revocation_list: CertificateRevocationList | None = None
+    """
+    The revocation list to use when validating peer x509 certificates,
+    or ``None`` to skip matching certificates against this list (unsafe
+    unless OCSP is active).
+    """
+
     max_chain_depth: int = 5
+    """
+    The maximum certificate chain depth. That is, how many certificates
+    can be found between the host certificate and the root certificate,
+    both included.
+    """
+
     trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
+    """
+    A list of public keys that are not subject to x509 validations and
+    that are always trusted. Can be used in addition to
+    :attr:`trust_store`.
+
+    *Enables :rfc:`7250` (Raw Public Keys). Using this attribute without
+    :attr:`trust_store` disallows exchange of x509 certificates.*
+    """
 
     private_key: PrivateKeyTypes | None = None
+    """
+
+
+    **Mandatory** server-side. **Required** client-side for :abbr:`mTLS
+    (mutual TLS)`.
+    """
+
     public_key: PublicKeyTypes | None = None
+    """
+    The public key counter part of :attr:`private_key`.
+
+    *Enables :rfc:`7250` (Raw Public Keys). Using this attribute without
+    :attr:`certificate_chain` disallows exchange of x509 certificates.*
+
+    **Mandatory** server-side. **Required** client-side for :abbr:`mTLS
+    (mutual TLS)`. *Unless* regular x509 certificates are in use.
+    """
+
     certificate_chain: list[Certificate] | None = None
+    """
+    The list of certificates that give a chain of trust between the host
+    certificate and a root certificate.
+
+    The first certificate in the list must be the certificate of the
+    current host. The following certificates each must sign the previous
+    one in the list. The last certificate must be signed by a root CA,
+    the root CA itself should not be listed.
+
+    **Mandatory** server-side. **Required** client-side for :abbr:`mTLS
+    (mutual TLS)`. *Unless* :rfc:`7250` (Raw Public Keys) is in use.
+    """
 
     # extensions
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384

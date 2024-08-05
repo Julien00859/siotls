@@ -13,7 +13,18 @@ LINUX_CA_CERTIFICATES_PATHS = {
 }
 
 
+def get_certifi_store():
+    """
+    Build a :class:`~Store` using ``certifi``, the python package that
+    provides Mozilla's CA bundle.
+    """
+    import certifi
+    with open(certifi.where(), 'rb') as ca_cert_file:
+        return Store(load_pem_x509_certificates(ca_cert_file.read()))
+
+
 def get_system_store():
+    """ Build a :class:`~Store` out of the system's CA bundle. """
     match platform.system():
         case 'Linux':
             ca_cert_path = get_ca_certificates_path(platform.freedesktop_os_release())

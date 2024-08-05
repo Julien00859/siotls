@@ -6,19 +6,20 @@ except ImportError:
     from siotls._vendor import StrEnum
 
 
-class Hex1Enum(enum.IntEnum):
+class _Hex1Enum(enum.IntEnum):
     """ An integer on 1 byte with hexadecimal representation. """
     def __repr__(self):
         return f'<{type(self).__name__}.{self.name}: {self.value} (0x{self.value:02x})>'
 
 
-class Hex2Enum(enum.IntEnum):
+class _Hex2Enum(enum.IntEnum):
     """ An integer on 2 bytes with hexadecimal representation. """
     def __repr__(self):
         return f'<{type(self).__name__}.{self.name}: {self.value} (0x{self.value:04x})>'
 
 
-class AlertDescription(Hex1Enum):
+class AlertDescription(_Hex1Enum):
+    """ Alert codes for :class:`siotls.contents.Alert`. """
     CLOSE_NOTIFY = 0
     UNEXPECTED_MESSAGE = 10
     BAD_RECORD_MAC = 20
@@ -48,12 +49,14 @@ class AlertDescription(Hex1Enum):
     NO_APPLICATION_PROTOCOL = 120
 
 
-class AlertLevel(Hex1Enum):
+class AlertLevel(_Hex1Enum):
+    """ Alert levels for :class:`siotls.contents.Alert`. """
     WARNING = 1
     FATAL = 2
 
 
 class ALPNProtocol(StrEnum):
+    """ Protocols supported by :class:`siotls.contents.handshakes.extensions.ALPN`. """
     HTTP_0_9 = "http/0.9"
     HTTP_1_0 = "http/1.0"
     HTTP_1_1 = "http/1.1"
@@ -89,18 +92,31 @@ class ALPNProtocol(StrEnum):
     DICOM = "dicom"
 
 
-class CertificateStatusType(Hex1Enum):
+class CertificateStatusType(_Hex1Enum):
+    """
+    Status for
+    :class:`siotls.contents.handshakes.extensions.CertificateStatusRequest`
+    and :class:`siotls.contents.handshakes.extensions.CertificateStatus`.
+    """
     OCSP = 1
 
 
-class CertificateType(Hex1Enum):
+class CertificateType(_Hex1Enum):
+    """
+    Certificate types for
+    :class:`siotls.contents.handshakes.extensions.ClientCertificateTypeRequest`,
+    :class:`siotls.contents.handshakes.extensions.ClientCertificateTypeResponse`,
+    :class:`siotls.contents.handshakes.extensions.ServerCertificateTypeRequest`,
+    and
+    :class:`siotls.contents.handshakes.extensions.ServerCertificateTypeResponse`,
+"""
     X509 = 0
     OPENPGP = 1
     RAW_PUBLIC_KEY = 2
     CT_1609DOT2 = 3
 
 
-class CipherSuites(Hex2Enum):
+class CipherSuites(_Hex2Enum):
     # The actual type in uint8_t[2] and not uint16_t but we want to use
     # an IntEnum in Python to ease serialization
     TLS_EMPTY_RENEGOTIATION_INFO_SCSV = 0x00ff
@@ -111,7 +127,7 @@ class CipherSuites(Hex2Enum):
     TLS_AES_128_CCM_8_SHA256 = 0x1305
 
 
-class ContentType(Hex1Enum):
+class ContentType(_Hex1Enum):
     INVALID = 0
     CHANGE_CIPHER_SPEC = 20
     ALERT = 21
@@ -120,7 +136,7 @@ class ContentType(Hex1Enum):
     HEARTBEAT = 24
 
 
-class ExtensionType(Hex2Enum):
+class ExtensionType(_Hex2Enum):
     SERVER_NAME = 0
     MAX_FRAGMENT_LENGTH = 1
     STATUS_REQUEST = 5
@@ -144,7 +160,7 @@ class ExtensionType(Hex2Enum):
     SIGNATURE_ALGORITHMS_CERT = 50  # Certificate signature
     KEY_SHARE = 51
 
-class HandshakeType(Hex1Enum):
+class HandshakeType(_Hex1Enum):
     CLIENT_HELLO = 1
     SERVER_HELLO = 2
     NEW_SESSION_TICKET = 4
@@ -157,21 +173,21 @@ class HandshakeType(Hex1Enum):
     KEY_UPDATE = 24
     MESSAGE_HASH = 254
 
-class HandshakeType_(Hex1Enum):  # noqa: N801
+class HandshakeType_(_Hex1Enum):  # noqa: N801
     ANY = -1  # for when an extension can be present in any handshake
     HELLO_RETRY_REQUEST = 2
 
 
-class HeartbeatMessageType(Hex1Enum):
+class HeartbeatMessageType(_Hex1Enum):
     heartbeat_request = 1
     heartbeat_response = 2
 
 
-class HeartbeatMode(Hex1Enum):
+class HeartbeatMode(_Hex1Enum):
     PEER_ALLOWED_TO_SEND = 1
     PEER_NOT_ALLOWED_TO_SEND = 2
 
-class MaxFragmentLengthCode(Hex1Enum):
+class MaxFragmentLengthCode(_Hex1Enum):
     MAX_512 = 1
     MAX_1024 = 2
     MAX_2048 = 3
@@ -192,7 +208,7 @@ class MaxFragmentLengthOctets(enum.IntEnum):
         return MaxFragmentLengthCode[self.name]
 
 
-class NamedGroup(Hex2Enum):
+class NamedGroup(_Hex2Enum):
     # ELLIPTIC Curve Groups (ECDHE)
     secp256r1 = 0x0017
     secp384r1 = 0x0018
@@ -208,16 +224,16 @@ class NamedGroup(Hex2Enum):
     ffdhe8192 = 0x0104
 
 
-class NameType(Hex1Enum):
+class NameType(_Hex1Enum):
     HOST_NAME = 0
 
 
-class PskKeyExchangeMode(Hex1Enum):
+class PskKeyExchangeMode(_Hex1Enum):
     PSK_KE = 0
     PSK_DHE_KE = 1
 
 
-class SignatureScheme(Hex2Enum):
+class SignatureScheme(_Hex2Enum):
     # RSASSA-PKCS1-v1_5 algorithms
     rsa_pkcs1_sha256 = 0x0401
     rsa_pkcs1_sha384 = 0x0501
@@ -247,7 +263,7 @@ class SignatureScheme(Hex2Enum):
     ecdsa_sha1 = 0x0203
 
 
-class TLSVersion(Hex2Enum):
+class TLSVersion(_Hex2Enum):
     TLS_1_0 = 0x0301
     TLS_1_1 = 0x0302
     TLS_1_2 = 0x0303

@@ -36,6 +36,7 @@ dev = [
   "parameterized",
   "pre-commit",
   "ruff==0.4.5",  # keep me sync with .pre-commit-config.yaml
+  "sphinx",
 ]
 
 [project.urls]
@@ -73,7 +74,7 @@ lint.ignore = [
   "TD", "FIX002",  # todo
   "RET504",  # x = ...; return x
 ]
-lint.exclude = ["src/siotls/_vendor.py"]
+lint.exclude = ["doc/**/*.py", "src/siotls/_vendor.py"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = [
