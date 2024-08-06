@@ -74,7 +74,7 @@ lint.ignore = [
   "TD", "FIX002",  # todo
   "RET504",  # x = ...; return x
 ]
-lint.exclude = ["doc/**/*.py", "src/siotls/_vendor.py"]
+lint.exclude = ["docs/**/*.py", "src/siotls/_vendor.py"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = [

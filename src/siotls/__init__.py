@@ -6,10 +6,10 @@ __version__ = importlib.metadata.version(__name__)
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-key_logger = logger.getChild('keylog')
-key_logger.propagate = False
-key_logger.setLevel(logging.DEBUG)
-key_logger.addHandler(logging.NullHandler())
+keylog = logger.getChild('keylog')
+keylog.propagate = False
+keylog.setLevel(logging.DEBUG)
+keylog.addHandler(logging.NullHandler())
 
 class TLSError(Exception):
     pass

@@ -70,9 +70,9 @@ def main():
     if not options.keylogfile:
         pass
     elif options.keylogfile.name == '-':
-        siotls.key_logger.addHandler(logging.StreamHandler())
+        siotls.keylog.addHandler(logging.StreamHandler())
     else:
-        siotls.key_logger.addHandler(logging.FileHandler(options.keylogfile, 'w'))
+        siotls.keylog.addHandler(logging.FileHandler(options.keylogfile, 'w'))
 
     # Check TLS cert/key
     if options.tlscert and not os.access(options.tlscert, os.R_OK):

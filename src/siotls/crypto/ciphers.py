@@ -9,7 +9,7 @@ from typing import ClassVar
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers import aead
 
-from siotls import key_logger
+from siotls import keylog
 from siotls.contents import alerts
 from siotls.crypto.hkdf import derive_secret, hkdf_expand_label, hkdf_extract
 from siotls.iana import CipherSuites
@@ -222,7 +222,7 @@ class TLSCipherSuite(metaclass=RegistryMeta):
             self._read_seq = peekable(iter(range(self.usage_limit)))
 
         if self._client_unique_hex:
-            key_logger.info("CLIENT_EARLY_TRAFFIC_SECRET %s %s",
+            keylog.info("CLIENT_EARLY_TRAFFIC_SECRET %s %s",
                 self._client_unique_hex, client_early_traffic.hex())
 
         return binder_key, early_exporter_master
@@ -255,9 +255,9 @@ class TLSCipherSuite(metaclass=RegistryMeta):
             self._read_seq = peekable(iter(range(self.usage_limit)))
 
         if self._client_unique_hex:
-            key_logger.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
+            keylog.info("CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s",
                 self._client_unique_hex, client_handshake_traffic.hex())
-            key_logger.info("SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s",
+            keylog.info("SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s",
                 self._client_unique_hex, server_handshake_traffic.hex())
 
     def derive_master_secrets(
@@ -295,11 +295,11 @@ class TLSCipherSuite(metaclass=RegistryMeta):
         self._server_finished_key = None
 
         if self._client_unique_hex:
-            key_logger.info("CLIENT_TRAFFIC_SECRET_0 %s %s",
+            keylog.info("CLIENT_TRAFFIC_SECRET_0 %s %s",
                 self._client_unique_hex, client_application_traffic.hex())
-            key_logger.info("SERVER_TRAFFIC_SECRET_0 %s %s",
+            keylog.info("SERVER_TRAFFIC_SECRET_0 %s %s",
                 self._client_unique_hex, server_application_traffic.hex())
-            key_logger.info("EXPORTER_SECRET %s %s",
+            keylog.info("EXPORTER_SECRET %s %s",
                 self._client_unique_hex, exporter_master.hex())
 
         return exporter_master, resumption_master

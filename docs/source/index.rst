@@ -15,5 +15,6 @@ documentation for details.
 
    tutorials/getting_started
    references/configuration
+   references/connection
    references/iana
    references/trust_store

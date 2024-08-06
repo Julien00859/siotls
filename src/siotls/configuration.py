@@ -1,7 +1,10 @@
+"""manquer un truc ici"""
+
 import dataclasses
 import functools
 import logging
 import typing
+from collections.abc import Sequence
 
 from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes, PublicKeyTypes
 from cryptography.x509 import Certificate, CertificateRevocationList
@@ -21,64 +24,71 @@ logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass(frozen=True)
 class TLSConfiguration:
+    """
+    Configure allowed values and restrictions for future connections.
+    """
+
     side: typing.Literal['client', 'server']
     """
     Whether this configuration will be used by a client connection or a
-    server one
+    server one.
     """
     _: dataclasses.KW_ONLY
 
-    # mandatory
-    cipher_suites: list[CipherSuites] = \
-        dataclasses.field(default_factory=[
-            CipherSuites.TLS_CHACHA20_POLY1305_SHA256,
-            CipherSuites.TLS_AES_256_GCM_SHA384,
-            CipherSuites.TLS_AES_128_GCM_SHA256,
-        ].copy)
+    cipher_suites: Sequence[CipherSuites] = (
+        CipherSuites.TLS_CHACHA20_POLY1305_SHA256,
+        CipherSuites.TLS_AES_256_GCM_SHA384,
+        CipherSuites.TLS_AES_128_GCM_SHA256,
+    )
     """
-    The list of allowed cipher suites. All connections can only be
-    established when both peer support and allow a same cipher suite.
-    The ciphers should be ordered server side in decreasing preference
-    order, i.e. the prefered cipher suite should be first in the list.
+    List the cipher suites that can be used to encrypt data transmitted
+    on the wire. The ciphers are ordered server side in decreasing
+    preference order, i.e. the prefered cipher suite should be first in
+    the list.
 
-    Default: Chacha > AES GCM 256 > AES GCM 128.
+    :attr:`TLSNegotiatedConfiguration.cipher_suite` holds the cipher
+    suite that have been agreed by both peers.
     """
 
-    key_exchanges: list[NamedGroup] = \
-        dataclasses.field(default_factory=[
-            NamedGroup.x25519,
-            NamedGroup.secp256r1,
-        ].copy)
+    key_exchanges: Sequence[NamedGroup] = (
+        NamedGroup.x25519,
+        NamedGroup.secp256r1,
+    )
     """
-    The list of allowed key exchange algorithm. New connections can only
+    List the allowed key exchange algorithm. New connections can only
     be established when both peer support and allow a same key exchange
     algorithm. The algorithms should be ordered server side in
     decreasing preference order, i.e. the prefered algorithm should be
     first in the list.
 
+    The negotiated cipher is stored in
+    :attr:`TLSConnection.nconfig.key_exchange`.
+
     Default: x25519 > secp256r1.
     """
 
-    signature_algorithms: list[NamedGroup] = \
-        dataclasses.field(default_factory=[
-            SignatureScheme.ed25519,
-            SignatureScheme.ed448,
-            SignatureScheme.ecdsa_secp256r1_sha256,
-            SignatureScheme.ecdsa_secp384r1_sha384,
-            SignatureScheme.ecdsa_secp521r1_sha512,
-            SignatureScheme.rsa_pss_pss_sha256,
-            SignatureScheme.rsa_pss_pss_sha384,
-            SignatureScheme.rsa_pss_pss_sha512,
-            SignatureScheme.rsa_pss_rsae_sha256,
-            SignatureScheme.rsa_pss_rsae_sha384,
-            SignatureScheme.rsa_pss_rsae_sha512,
-        ].copy)
+    signature_algorithms: Sequence[SignatureScheme] = (
+        SignatureScheme.ed25519,
+        SignatureScheme.ed448,
+        SignatureScheme.ecdsa_secp256r1_sha256,
+        SignatureScheme.ecdsa_secp384r1_sha384,
+        SignatureScheme.ecdsa_secp521r1_sha512,
+        SignatureScheme.rsa_pss_pss_sha256,
+        SignatureScheme.rsa_pss_pss_sha384,
+        SignatureScheme.rsa_pss_pss_sha512,
+        SignatureScheme.rsa_pss_rsae_sha256,
+        SignatureScheme.rsa_pss_rsae_sha384,
+        SignatureScheme.rsa_pss_rsae_sha512,
+    )
     """
     The list of allowed signature algorithms. The algorithms should be
     ordered in decreasing preference order, i.e. the prefered algorithm
-    should be in the list. The order matters when the server and/or
-    client holds several certificates for a same Subject but with
+    should be first in the list. The order matters when the server
+    and/or client holds several certificates for a same Subject but with
     different Subject Public Key Info.
+
+    The negotiated cipher is stored in
+    :attr:`TLSConnection.nconfig.signature_algorithm`.
 
     Default: EdDSA > ECDSA > RSA-PSS (pss) > RSA-PSS (rsaEncryption),
     each time sha256 > sha384 > sha512.
@@ -107,7 +117,7 @@ class TLSConfiguration:
     both included.
     """
 
-    trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
+    trusted_public_keys: Sequence[PublicKeyTypes] = ()
     """
     A list of public keys that are not subject to x509 validations and
     that are always trusted. Can be used in addition to
@@ -136,7 +146,7 @@ class TLSConfiguration:
     (mutual TLS)`. *Unless* regular x509 certificates are in use.
     """
 
-    certificate_chain: list[Certificate] | None = None
+    certificate_chain: Sequence[Certificate] | None = None
     """
     The list of certificates that give a chain of trust between the host
     certificate and a root certificate.
@@ -150,14 +160,54 @@ class TLSConfiguration:
     (mutual TLS)`. *Unless* :rfc:`7250` (Raw Public Keys) is in use.
     """
 
-    # extensions
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384
-    can_echo_heartbeat: bool = True
-    alpn: list[ALPNProtocol] = dataclasses.field(default_factory=list)
-    server_hostnames: list[str] = dataclasses.field(default_factory=list)
+    """
+    Negociate :rfc:`6066#section-4` (Maximum Fragment Length)
 
-    # extra
+    The negotiated fragment length is stored in
+    :attr:`TLSConnection.nconfig.max_fragment_length`.
+    """
+
+    can_echo_heartbeat: bool = True
+    """
+    Negociate :rfc:`6520` (Heartbeat).
+
+    The negotiated heartbeat options are stored in
+    :attr:`TLSConnection.nconfig.can_send_heartbeat` and
+    :attr:`TLSConnection.nconfig.can_echo_heartbeat`.
+    """
+
+    alpn: Sequence[ALPNProtocol] = ()
+    """
+    Negociate :rfc:`7301` (Application-Layer Protocol Negociation/ALPN).
+
+    The list of protocols that this application is willing to use once
+    the secure TLS connection is established. The protocols should be
+    ordered server-side in decreasing preference order, i.e. the
+    prefered protocol should be first in the list.
+
+    The negotiated protocol is stored in :attr:`TLSConnection.nconfig.alpn`.
+    """
+
+    server_hostnames: Sequence[str] = ()
+    """
+    Negociate :rfc:`6066#section-3` (Server Name Indication/SNI).
+
+    Allow a single TLS server to serve multiple hosts. Much like the
+    Host header for HTTP. The server must provide a certificate for
+    every hosts, it can be a single certificate with multiple :abbr:`SAN
+    (Server Alternative Name)` entries.
+
+    This attribute is server-side only.
+    """
+
     log_keys: bool = False
+    """
+    Enable key logging for netword analysis tools such as wireshark.
+
+    Setting this value ``True`` is not enough to enable key logging, the
+    ``siotls.keylog`` logger must be configured too.
+    """
 
     @property
     def require_peer_authentication(self):
@@ -238,8 +288,11 @@ class TLSConfiguration:
             raise ValueError(e)
 
 
+# This class is manually documented
 @dataclasses.dataclass(init=False)
 class TLSNegotiatedConfiguration:
+    """ The values agreed by both peers on a specific connection. """
+
     cipher_suite: CipherSuites | None
     key_exchange: NamedGroup | None
     signature_algorithm: SignatureScheme | None

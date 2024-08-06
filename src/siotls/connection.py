@@ -3,7 +3,7 @@ import secrets
 import struct
 import types
 
-from siotls import TLSError, key_logger
+from siotls import TLSError, keylog
 from siotls.crypto.ciphers import TLSCipherSuite
 from siotls.iana import AlertLevel, ContentType, TLSVersion
 from siotls.serial import SerialIO, TLSBufferError, TooMuchDataError
@@ -70,11 +70,11 @@ class TLSConnection:
 
     def initiate_connection(self):
         if self.config.log_keys:
-            is_key_logger_enabled = any(
+            is_keylog_enabled = any(
                 not isinstance(handler, logging.NullHandler)
-                for handler in key_logger.handlers
+                for handler in keylog.handlers
             )
-            if is_key_logger_enabled:
+            if is_keylog_enabled:
                 logger.info("key log enabled for current connection.")
             else:
                 logger.warning(
@@ -82,7 +82,7 @@ class TLSConnection:
                     "logging.Handler seems setup on the %r logger. You must "
                     "setup one.\nlogging.getLogger(%r).addHandler(logging."
                     "FileHandler(path_to_keylogfile, %r))",
-                    key_logger.name, key_logger.name, "w")
+                    keylog.name, keylog.name, "w")
 
         self._state.initiate_connection()
 

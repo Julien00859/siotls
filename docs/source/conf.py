@@ -34,4 +34,7 @@ autodoc_type_aliases = {
     "PrivateKeyTypes": "cryptography.hazmat.primitives.asymmetric.types.PrivateKeyTypes",
     "PublicKeyTypes": "cryptography.hazmat.primitives.asymmetric.types.PublicKeyTypes",
 }
+autodoc_class_signature = "separated"
 autodoc_typehints = "description"
+python_maximum_signature_line_length = 80
+python_display_short_literal_types = True
