@@ -11,7 +11,7 @@ from . import Content
 
 
 @dataclasses.dataclass(init=False)
-class Alert(Content, Serializable, metaclass=RegistryMeta):
+class _Alert(Content, Serializable, metaclass=RegistryMeta):
     _registry: typing.ClassVar = {}
     content_type = ContentType.ALERT
     can_fragment = False
@@ -20,7 +20,7 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
         struct {
             AlertLevel level;
             AlertDescription description;
-            select (Alert.level) {
+            select (_Alert.level) {
                 case 0x00: CloseNotify;
                 case 0x0a: UnexpectedMessage;
                 case 0x14: BadRecordMac;
@@ -50,7 +50,7 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
                 case 0x78: NoApplicationProtocol;
                 case    _: UnknownAlert;
             };
-        } Alert;
+        } _Alert;
     """).strip('\n')
     args: tuple[typing.Any]
     level: AlertLevel
@@ -58,7 +58,7 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        if Alert in cls.__bases__:
+        if _Alert in cls.__bases__:
             cls._registry[cls.description] = cls
 
     def __init__(self, *args, level=None):
@@ -77,7 +77,7 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
         try:
             cls = abc[AlertDescription(description)]
         except ValueError:
-            cls = type(f'UnknownAlert{description}', (Alert,), {
+            cls = type(f'UnknownAlert{description}', (_Alert,), {
                 'level': level,
                 'description': description,
                 '_struct': '',
@@ -90,11 +90,10 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
 
 
 class TLSFatalAlert(TLSError):  # noqa: N818
-    pass
+    """ Base class for all TLS Fatal Alerts """
 
 
-
-class CloseNotify(Alert):
+class CloseNotify(_Alert):
     """
     This alert notifies the recipient that the sender will not send any
     more messages on this connection.  Any data received after a closure
@@ -104,7 +103,7 @@ class CloseNotify(Alert):
     description = AlertDescription.CLOSE_NOTIFY
 
 
-class UnexpectedMessage(Alert, TLSFatalAlert):
+class UnexpectedMessage(_Alert, TLSFatalAlert):
     """
     An inappropriate message (e.g., the wrong handshake message,
     premature Application Data, etc.) was received. This alert should
@@ -114,7 +113,7 @@ class UnexpectedMessage(Alert, TLSFatalAlert):
     description = AlertDescription.UNEXPECTED_MESSAGE
 
 
-class BadRecordMac(Alert, TLSFatalAlert):
+class BadRecordMac(_Alert, TLSFatalAlert):
     """
     This alert is returned if a record is received which cannot be
     deprotected.  Because AEAD algorithms combine decryption and
@@ -127,7 +126,7 @@ class BadRecordMac(Alert, TLSFatalAlert):
     description = AlertDescription.BAD_RECORD_MAC
 
 
-class RecordOverflow(Alert, TLSFatalAlert):
+class RecordOverflow(_Alert, TLSFatalAlert):
     """
     A TLSCiphertext record was received that had a length more than 2^14
     + 256 bytes, or a record decrypted to a TLSPlaintext record with
@@ -139,7 +138,7 @@ class RecordOverflow(Alert, TLSFatalAlert):
     description = AlertDescription.RECORD_OVERFLOW
 
 
-class HandshakeFailure(Alert, TLSFatalAlert):
+class HandshakeFailure(_Alert, TLSFatalAlert):
     """
     Receipt of a "handshake_failure" alert message indicates that the
     sender was unable to negotiate an acceptable set of security
@@ -149,7 +148,7 @@ class HandshakeFailure(Alert, TLSFatalAlert):
     description = AlertDescription.HANDSHAKE_FAILURE
 
 
-class BadCertificate(Alert, TLSFatalAlert):
+class BadCertificate(_Alert, TLSFatalAlert):
     """
     A certificate was corrupt, contained signatures that did not verify
     correctly, etc.
@@ -158,25 +157,25 @@ class BadCertificate(Alert, TLSFatalAlert):
     description = AlertDescription.BAD_CERTIFICATE
 
 
-class UnsupportedCertificate(Alert, TLSFatalAlert):
+class UnsupportedCertificate(_Alert, TLSFatalAlert):
     """ A certificate was of an unsupported type. """
     level = AlertLevel.FATAL
     description = AlertDescription.UNSUPPORTED_CERTIFICATE
 
 
-class CertificateRevoked(Alert, TLSFatalAlert):
+class CertificateRevoked(_Alert, TLSFatalAlert):
     """ A certificate was revoked by its signer. """
     level = AlertLevel.FATAL
     description = AlertDescription.CERTIFICATE_REVOKED
 
 
-class CertificateExpired(Alert, TLSFatalAlert):
+class CertificateExpired(_Alert, TLSFatalAlert):
     """ A certificate has expired or is not currently valid. """
     level = AlertLevel.FATAL
     description = AlertDescription.CERTIFICATE_EXPIRED
 
 
-class CertificateUnknown(Alert, TLSFatalAlert):
+class CertificateUnknown(_Alert, TLSFatalAlert):
     """
     Some other (unspecified) issue arose in processing the certificate,
     rendering it unacceptable.
@@ -185,7 +184,7 @@ class CertificateUnknown(Alert, TLSFatalAlert):
     description = AlertDescription.CERTIFICATE_UNKNOWN
 
 
-class IllegalParameter(Alert, TLSFatalAlert):
+class IllegalParameter(_Alert, TLSFatalAlert):
     """
     A field in the handshake was incorrect or inconsistent with other
     fields.  This alert is used for errors which conform to the formal
@@ -195,7 +194,7 @@ class IllegalParameter(Alert, TLSFatalAlert):
     description = AlertDescription.ILLEGAL_PARAMETER
 
 
-class UnknownCa(Alert, TLSFatalAlert):
+class UnknownCa(_Alert, TLSFatalAlert):
     """
     A valid certificate chain or partial chain was received, but the
     certificate was not accepted because the CA certificate could not be
@@ -205,7 +204,7 @@ class UnknownCa(Alert, TLSFatalAlert):
     description = AlertDescription.UNKNOWN_CA
 
 
-class AccessDenied(Alert, TLSFatalAlert):
+class AccessDenied(_Alert, TLSFatalAlert):
     """
     A valid certificate or PSK was received, but when access control was
     applied, the sender decided not to proceed with negotiation.
@@ -214,7 +213,7 @@ class AccessDenied(Alert, TLSFatalAlert):
     description = AlertDescription.ACCESS_DENIED
 
 
-class DecodeError(Alert, TLSFatalAlert):
+class DecodeError(_Alert, TLSFatalAlert):
     """
     A message could not be decoded because some field was out of the
     specified range or the length of the message was incorrect.  This
@@ -227,7 +226,7 @@ class DecodeError(Alert, TLSFatalAlert):
     description = AlertDescription.DECODE_ERROR
 
 
-class DecryptError(Alert, TLSFatalAlert):
+class DecryptError(_Alert, TLSFatalAlert):
     """
     A handshake (not record layer) cryptographic operation failed,
     including being unable to correctly verify a signature or validate a
@@ -237,7 +236,7 @@ class DecryptError(Alert, TLSFatalAlert):
     description = AlertDescription.DECRYPT_ERROR
 
 
-class ProtocolVersion(Alert, TLSFatalAlert):
+class ProtocolVersion(_Alert, TLSFatalAlert):
     """
     The protocol version the peer has attempted to negotiate is
     recognized but not supported (see RFC8446 Appendix D)
@@ -246,7 +245,7 @@ class ProtocolVersion(Alert, TLSFatalAlert):
     description = AlertDescription.PROTOCOL_VERSION
 
 
-class InsufficientSecurity(Alert, TLSFatalAlert):
+class InsufficientSecurity(_Alert, TLSFatalAlert):
     """
     Returned instead of "handshake_failure" when a negotiation has
     failed specifically because the server requires parameters more
@@ -256,7 +255,7 @@ class InsufficientSecurity(Alert, TLSFatalAlert):
     description = AlertDescription.INSUFFICIENT_SECURITY
 
 
-class InternalError(Alert, TLSFatalAlert):
+class InternalError(_Alert, TLSFatalAlert):
     """
     An internal error unrelated to the peer or the correctness of the
     protocol (such as a memory allocation failure) makes it impossible
@@ -266,7 +265,7 @@ class InternalError(Alert, TLSFatalAlert):
     description = AlertDescription.INTERNAL_ERROR
 
 
-class InappropriateFallback(Alert, TLSFatalAlert):
+class InappropriateFallback(_Alert, TLSFatalAlert):
     """
     Sent by a server in response to an invalid connection retry attempt
     from a client (see RFC7507).
@@ -275,7 +274,7 @@ class InappropriateFallback(Alert, TLSFatalAlert):
     description = AlertDescription.INAPPROPRIATE_FALLBACK
 
 
-class UserCanceled(Alert):
+class UserCanceled(_Alert):
     """
     This alert notifies the recipient that the sender is canceling the
     handshake for some reason unrelated to a protocol failure.  If a
@@ -288,7 +287,7 @@ class UserCanceled(Alert):
     description = AlertDescription.USER_CANCELED
 
 
-class MissingExtension(Alert, TLSFatalAlert):
+class MissingExtension(_Alert, TLSFatalAlert):
     """
     Sent by endpoints that receive a handshake message not containing an
     extension that is mandatory to send for the offered TLS version or
@@ -298,7 +297,7 @@ class MissingExtension(Alert, TLSFatalAlert):
     description = AlertDescription.MISSING_EXTENSION
 
 
-class UnsupportedExtension(Alert, TLSFatalAlert):
+class UnsupportedExtension(_Alert, TLSFatalAlert):
     """
     Sent by endpoints receiving any handshake message containing an
     extension known to be prohibited for inclusion in the given
@@ -310,7 +309,7 @@ class UnsupportedExtension(Alert, TLSFatalAlert):
     description = AlertDescription.UNSUPPORTED_EXTENSION
 
 
-class UnrecognizedName(Alert, TLSFatalAlert):
+class UnrecognizedName(_Alert, TLSFatalAlert):
     """
     Sent by servers when no server exists identified by the name
     provided by the client via the "server_name" extension (see
@@ -320,7 +319,7 @@ class UnrecognizedName(Alert, TLSFatalAlert):
     description = AlertDescription.UNRECOGNIZED_NAME
 
 
-class BadCertificateStatusResponse(Alert, TLSFatalAlert):
+class BadCertificateStatusResponse(_Alert, TLSFatalAlert):
     """
     Sent by clients when an invalid or unacceptable OCSP response is
     provided by the server via the "status_request" extension (see
@@ -330,7 +329,7 @@ class BadCertificateStatusResponse(Alert, TLSFatalAlert):
     description = AlertDescription.BAD_CERTIFICATE_STATUS_RESPONSE
 
 
-class UnknownPskIdentity(Alert, TLSFatalAlert):
+class UnknownPskIdentity(_Alert, TLSFatalAlert):
     """
     Sent by servers when PSK key establishment is desired but no
     acceptable PSK identity is provided by the client. Sending this
@@ -341,7 +340,7 @@ class UnknownPskIdentity(Alert, TLSFatalAlert):
     description = AlertDescription.UNKNOWN_PSK_IDENTITY
 
 
-class CertificateRequired(Alert, TLSFatalAlert):
+class CertificateRequired(_Alert, TLSFatalAlert):
     """
     Sent by servers when a client certificate is desired but none was
     provided by the client.
@@ -350,7 +349,7 @@ class CertificateRequired(Alert, TLSFatalAlert):
     description = AlertDescription.CERTIFICATE_REQUIRED
 
 
-class NoApplicationProtocol(Alert, TLSFatalAlert):
+class NoApplicationProtocol(_Alert, TLSFatalAlert):
     """
     Sent by servers when a client "application_layer_protocol_negotiation"
     extension advertises only protocols that the server does not support

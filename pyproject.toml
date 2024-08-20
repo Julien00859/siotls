@@ -32,6 +32,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "coverage",
+  "furo",
   "isort==5.13.2",  # keep me sync with .pre-commit-config.yaml
   "parameterized",
   "pre-commit",

@@ -9,10 +9,10 @@ Configuration
    .. class:: TLSNegotiatedConfiguration
 
       The values agreed by both peers on a specific connection.
-      Accessible on :attr:`siotls.connection.TLSConnection.nconfig`.
+      Available at :attr:`siotls.connection.TLSConnection.nconfig`.
 
       .. attribute:: alpn
-         :type: ALPNProtocol
+         :type: ALPNProtocol | None
 
       .. attribute:: can_echo_heartbeat
          :type: bool
@@ -24,7 +24,7 @@ Configuration
          :type: CipherSuites
 
       .. attribute:: client_certificate_type
-         :type: CertificateTyp
+         :type: CertificateType
 
       .. attribute:: key_exchange
          :type: NamedGroup

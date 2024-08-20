@@ -16,10 +16,10 @@ class Content:
         try:
             return _content_registry[ContentType(content_type)]
         except ValueError as exc:
-            raise DecodeError(*exc.args) from exc
+            raise alerts.DecodeError(*exc.args) from exc
 
 
-from .alerts import Alert, DecodeError
+from . import alerts
 from .application_data import ApplicationData
 from .change_cipher_spec import ChangeCipherSpec
 from .handshakes import Handshake

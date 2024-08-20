@@ -25,13 +25,50 @@ logger = logging.getLogger(__name__)
 @dataclasses.dataclass(frozen=True)
 class TLSConfiguration:
     """
-    Configure allowed values and restrictions for future connections.
+    The TLSConfiguration class provides a comprehensive set of options
+    to configure the security parameters for TLS connections, applicable
+    to both clients and servers.
+
+    It allows control over the cryptographic elements involved in the
+    TLS handshake, including the selection of ciphers, key exchange
+    methods, and signature algorithms. It also allows control over
+    various TLS extensions such as Server Name Indication (SNI),
+    Application-Layer Protocol Negotiation (ALPN) and others.
+
+    On the client-side, the ``trust_store`` and ``revocation_list``
+    parameters are recommended. If ``trust_store`` is not set, the
+    server certificates will not be verified.
+
+    >>> minimal_client_config = TLSConfiguration(
+    >>>     'client',
+    >>>     trust_store=build_system_store(),
+    >>>     revocation_list=...,
+    >>> )
+
+    On the server-side, the ``private_key`` and ``certificate_chain``
+    parameters are mandatory.
+
+    >>> minimal_server_config = TLSConfiguration(
+    >>>     'server',
+    >>>     private_key=...,
+    >>>     certificate_chain=...,
+    >>> )
+
+    Mutual TLS, for authentication clients too, is possible. Simply set
+    the ``trust_store`` and ``revocation_list`` parameters on the
+    server, or a ``private_key`` plus ``certificate_chain`` pair on the
+    client.
+
+    The ``trust_store`` and ``certificate_chain`` parameters are used
+    for certificate authentication. It is possible to use raw public
+    keys in addition to / instead of certificates. Simply use the
+    ``trusted_public_keys`` and ``public_key`` parameters.
     """
 
     side: typing.Literal['client', 'server']
     """
-    Whether this configuration will be used by a client connection or a
-    server one.
+    Tell whether this configuration will be used for client connections
+    or server ones.
     """
     _: dataclasses.KW_ONLY
 
@@ -42,12 +79,17 @@ class TLSConfiguration:
     )
     """
     List the cipher suites that can be used to encrypt data transmitted
-    on the wire. The ciphers are ordered server side in decreasing
-    preference order, i.e. the prefered cipher suite should be first in
-    the list.
+    on the wire.
 
-    :attr:`TLSNegotiatedConfiguration.cipher_suite` holds the cipher
-    suite that have been agreed by both peers.
+    If the peers cannot agree on a same cipher suite, the connection
+    fails with a :class:`siotls.alerts.HandshakeFailure` fatal alert.
+
+    The list should be ordered server-side in decreasing preference
+    order, i.e. the prefered cipher should be first in the list. The
+    order doesn't matter client-side.
+
+    The negotiated cipher is available at
+    :attr:`TLSNegotiatedConfiguration.cipher_suite`.
     """
 
     key_exchanges: Sequence[NamedGroup] = (
@@ -55,16 +97,19 @@ class TLSConfiguration:
         NamedGroup.secp256r1,
     )
     """
-    List the allowed key exchange algorithm. New connections can only
-    be established when both peer support and allow a same key exchange
-    algorithm. The algorithms should be ordered server side in
-    decreasing preference order, i.e. the prefered algorithm should be
-    first in the list.
+    List the allowed key exchange algorithms that can be used to share
+    a secret and bootstrap encryption.
 
-    The negotiated cipher is stored in
+    If the peers cannot agree on a same key exchange algorithm, the
+    connection fails with a :class:`siotls.alerts.HandshakeFailure`
+    fatal alert.
+
+    The list should be ordered server-side in decreasing preference
+    order, i.e. the prefered algorithm should be first in the list. The
+    order doesn't matter client-side.
+
+    The negotiated algorithm is available at
     :attr:`TLSConnection.nconfig.key_exchange`.
-
-    Default: x25519 > secp256r1.
     """
 
     signature_algorithms: Sequence[SignatureScheme] = (
@@ -81,112 +126,132 @@ class TLSConfiguration:
         SignatureScheme.rsa_pss_rsae_sha512,
     )
     """
-    The list of allowed signature algorithms. The algorithms should be
-    ordered in decreasing preference order, i.e. the prefered algorithm
-    should be first in the list. The order matters when the server
-    and/or client holds several certificates for a same Subject but with
-    different Subject Public Key Info.
+    List the signature algorithm allowed in the CertificateVerify TLS
+    handshake.
 
-    The negotiated cipher is stored in
+    Typically used to refine what asymetric key algorithms are
+    authorized, with what padding and hashing algorithms for new
+    signatures. This can be used to allow RSA-PSS-SHA2 but reject
+    RSA-PKCS1-SHA1.
+
+    The negotiated algorithm is available at
     :attr:`TLSConnection.nconfig.signature_algorithm`.
-
-    Default: EdDSA > ECDSA > RSA-PSS (pss) > RSA-PSS (rsaEncryption),
-    each time sha256 > sha384 > sha512.
     """
 
     trust_store: Store | None = None
     """
+    Make peer authentication mandatory. Allow the peer to authenticate
+    using x509 certificates.
+
+    It validates the certificates using the CA/Browser Forum baseline
+    requirements for TLS server certificates[^1].
+
     The trust store to use when validating peer x509 certificates, or
     ``None`` to disable x509 validation (unsafe unless
     :attr:`trusted_public_keys` is non empty). The module
     :mod:`siotls.trust_store` provides several functions to facilitate
     building such store.
+
+    [^1]: https://cabforum.org/working-groups/server/baseline-requirements/documents/
     """
 
     revocation_list: CertificateRevocationList | None = None
     """
-    The revocation list to use when validating peer x509 certificates,
-    or ``None`` to skip matching certificates against this list (unsafe
-    unless OCSP is active).
+    To use with :attr:`trust_store`, list the certificate that are valid
+    by themselves but have been revoked by their issuing certification
+    authority.
     """
 
     max_chain_depth: int = 5
     """
-    The maximum certificate chain depth. That is, how many certificates
-    can be found between the host certificate and the root certificate,
-    both included.
+    Limit the length of the peer's certificate chain when authenticating
+    via x509 certificate.
     """
 
     trusted_public_keys: Sequence[PublicKeyTypes] = ()
     """
-    A list of public keys that are not subject to x509 validations and
-    that are always trusted. Can be used in addition to
-    :attr:`trust_store`.
+    Negotiate :rfc:`7250#` (Raw Public Keys).
 
-    *Enables :rfc:`7250` (Raw Public Keys). Using this attribute without
-    :attr:`trust_store` disallows exchange of x509 certificates.*
+    Make peer authentication mandatory. Allow the peer to authenticate
+    using raw public keys.
+
+    When used in addition to :attr:`trust_store`, it allows the peer to
+    authenticate with either x509 (preferred) or raw public keys. When
+    used instead of :attr:`trust_store`, it only allows raw public keys
+    and will reject x509 certificates with an
+    :class:`alerts.UnsupportedCertificate` error.
     """
 
     private_key: PrivateKeyTypes | None = None
     """
-
-
-    **Mandatory** server-side. **Required** client-side for :abbr:`mTLS
-    (mutual TLS)`.
+    ...
     """
 
     public_key: PublicKeyTypes | None = None
     """
-    The public key counter part of :attr:`private_key`.
+    Negotiate :rfc:`7250#` (Raw Public Keys).
 
-    *Enables :rfc:`7250` (Raw Public Keys). Using this attribute without
-    :attr:`certificate_chain` disallows exchange of x509 certificates.*
+    ...
 
-    **Mandatory** server-side. **Required** client-side for :abbr:`mTLS
-    (mutual TLS)`. *Unless* regular x509 certificates are in use.
+    When used in addition to :attr:`certificate_chain`, it will send
+    either the certificate chain, either the public key, depending on
+    the peer's negotiated preference. When used instead of
+    :attr:`certificate_chain`, it will either send the public key,
+    either fail with an :class:`alerts.UnsupportedCertificate` alert,
+    depending on the peer's support for raw public keys.
     """
 
     certificate_chain: Sequence[Certificate] | None = None
     """
-    The list of certificates that give a chain of trust between the host
-    certificate and a root certificate.
+    The list of certificates that together form a chain of trust between
+    the host certificate and a root certificate. Make this side
+    authentication possible using x509 certificates.
 
     The first certificate in the list must be the certificate of the
     current host. The following certificates each must sign the previous
     one in the list. The last certificate must be signed by a root CA,
     the root CA itself should not be listed.
-
-    **Mandatory** server-side. **Required** client-side for :abbr:`mTLS
-    (mutual TLS)`. *Unless* :rfc:`7250` (Raw Public Keys) is in use.
     """
 
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384
     """
     Negociate :rfc:`6066#section-4` (Maximum Fragment Length)
 
-    The negotiated fragment length is stored in
-    :attr:`TLSConnection.nconfig.max_fragment_length`.
+    Limit the length of data encapsuled by TLS, fragmenting the data
+    over multiple records when necessary. The limit only accounts for
+    the fragment length and does not account for the additional 5 bytes
+    record header.
+
+    This doesn't limit the size of the internal buffers used by siotls
+    which can grow up to 24 MiB during handshake after defragmentation.
+
+    The negotiated length is available at
+    :attr:`TLSNegotiatedConfiguration.max_fragment_length`.
     """
 
     can_echo_heartbeat: bool = True
     """
-    Negociate :rfc:`6520` (Heartbeat).
+    Negociate :rfc:`6520#` (Heartbeat).
 
-    The negotiated heartbeat options are stored in
-    :attr:`TLSConnection.nconfig.can_send_heartbeat` and
-    :attr:`TLSConnection.nconfig.can_echo_heartbeat`.
+    ...
+
+    The negotiated heartbeat options is available at
+    :attr:`TLSNegotiatedConfiguration.can_send_heartbeat` and
+    :attr:`TLSNegotiatedConfiguration.can_echo_heartbeat`.
     """
 
     alpn: Sequence[ALPNProtocol] = ()
     """
-    Negociate :rfc:`7301` (Application-Layer Protocol Negociation/ALPN).
+    Negociate :rfc:`7301#` (Application-Layer Protocol Negociation/ALPN).
 
-    The list of protocols that this application is willing to use once
-    the secure TLS connection is established. The protocols should be
-    ordered server-side in decreasing preference order, i.e. the
-    prefered protocol should be first in the list.
+    List the protocols that this application is willing to use once the
+    connection is secured.
 
-    The negotiated protocol is stored in :attr:`TLSConnection.nconfig.alpn`.
+    The list should be ordered server-side in decreasing preference
+    order, i.e. the prefered protocol should be first in the list.
+
+    The negotiated protocol is available at
+    :attr:`TLSNegotiatedConfiguration.alpn`.
     """
 
     server_hostnames: Sequence[str] = ()
@@ -194,9 +259,8 @@ class TLSConfiguration:
     Negociate :rfc:`6066#section-3` (Server Name Indication/SNI).
 
     Allow a single TLS server to serve multiple hosts. Much like the
-    Host header for HTTP. The server must provide a certificate for
-    every hosts, it can be a single certificate with multiple :abbr:`SAN
-    (Server Alternative Name)` entries.
+    Host header for HTTP. The certificate must be appropriate for all
+    hosts.
 
     This attribute is server-side only.
     """

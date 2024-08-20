@@ -72,8 +72,16 @@ class ClientWaitCertificate(State):
     def _verify_chain(self, certificate_entries):
         leaf, *intermediates = (e.certificate for e in certificate_entries)
         try:
+            # It is a great tool from cryptography... but the allowed
+            # public keys are taken from the CA/B forum and are not
+            # configurable. i.e. it rejects ed25519 and ed448, and it is
+            # not possible to restrict the list further down using tls
+            # signature_algorithm_cert.
+            # Also CRL support isn't implemented as of 43.0
             self._get_verifier().verify(leaf, intermediates)
         except x509.verification.VerificationError as exc:
+            # TODO: CertificateRevoked, CertificateExpired, CertificateUnknown
+            #       UnknownCa
             raise alerts.BadCertificate from exc
 
     def _get_verifier(self):

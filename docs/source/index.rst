@@ -14,6 +14,7 @@ documentation for details.
    :maxdepth: 2
 
    tutorials/getting_started
+   references/alerts
    references/configuration
    references/connection
    references/iana
