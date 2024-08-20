@@ -54,15 +54,18 @@ class TLSConfiguration:
     >>>     certificate_chain=...,
     >>> )
 
-    Mutual TLS, for authentication clients too, is possible. Simply set
-    the ``trust_store`` and ``revocation_list`` parameters on the
-    server, or a ``private_key`` plus ``certificate_chain`` pair on the
-    client.
+    Server authentication is mandatory by TLS. Client authentication
+    (mutual TLS) is optional. Set the ``trust_store`` and
+    ``revocation_list`` parameters server-side to request client
+    authentication. Set the ``private_key`` and ``certificate_chain``
+    pair client-side to respond.
 
     The ``trust_store`` and ``certificate_chain`` parameters are used
-    for certificate authentication. It is possible to use raw public
-    keys in addition to / instead of certificates. Simply use the
-    ``trusted_public_keys`` and ``public_key`` parameters.
+    for certificate authentication. Raw public keys can be used in
+    addition to / instead of certificates. Set the ``public_key``
+    parameter server-side. Set the ``trusted_public_keys`` parameter
+    client-side. Set the other parameter on the other side for mutual
+    TLS.
     """
 
     side: typing.Literal['client', 'server']

@@ -20,7 +20,7 @@ class _Alert(Content, Serializable, metaclass=RegistryMeta):
         struct {
             AlertLevel level;
             AlertDescription description;
-            select (_Alert.level) {
+            select (Alert.level) {
                 case 0x00: CloseNotify;
                 case 0x0a: UnexpectedMessage;
                 case 0x14: BadRecordMac;
@@ -50,7 +50,7 @@ class _Alert(Content, Serializable, metaclass=RegistryMeta):
                 case 0x78: NoApplicationProtocol;
                 case    _: UnknownAlert;
             };
-        } _Alert;
+        } Alert;
     """).strip('\n')
     args: tuple[typing.Any]
     level: AlertLevel
