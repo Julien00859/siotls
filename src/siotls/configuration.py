@@ -35,7 +35,7 @@ class TLSConfiguration:
     various TLS extensions such as Server Name Indication (SNI),
     Application-Layer Protocol Negotiation (ALPN) and others.
 
-    On the client-side, the ``trust_store`` and ``revocation_list``
+    **Client** On the client-side, the ``trust_store`` and ``revocation_list``
     parameters are recommended. If ``trust_store`` is not set, the
     server certificates will not be verified.
 
@@ -45,7 +45,7 @@ class TLSConfiguration:
     >>>     revocation_list=...,
     >>> )
 
-    On the server-side, the ``private_key`` and ``certificate_chain``
+    **Server** On the server-side, the ``private_key`` and ``certificate_chain``
     parameters are mandatory.
 
     >>> minimal_server_config = TLSConfiguration(
@@ -54,18 +54,18 @@ class TLSConfiguration:
     >>>     certificate_chain=...,
     >>> )
 
-    Server authentication is mandatory by TLS. Client authentication
-    (mutual TLS) is optional. Set the ``trust_store`` and
+    **Mutual TLS** Server authentication is mandatory by TLS. Client
+    authentication (mutual TLS) is optional. Set the ``trust_store`` and
     ``revocation_list`` parameters server-side to request client
     authentication. Set the ``private_key`` and ``certificate_chain``
     pair client-side to respond.
 
-    The ``trust_store`` and ``certificate_chain`` parameters are used
-    for certificate authentication. Raw public keys can be used in
-    addition to / instead of certificates. Set the ``public_key``
-    parameter server-side. Set the ``trusted_public_keys`` parameter
-    client-side. Set the other parameter on the other side for mutual
-    TLS.
+    **Raw Public Keys** The ``trust_store`` and ``certificate_chain``
+    parameters are used for certificate authentication. It is possible
+    to use raw public keys in addition to / instead of certificates. Set
+    the ``public_key`` parameter server-side. Set the
+    ``trusted_public_keys`` parameter client-side. Set the other
+    parameter on the other side for mutual TLS using raw public keys.
     """
 
     side: typing.Literal['client', 'server']
