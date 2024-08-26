@@ -15,6 +15,7 @@ author = 'Julien Castiaux'
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx_design",
 ]
 
 templates_path = ['_templates']
