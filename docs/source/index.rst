@@ -35,7 +35,7 @@ In this documentation
 
    .. grid-item:: :doc:`How-to guides <guides/index>`
 
-      **Step-by-step** instructions to leverage advanced TLS 1.3
+      **Step-by-step** instructions to benefit from advanced TLS 1.3
       features.
 
 .. grid:: 1 1 2 2

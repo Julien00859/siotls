@@ -69,6 +69,11 @@ class TLSConnection:
     # ------------------------------------------------------------------
 
     def initiate_connection(self):
+        """
+        Start the TLS three-way handshakes with the peer. Client-side it
+        sends the first ClientHello message. Server-side it puts the
+        connection in a state to accept the ClientHello.
+        """
         if self.config.log_keys:
             is_keylog_enabled = any(
                 not isinstance(handler, logging.NullHandler)
@@ -87,6 +92,13 @@ class TLSConnection:
         self._state.initiate_connection()
 
     def receive_data(self, data):
+        """
+        Enqueue raw / encrypted data received from the peer inside the
+        connection's appropriate buffer. Process the messages when
+        enough data is present. Prepare the messages to be forwarded to
+        the application upon next call to :meth:`data_to_read`, and the
+        data to send to the peer upon next call to :meth:`data_to_send`.
+        """
         if not data:
             e = f"empty data: {data}"
             raise ValueError(e)
@@ -131,14 +143,26 @@ class TLSConnection:
             self.rekey()
 
     def send_data(self, data: bytes):
+        """
+        Enqueue and encrypt clear/un-encrypted data comming from this
+        side's application. Prepare the message to be send upon next
+        call to :meth:`data_to_send`.
+        """
         self._send_content(ApplicationData(data))
 
     def data_to_read(self):
+        """
+        Dequeue the clear data received from the peer that is intended
+        for this side's application.
+        """
         application_data = self._application_data
         self._application_data = bytearray()
         return application_data
 
     def data_to_send(self):
+        """
+        Dequeue the encrypted data that is intended to the peer.
+        """
         output = self._output_data
         self._output_data = bytearray()
         return output
@@ -150,6 +174,11 @@ class TLSConnection:
         raise NotImplementedError
 
     def close_receiving_end(self):
+        """
+        Half-close the connection, refuse to process all new incomming
+        messages. This method must be called when the TCP connection was
+        closed/reset by the peer.
+        """
         if not self.is_post_handshake():
             logger.warning("EOF or CloseNotify alert during handshake")
             self._fail()
@@ -159,6 +188,10 @@ class TLSConnection:
         self._state.can_receive = False
 
     def close_sending_end(self):
+        """
+        Half-close the connection, signal the peer that this side will
+        not send any new message.
+        """
         if not isinstance(self._state, states.Closed | states.Failed):
             self._move_to_state(states.Closed)
         if self._state.can_send:
@@ -175,9 +208,17 @@ class TLSConnection:
         self._move_to_state(states.Failed)
 
     def is_post_handshake(self):
+        """
+        True when the connection state is Connected / Closed (either
+        end) / Failed; False otherwise.
+        """
         return isinstance(self._state, states.Connected | states.Closed | states.Failed)
 
     def is_connected(self):
+        """
+        True when the connection's state is Connected / Half-Closed
+        (sending end); False otherwise.
+        """
         if isinstance(self._state, states.Closed):
             # considere half-closed to be "connected" when it is still
             # ok to receive data

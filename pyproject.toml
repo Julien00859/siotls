@@ -26,10 +26,13 @@ classifiers = [
 
 dependencies = [
   "cryptography>=43",
-  "idna"
+  "idna",
 ]
 
 [project.optional-dependencies]
+cryptography = [
+  "cryptography>=43",
+]
 dev = [
   "coverage",
   "furo",

@@ -13,6 +13,7 @@ class WrappedSocket:
         self.close()
 
     def do_handhskake(self):
+        """ Perform the TLS handshakes. """
         self.conn.initiate_connection()
         if self.conn.config.side == 'client':
             self.sock.send(self.conn.data_to_send())
@@ -27,6 +28,7 @@ class WrappedSocket:
                 self.conn.close_receiving_end()  # it goes post handshake
 
     def read(self):
+        """ Block reading for new message. """
         application_data = self.conn.data_to_read()
         while self.conn.is_connected() and not application_data:
             if input_data := self.sock.recv(self.conn.max_fragment_length):
@@ -41,10 +43,12 @@ class WrappedSocket:
         return application_data
 
     def write(self, data):
+        """ Block writing for a message. """
         self.conn.send_data(data)
         self.sock.send(self.conn.data_to_send())
 
     def close(self):
+        """ Close the TLS connection. """
         self.conn.close_sending_end()
         if close_notify := self.conn.data_to_send():
             self.sock.send(close_notify)

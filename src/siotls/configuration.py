@@ -208,7 +208,7 @@ class TLSConfiguration:
     """
     The list of certificates that together form a chain of trust between
     the host certificate and a root certificate. Make this side
-    authentication possible using x509 certificates.
+    authenticate using x509 certificates.
 
     The first certificate in the list must be the certificate of the
     current host. The following certificates each must sign the previous
