@@ -1,15 +1,17 @@
 import abc
 import binascii
+import collections
+import inspect
 import itertools
 import math
-import time
-from datetime import datetime
-from http import HTTPStatus
-from wsgiref.handlers import format_date_time
-
-import siotls
 
 _sentinel = object()
+
+
+# Get the pure python implementation of collections.OrderedDict
+_collections_globals = {k: getattr(collections, k) for k in dir(collections)}
+exec(inspect.getsource(collections.OrderedDict), _collections_globals)  # noqa: S102
+PyOrderedDict = _collections_globals.pop("OrderedDict")
 
 
 class RegistryMeta(abc.ABCMeta):
@@ -60,53 +62,6 @@ def hexdump(bytes_):
     return xd.decode()
 
 
-USER_AGENT = f"python-siotls/{siotls.__version__}"
-
-HTTP11_REQUEST = f"""\
-{{method}} {{path}} HTTP/1.1\r
-Host: {{host}}\r
-User-Agent: {USER_AGENT}\r
-Connection: close\r
-Content-Type: text/plain; charset=utf-8\r
-Content-Length: {{length}}\r
-\r
-{{body}}"""
-
-def make_http11_request(host: str, method: str, path: str, body: str):
-    return HTTP11_REQUEST.format(
-        host=host,
-        method=method,
-        path=path,
-        length=len(body),
-        body=body
-    )
-
-HTTP11_RESPONSE = f"""\
-HTTP/1.1 {{status.value}} {{status.phrase}}\r
-Date: {{date}}\r
-Server: siotls/{siotls.__version__}\r
-Connection: close\r
-Content-Type: text/plain; charset=utf-8\r
-Content-Length: {{length}}\r
-\r
-{{body}}"""
-
-def make_http11_response(code: int, body: str, now: datetime | None = None):
-    return HTTP11_RESPONSE.format(
-        status=HTTPStatus(code),
-        date=format_date_time(now.timestamp() if now else time.time()),
-        length=len(body),
-        body=body,
-    )
-
-
-def try_cast(type_, value, exceptions=ValueError):
-    try:
-        return type_(value)
-    except exceptions:
-        return value
-
-
 class peekable:  # noqa: N801
     def __init__(self, iterable):
         self._it = iter(iterable)
@@ -133,6 +88,22 @@ class peekable:  # noqa: N801
         return self._peeked
 
 
+def socket_pformat(address, default_port=None):
+    addr, port, *_ = address
+    if not port or port == default_port:
+        return addr
+    if ':' in addr[:5]:  # ipv6
+        return f'[{addr}]:{port}'
+    return f'{addr}:{port}'
+
+
 def submap(mapping, keys):
     keys = frozenset(keys)
     return {key: mapping[key] for key in mapping if key in keys}
+
+
+def try_cast(type_, value, exceptions=ValueError):
+    try:
+        return type_(value)
+    except exceptions:
+        return value

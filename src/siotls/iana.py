@@ -1,10 +1,5 @@
 import enum
 
-try:
-    from enum import StrEnum
-except ImportError:
-    from siotls._vendor import StrEnum
-
 
 class Hex1Enum(enum.IntEnum):
     """ An integer on 1 byte with hexadecimal representation. """
@@ -53,7 +48,7 @@ class AlertLevel(Hex1Enum):
     FATAL = 2
 
 
-class ALPNProtocol(StrEnum):
+class ALPNProtocol(enum.StrEnum):
     HTTP_0_9 = "http/0.9"
     HTTP_1_0 = "http/1.0"
     HTTP_1_1 = "http/1.1"

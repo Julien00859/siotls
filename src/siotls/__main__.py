@@ -27,8 +27,8 @@ class ColoredFormatter(logging.Formatter):
 
 
 def setup_logging(verbosity):
-    if hasattr(sys.stderr, 'fileno') and os.isatty(sys.stderr.fileno()):
-        logging.getLogger().handlers[0].formatter = ColoredFormatter(logging.BASIC_FORMAT)
+    #if hasattr(sys.stderr, 'fileno') and os.isatty(sys.stderr.fileno()):
+    #    logging.getLogger().handlers[0].formatter = ColoredFormatter(logging.BASIC_FORMAT)
     logging.getLogger().setLevel(max(verbosity, logging.DEBUG))
     if verbosity < logging.DEBUG:
         logging.captureWarnings(capture=True)
@@ -46,8 +46,8 @@ def main():
     parser.add_argument('-s', '--silent', action='count', default=0,
         help="decrease logging verbosity (repeatable)")
     parser.add_argument('side', action='store', choices=('client', 'server'))
-    parser.add_argument('--host', action='store', default='localhost',
-        help="IP address on which the server will listen / client will connect")
+    parser.add_argument('--host', action='store', default='::1',
+        help="Host / IPv6 address on which the server will listen / client will connect")
     parser.add_argument('--port', action='store', type=int, default=8446,
         help="TCP port number on which the server will listen / client will connect")
     parser.add_argument('--tlscert', '--sslcert', action='store', type=pathlib.Path,
@@ -104,6 +104,8 @@ def main():
     except Exception as exc:  # noqa: BLE001
         logger.critical("Fatal exception", exc_info=exc)
         return 1
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received, exiting.")
 
     return 0
 

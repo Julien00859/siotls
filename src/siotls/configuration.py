@@ -16,7 +16,7 @@ from siotls.iana import (
     NamedGroup,
     SignatureScheme,
 )
-from siotls.ocsp_over_http import OCSPService
+from siotls.services import CRLService, OCSPService
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +54,9 @@ class TLSConfiguration:
         ].copy)
 
     trust_store: Store | None = None
-    revocation_list: CertificateRevocationList | None = None
+    static_revocation_list: CertificateRevocationList | None = None
     ocsp_service: OCSPService | None = None
+    crl_service: CRLService | None = None
     max_chain_depth: int = 5
     trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
 
@@ -119,11 +120,12 @@ class TLSConfiguration:
             self._check_public_key()
 
         if (self.require_peer_authentication
-            and not self.revocation_list
+            and not self.static_revocation_list
             and not self.ocsp_service
+            and not self.crl_service
         ):
-            w =("missing revocation list or ocsp service, will not "
-                "verify that the peer's certificate is not revoked")
+            w =("missing static revocation list, ocsp service, or crl "
+                "service: certificate revocation check disabled")
             logger.warning(w)
 
     def _check_mandatory_settings(self):

@@ -1,20 +1,22 @@
 import logging
 import socket
-from datetime import datetime
+from datetime import UTC, datetime
+from http import HTTPStatus
+from wsgiref.handlers import format_date_time
 
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.x509 import load_pem_x509_certificates
 
-from siotls import TLSConfiguration, TLSConnection
-from siotls.ocsp_over_http import OcspOverHttp
-from siotls.utils import make_http11_response
+from siotls import USER_AGENT, TLSConfiguration, TLSConnection
+from siotls.services.ocsp_over_http import OcspOverHttp
+from siotls.utils import socket_pformat
 
 logger = logging.getLogger(__name__)
 
 
-def serve(host, port, certificate_chain_path, private_key_path, log_keys):
-    with open(certificate_chain_path, 'rb') as certificate_chain_file, \
-         open(private_key_path, 'rb') as private_key_file:
+def serve(host, port, certificate_chain_path, private_key_path, *, log_keys: bool):
+    with (open(certificate_chain_path, 'rb') as certificate_chain_file,
+          open(private_key_path, 'rb') as private_key_file):
         tls_config = TLSConfiguration(
             'server',
             private_key=load_pem_private_key(private_key_file.read(), None),
@@ -24,58 +26,59 @@ def serve(host, port, certificate_chain_path, private_key_path, log_keys):
             log_keys=log_keys,
         )
 
-    server = socket.socket()
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind((host, port))
-    server.listen(1)
-    logger.info("listening on %s port %s", host, port)
-
-    try:
+    server = socket.create_server((host, port), family=socket.AF_INET6)
+    server_name = socket_pformat(server.getsockname(), default_port=443)
+    logger.info("serving http on %s port %s (https://%s)", host, port, server_name)
+    with server:
         while True:
-            client = None
-            client, client_info = server.accept()
-            client.settimeout(1)
-            logger.info("connection with %s:%s established", client_info[0], client_info[1])
-            try:
-                handle_one(client, client_info, tls_config)
-            except Exception:
-                logger.exception("while handling %s", client_info)
-            logger.info("connection with %s:%s closed", client_info[0], client_info[1])
-            client.close()
-    except KeyboardInterrupt:
-        logger.info("closing server")
-    finally:
-        if client:
-            client.close()
-        server.close()
+            client, client_addr = server.accept()
+            client_name = socket_pformat(client_addr)
+            logger.info("connection with %s established", client_name)
+            with client:
+                conn = TLSConnection(tls_config)
+                try:
+                    with conn.wrap(client) as sclient:
+                        logger.info("connection with %s secured", client_name)
+                        http_serve_one(sclient, client_addr)
+                except Exception:
+                    logger.exception("connection with %s failed", client_name)
+            logger.info("connection with %s closed", client_name)
 
 
-def handle_one(client, client_info, tls_config):
-    conn = TLSConnection(tls_config)
-
-    with conn.wrap(client) as sclient:
-        logger.info("connection with %s:%s secured", client_info[0], client_info[1])
-        http_req = sclient.read()
-        try:
-            request_line = http_req.decode().partition('\r\n')[0]
-            method, path, version = request_line.split()
-            if method != 'GET':
-                code, body = 405, ""
-            elif path != '/':
-                code, body = 404, ""
-            else:
-                code, body = 200, "Hello from siotls\n"
-        except ValueError:
-            code, body = 400, ""
-
-        now = datetime.now().astimezone()
-        http_res = make_http11_response(code, body, now=now)
-        sclient.write(http_res.encode())
-        logger.info(
-            '%s - - [%s] "%s" %d %s',
-            client_info[0],
-            now.strftime('%d/%b/%Y:%H:%M:%S %z'),
-            request_line,
-            code,
-            len(body),
+def http_serve_one(sclient, client_addr):
+    http_req = sclient.read()
+    request_line = http_req.partition(b'\r\n')[0].decode('latin-1')
+    try:
+        method, path, version = request_line.split(' ')
+    except ValueError:
+        code, body = 505, ""
+    else:
+        code, body = (
+                 (405, "") if method != 'GET'
+            else (404, "") if path != '/'
+            else (200, "Hello from siotls\n")
         )
+    now = datetime.now().astimezone()
+    sclient.write(make_http11_response(code, body, now=now))
+    logger.info(
+        '%s - - [%s] "%s" %d %s',
+        client_addr[0],
+        now.strftime('%d/%b/%Y:%H:%M:%S %z'),
+        request_line,
+        code,
+        len(body),
+    )
+
+
+def make_http11_response(code: int, textbody: str, now: datetime | None = None):
+    date = format_date_time((now or datetime.now(UTC)).timestamp())
+    status = HTTPStatus(code)
+    return (
+        f"HTTP/1.1 {status.value} {status.phrase}\r\n"
+        f"Date: {date}\r\n"
+        f"Server: {USER_AGENT}\r\n"
+        f"Connection: close\r\n"
+        f"Content-Type: text/plain; charset=utf-8\r\n"
+        f"Content-Length: {len(textbody)}\r\n"
+        f"\r\n"
+    ).encode() + textbody.encode()

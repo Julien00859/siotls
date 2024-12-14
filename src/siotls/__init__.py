@@ -3,6 +3,8 @@ import logging
 
 __version__ = importlib.metadata.version(__name__)
 
+USER_AGENT = f'python-{__name__}/{__version__}'
+
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 

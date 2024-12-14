@@ -14,8 +14,8 @@ from os import fspath
 from threading import Thread
 
 from siotls import TLSConnection
+from siotls.examples.simple_server import make_http11_response
 from siotls.iana import NamedGroup
-from siotls.utils import make_http11_response
 
 from . import TAG_INTEGRATION, TestCase, test_temp_dir
 from .config import server_config
@@ -160,7 +160,7 @@ class TestCURL(TestCase):
                     http_get.partition(b'\r\n')[0],
                     b"GET / HTTP/1.1"
                 )
-                sclient.write(make_http11_response(204, "").encode())
+                sclient.write(make_http11_response(204, ""))
 
         client.close()
         proc.wait(timeout=1)

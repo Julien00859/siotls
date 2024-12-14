@@ -4,7 +4,7 @@ from abc import abstractmethod
 from collections import defaultdict
 from typing import Any, ClassVar
 
-from cryptography.hazmat._oid import PublicKeyAlgorithmOID
+from cryptography.hazmat._oid import PublicKeyAlgorithmOID, SignatureAlgorithmOID
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding, rsa, types
 
@@ -17,12 +17,42 @@ class TLSSignatureSuite(metaclass=RegistryMeta):
     _cipher_registry: ClassVar = {}
 
     iana_id: SignatureScheme
+    sign_oid: SignatureAlgorithmOID
     key: types.PublicKeyTypes | types.PrivateKeyTypes
 
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and TLSSignatureSuite in cls.__bases__:
             cls._cipher_registry[cls.iana_id] = cls
+
+    @classmethod
+    def for_signature(cls, certificate, sign_oid, hash_algo, parameters=None):
+        # It is for verifying EXISTING signatures.
+        signs = cls.for_certificate(certificate)
+        if isinstance(signs[0], _RSAMixin):
+            signs = [
+                sign for sign in signs
+                if sign.sign_oid == sign_oid
+                if sign.digestmod == hash_algo
+                if parameters and sign.padding == parameters
+            ]
+        elif isinstance(signs[0], _ECDSAMixin):
+            signs = [
+                sign for sign in signs
+                if sign.sign_oid == sign_oid
+                if sign.digestmod == hash_algo
+            ]
+
+        if len(signs) == 0:
+            e = "no matching algorithm"
+            raise ValueError(e)
+        elif len(signs) > 1:
+            e = "multiple matching algorithms"
+            raise ValueError(e)
+        if sign_oid and signs[0].sign_oid != sign_oid:
+            e = "signature algorithm don't match"
+            raise ValueError(e)
+        return signs[0]
 
     @classmethod
     def for_certificate(cls, certificate):
@@ -89,54 +119,63 @@ class _RSAMixin:
 
 class TLS_RSA_PKCS1_SHA256(_RSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.rsa_pkcs1_sha256
+    sign_oid = SignatureAlgorithmOID.RSA_WITH_SHA256
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     digestmod = hashes.SHA256()
     padding = padding.PKCS1v15()
 
 class TLS_RSA_PKCS1_SHA384(_RSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.rsa_pkcs1_sha384
+    sign_oid = SignatureAlgorithmOID.RSA_WITH_SHA384
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     digestmod = hashes.SHA384()
     padding = padding.PKCS1v15()
 
 class TLS_RSA_PKCS1_SHA512(_RSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.rsa_pkcs1_sha512
+    sign_oid = SignatureAlgorithmOID.RSA_WITH_SHA512
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     digestmod = hashes.SHA512()
     padding = padding.PKCS1v15()
 
 class TLS_RSA_PSS_RSAE_SHA256(_RSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.rsa_pss_rsae_sha256
+    sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     digestmod = hashes.SHA256()
     padding = padding.PSS(padding.MGF1(hashes.SHA256()), padding.PSS.DIGEST_LENGTH)
 
 class TLS_RSA_PSS_RSAE_SHA384(_RSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.rsa_pss_rsae_sha384
+    sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     digestmod = hashes.SHA384()
     padding = padding.PSS(padding.MGF1(hashes.SHA384()), padding.PSS.DIGEST_LENGTH)
 
 class TLS_RSA_PSS_RSAE_SHA512(_RSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.rsa_pss_rsae_sha512
+    sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     digestmod = hashes.SHA512()
     padding = padding.PSS(padding.MGF1(hashes.SHA512()), padding.PSS.DIGEST_LENGTH)
 
 class TLS_RSA_PSS_PSS_SHA256(_RSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.rsa_pss_pss_sha256
+    sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSASSA_PSS
     digestmod = hashes.SHA256()
     padding = padding.PSS(padding.MGF1(hashes.SHA256()), padding.PSS.DIGEST_LENGTH)
 
 class TLS_RSA_PSS_PSS_SHA384(_RSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.rsa_pss_pss_sha384
+    sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSASSA_PSS
     digestmod = hashes.SHA384()
     padding = padding.PSS(padding.MGF1(hashes.SHA384()), padding.PSS.DIGEST_LENGTH)
 
 class TLS_RSA_PSS_PSS_SHA512(_RSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.rsa_pss_pss_sha512
+    sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSASSA_PSS
     digestmod = hashes.SHA512()
     padding = padding.PSS(padding.MGF1(hashes.SHA512()), padding.PSS.DIGEST_LENGTH)
@@ -161,16 +200,19 @@ class _ECDSAMixin:
 
 class TLS_ECDSA_SECP256R1_SHA256(_ECDSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.ecdsa_secp256r1_sha256
+    sign_oid = SignatureAlgorithmOID.ECDSA_WITH_SHA256
     digestmod = hashes.SHA256()
     curve_name = ec.SECP256R1.name
 
 class TLS_ECDSA_SECP384R1_SHA384(_ECDSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.ecdsa_secp384r1_sha384
+    sign_oid = SignatureAlgorithmOID.ECDSA_WITH_SHA384
     digestmod = hashes.SHA384()
     curve_name = ec.SECP384R1.name
 
 class TLS_ECDSA_SECP521R1_SHA512(_ECDSAMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.ecdsa_secp521r1_sha512
+    sign_oid = SignatureAlgorithmOID.ECDSA_WITH_SHA512
     digestmod = hashes.SHA512()
     curve_name = ec.SECP521R1.name
 
@@ -184,6 +226,8 @@ class _EDMixin:
 
 class TLS_ED25519(_EDMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.ed25519
+    sign_oid = SignatureAlgorithmOID.ED25519
 
 class TLS_ED448(_EDMixin, TLSSignatureSuite):
     iana_id = SignatureScheme.ed448
+    sign_oid = SignatureAlgorithmOID.ED448

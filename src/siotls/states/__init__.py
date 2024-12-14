@@ -43,6 +43,8 @@ class State(metaclass=abc.ABCMeta):
                 logger.debug("warning alert from %s: %s",
                      self.config.other_side, content.description.name)
             else:
+                self._move_to_state(Closed)
+                self._state.can_receive = False
                 e = f"fatal alert from {self.config.other_side}"
                 raise Alert[alert.description](e)
         elif content.content_type == ContentType.HEARTBEAT:
