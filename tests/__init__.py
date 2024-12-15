@@ -4,7 +4,9 @@ import contextlib
 import dataclasses
 import logging
 import re
+import selectors
 import shutil
+import subprocess
 import tempfile
 import unittest
 from os import fspath, getenv
@@ -24,6 +26,7 @@ setup_logging(logging.ERROR - 10 * options.verbosity)
 test_temp_dir = Path(tempfile.mkdtemp(prefix='siotls-test-'))
 atexit.register(shutil.rmtree, fspath(test_temp_dir), ignore_errors=True)
 
+TAG_EXTERNAL = getenv('SIOTLS_EXTERNAL') == '1'
 TAG_INTEGRATION = getenv('SIOTLS_INTEGRATION') == '1'
 TAG_SLOW = getenv('SIOTLS_SLOW') == '1'
 
@@ -80,6 +83,30 @@ class TestCase(unittest.TestCase):
                     break
             else:
                 self.assertRegex(message, log_pattern)  # it fails
+
+    def popen(self, *args, stdout=None, stderr=None, **kwargs):
+        proc = subprocess.Popen(*args, stdout=stdout, stderr=stderr, **kwargs)  # noqa: S603
+        self.addCleanup(self._popen_kill, proc)
+        if stdout is subprocess.PIPE:
+            self.addCleanup(proc.stdout.close)
+        if stderr is subprocess.PIPE:
+            self.addCleanup(proc.stderr.close)
+        return proc
+
+    def _popen_kill(self, proc, timeout=.1):
+        if proc.returncode is not None:
+            return
+        proc.terminate()
+        try:
+            proc.wait(timeout)
+        except TimeoutError:
+            proc.kill()
+
+    def selector(self, file, event=selectors.EVENT_READ):
+        sel = selectors.DefaultSelector()
+        sel.register(file, event)
+        self.addCleanup(sel.close)
+        return sel
 
 
 def tls_decode(tls_connection, new_data=None):

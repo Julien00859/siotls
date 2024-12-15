@@ -27,8 +27,8 @@ class ColoredFormatter(logging.Formatter):
 
 
 def setup_logging(verbosity):
-    #if hasattr(sys.stderr, 'fileno') and os.isatty(sys.stderr.fileno()):
-    #    logging.getLogger().handlers[0].formatter = ColoredFormatter(logging.BASIC_FORMAT)
+    if hasattr(sys.stderr, 'fileno') and os.isatty(sys.stderr.fileno()):
+        logging.getLogger().handlers[0].formatter = ColoredFormatter(logging.BASIC_FORMAT)
     logging.getLogger().setLevel(max(verbosity, logging.DEBUG))
     if verbosity < logging.DEBUG:
         logging.captureWarnings(capture=True)

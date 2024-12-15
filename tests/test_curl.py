@@ -7,7 +7,6 @@ import os
 import re
 import shutil
 import socket
-import subprocess as sp
 import unittest
 from collections import namedtuple
 from os import fspath
@@ -132,9 +131,7 @@ class TestCURL(TestCase):
             args.append(f'--{option}')
             args.append(value)
         env = {'SSLKEYLOGFILE': self.keylogfile.name}
-        proc = sp.Popen(args, stdout=self.curl_pipe_w, stderr=self.curl_pipe_w, env=env)
-        self.addCleanup(proc.wait, timeout=1)
-        self.addCleanup(proc.terminate)
+        proc = self.popen(args, stdout=self.curl_pipe_w, stderr=self.curl_pipe_w, env=env)
 
         client, client_info = self.socket.accept()
         self.addCleanup(client.close)

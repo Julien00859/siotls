@@ -47,7 +47,7 @@ def serve(host, port, certificate_chain_path, private_key_path, *, log_keys: boo
 
 def http_serve_one(sclient, client_addr):
     http_req = sclient.read()
-    request_line = http_req.partition(b'\r\n')[0].decode('latin-1')
+    request_line = http_req.partition(b'\r\n')[0].decode(errors='replace')
     try:
         method, path, version = request_line.split(' ')
     except ValueError:
@@ -59,7 +59,8 @@ def http_serve_one(sclient, client_addr):
             else (200, "Hello from siotls\n")
         )
     now = datetime.now().astimezone()
-    sclient.write(make_http11_response(code, body, now=now))
+    http_res = make_http11_response(code, body, now=now)
+    sclient.write(http_res)
     logger.info(
         '%s - - [%s] "%s" %d %s',
         client_addr[0],

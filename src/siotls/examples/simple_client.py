@@ -5,8 +5,10 @@ from siotls import USER_AGENT, TLSConfiguration, TLSConnection
 from siotls.services.crl_over_http import CrlOverHttp
 from siotls.services.ocsp_over_http import OcspOverHttp
 from siotls.trust_store import get_system_store
+from siotls.utils import socket_pformat
 
 logger = logging.getLogger(__name__)
+
 
 def connect(host, port, *, check_certificate: bool, log_keys: bool):
     options = {}
@@ -22,23 +24,24 @@ def connect(host, port, *, check_certificate: bool, log_keys: bool):
     )
 
     with socket.create_connection((host, port), timeout=5) as sock:
-        logger.info("connection with %s established", host)
+        server_name = socket_pformat((host, port))
+        logger.info("connection with %s established", server_name)
         conn = TLSConnection(config, server_hostname=host)
         with conn.wrap(sock) as ssock:
-            logger.info("connection with %s secured", host)
+            logger.info("connection with %s secured", server_name)
             http_connect_one(host, ssock)
-    logger.info("connection with %s closed", host)
+    logger.info("connection with %s closed", server_name)
 
 
 def http_connect_one(host, ssock):
     http_req = make_http11_request(host, 'GET', '/', '')
-    if logger.isEnabledFor(logging.DEBUG):
-        print(http_req.decode('latin-1'))  # noqa: T201
+    logger.debug("sending payload:\n%s", http_req.decode())
     ssock.write(http_req)
 
-    http_res = ssock.read().decode('latin-1')
-    if logger.isEnabledFor(logging.INFO):
-        print(http_res)  # noqa: T201
+    http_res = ssock.read()
+    headers, _, body = http_res.partition(b'\r\n\r\n')
+    logger.debug("received headers:\n%s", headers.decode(errors='replace'))
+    print(body.decode(errors='replace'))  # noqa: T201
 
 
 def make_http11_request(host: str, method: str, path: str, textbody: str):
