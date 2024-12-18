@@ -224,7 +224,13 @@ class TLSConnection:
         fragment = self._input_data[5:content_length + 5]
         self._input_data = self._input_data[content_length + 5:]
         if self._cipher.must_decrypt:
-            content_type, fragment = self._decrypt(header, fragment)
+            if content_type == ContentType.APPLICATION_DATA:
+                content_type, fragment = self._decrypt(header, fragment)
+            elif content_type == ContentType.ALERT and not self.is_post_handshake():
+                pass
+            else:
+                e = f"expected encrypted data but found clear {content_type}"
+                raise alerts.UnexpectedMessage(e)
 
         if content_type == ContentType.CHANGE_CIPHER_SPEC:
             e = f"invalid {ContentType.CHANGE_CIPHER_SPEC} record"

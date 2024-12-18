@@ -1,5 +1,5 @@
 """
-The Transcript Hash is a running sha2 of the handshake messages echanged
+The Transcript Hash is a running sha2 of the handshake messages exchanged
 in the original handshakes. The digest is used many times, at various
 stages of the exchange, by the TLSSecrets class. The digest, together
 with the key exchanged via KeyShare or PreSharedKey, is used to generate

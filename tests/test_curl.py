@@ -12,6 +12,8 @@ from collections import namedtuple
 from os import fspath
 from threading import Thread
 
+from parameterized import parameterized
+
 from siotls import TLSConnection
 from siotls.examples.simple_server import make_http11_response
 from siotls.iana import NamedGroup
@@ -138,12 +140,16 @@ class TestCURL(TestCase):
 
         return proc, client
 
-    def test_curl_keylogfile(self):
+    @parameterized.expand([
+        ('server_hello', NamedGroup.x25519),
+        ('hello_retry_request', NamedGroup.x448),
+    ])
+    def test_curl_keylogfile(self, _, group):
         KeyLogFormat = namedtuple("KeyLogFormat", ["label", "client_random", "value"])
 
         config = dataclasses.replace(
             server_config,
-            key_exchanges=[NamedGroup.ffdhe2048],
+            key_exchanges=[group],
             alpn=['http/1.1'],
             log_keys=True
         )
