@@ -1,5 +1,5 @@
 import ipaddress
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
@@ -17,7 +17,7 @@ from siotls import TLSConfiguration
 
 from . import test_temp_dir
 
-now = datetime.now(timezone.utc)
+now = datetime.now(UTC)
 VALIDITY = timedelta(minutes=10)
 
 key_usage_ca = x509.KeyUsage(  # cert and crl sign
@@ -65,9 +65,19 @@ ca_cert = (
     .add_extension(ca_ski, critical=False)
     .sign(ca_privkey, hashes.SHA256())
 )
+ca_crl = (
+    x509.CertificateRevocationListBuilder()
+    .issuer_name(ca_subject)
+    .last_update(now)
+    .next_update(now + VALIDITY)
+    .sign(
+        private_key=ca_privkey, algorithm=hashes.SHA256(),
+    )
+)
 (test_temp_dir/'ca-pubkey.pem').write_bytes(ca_pubkey.public_bytes(
     Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
 (test_temp_dir/'ca-cert.pem').write_bytes(ca_cert.public_bytes(Encoding.PEM))
+(test_temp_dir/'ca-crl.pem').write_bytes(ca_crl.public_bytes(Encoding.PEM))
 ca_aki = x509.AuthorityKeyIdentifier(
     ca_ski.digest, [x509.DNSName(ca_domain)], ca_cert.serial_number
 )
@@ -150,8 +160,10 @@ server_config = TLSConfiguration(
     private_key=server_privkey,
     certificate_chain=[server_cert, ca_cert],
     server_hostnames=[server_domain],
+    static_revocation_list=ca_crl,
 )
 client_config = TLSConfiguration(
     'client',
     trust_store=test_trust_store,
+    static_revocation_list=ca_crl,
 )

@@ -3,6 +3,7 @@ import subprocess as sp
 import sys
 import unittest
 from os import fspath
+from pathlib import Path
 
 from parameterized import parameterized
 
@@ -82,6 +83,7 @@ class TestExample(TestCase):
                 'client',
                 '--host', hostname,
                 '--port', '443',
+                '-v', '--keylogfile', fspath(Path.home()/'.tlskeylogfile'),
             ],
             stdout=sp.PIPE,
             stderr=sp.PIPE,

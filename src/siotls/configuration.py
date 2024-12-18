@@ -120,7 +120,7 @@ class TLSConfiguration:
             self._check_public_key()
 
         if (self.require_peer_authentication
-            and not self.static_revocation_list
+            and self.static_revocation_list is None
             and not self.ocsp_service
             and not self.crl_service
         ):
