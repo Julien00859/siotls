@@ -68,7 +68,7 @@ class ClientWaitServerHello(State):
 
         cookie_ext = hello_retry_request.extensions.get(ExtensionType.COOKIE)
         self._move_to_state(ClientStart, cookie=cookie_ext and cookie_ext.cookie)
-        self.connection.initiate_connection()
+        self.connection._state.initiate_connection()  # noqa: SLF001
 
     def _process_server_hello(self, server_hello):
         self._server_unique = server_hello.random

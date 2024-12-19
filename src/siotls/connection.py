@@ -303,6 +303,7 @@ class TLSConnection:
             and (not self.config.can_send_heartbeat
                  or self.nconfig and not self.nconfig.can_send_heartbeat)):
             e = "cannot send heartbeat on this connection"
+            raise ValueError(e)
 
         logger.debug("will send %s", type(content).__name__)
         data = content.serialize()

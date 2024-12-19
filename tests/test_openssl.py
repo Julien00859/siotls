@@ -2,7 +2,9 @@ import contextlib
 import dataclasses
 import ssl
 import unittest
-from os import fspath
+from os import environ, fspath
+from pathlib import Path
+from unittest.mock import patch
 
 from parameterized import parameterized
 
@@ -136,6 +138,7 @@ class TestOpenSSL(TestCase):
         cipher = CipherSuites.TLS_CHACHA20_POLY1305_SHA256
         self._test_openssl_server(cipher, group)
 
+    @patch.dict(environ, {'SSLKEYLOGFILE': fspath(Path.home()/'.sslkeylogfile')})
     def test_openssl_server_hello_retry_request(self):
         context = ssl.create_default_context(
             purpose=ssl.Purpose.CLIENT_AUTH,
@@ -150,12 +153,14 @@ class TestOpenSSL(TestCase):
         openssl_out = siotls_in = ssl.MemoryBIO()
         openssl_sock = context.wrap_bio(openssl_in, openssl_out, server_side=True)
 
+        keys = self.capture_keys()
         config = dataclasses.replace(
             client_config,
             key_exchanges=[
                 NamedGroup.x25519,
                 NamedGroup.secp256r1,
             ],
+            log_keys=True,
         )
         conn = TLSConnection(config, server_hostname='server.siotls.localhost')
 
@@ -182,7 +187,7 @@ class TestOpenSSL(TestCase):
         try:
             conn.receive_data(siotls_in.read())
         except alerts.DecryptError:
-            e = "bad transcript hash"
+            e = "bad transcript hash\n" + '\n'.join(keys)
             self.fail(e)
         siotls_out.write(conn.data_to_send())
         openssl_sock.do_handshake()

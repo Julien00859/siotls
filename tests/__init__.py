@@ -84,6 +84,13 @@ class TestCase(unittest.TestCase):
             else:
                 self.assertRegex(message, log_pattern)  # it fails
 
+    def capture_keys(self):
+        ctx = self.assertLogs('siotls.keylog', logging.INFO)
+        ctx.LOGGING_FORMAT = '%(message)s'
+        keys = ctx.__enter__().output
+        self.addCleanup(ctx.__exit__, None, None, None)
+        return keys
+
     def popen(self, *args, stdout=None, stderr=None, **kwargs):
         proc = subprocess.Popen(*args, stdout=stdout, stderr=stderr, **kwargs)  # noqa: S603
         self.addCleanup(self._popen_kill, proc)
