@@ -87,7 +87,7 @@ class CrlOverHttp(CRLService):
             e = "url authority cannot be empty"
             raise ValueError(e)
 
-        logger.info("downloading revocation list at %s", url)
+        logger.info("downloading revocation list from %s", url)
         http_req = Request(  # noqa: S310
             url,
             headers={
