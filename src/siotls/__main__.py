@@ -70,8 +70,10 @@ def main():
     if not options.keylogfile:
         pass
     elif options.keylogfile.name == '-':
+        logger.info("Logging keys on stdout")
         siotls.key_logger.addHandler(logging.StreamHandler())
     else:
+        logger.info("Logging keys at %s", options.keylogfile)
         siotls.key_logger.addHandler(logging.FileHandler(options.keylogfile, 'w'))
 
     # Check TLS cert/key

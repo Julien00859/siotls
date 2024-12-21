@@ -24,20 +24,29 @@ from . import TLSSignatureSuite
 
 AIA = ExtensionOID.AUTHORITY_INFORMATION_ACCESS
 OCSP = AuthorityInformationAccessOID.OCSP
+CA_ISSUERS = AuthorityInformationAccessOID.CA_ISSUERS
 
 
-def get_ocsp_url(certificate):
+def get_ocsp_urls(certificate):
+    ocsp_urls = []
+    cert_urls = []
+
     try:
         ext = certificate.extensions.get_extension_for_oid(AIA)
     except ExtensionNotFound:
-        return None
-    for access_description in ext.value:
-        if access_description.access_method == OCSP:
-            url = access_description.access_location.value
-            urlobj = urlsplit(url)
-            if urlobj.scheme == 'http' and urlobj.netloc:
-                return url
-    return None
+        pass
+    else:
+        for access_description in ext.value:
+            if access_description.access_method in (OCSP, CA_ISSUERS):
+                url = access_description.access_location.value
+                urlobj = urlsplit(url)
+                if urlobj.scheme == 'http' and urlobj.netloc:
+                    if access_description.access_method == OCSP:
+                        ocsp_urls.append(url)
+                    else:
+                        cert_urls.append(url)
+
+    return ocsp_urls, cert_urls
 
 
 def make_ocsp_request(certificate, issuer, digestmod=SHA1) -> bytes:

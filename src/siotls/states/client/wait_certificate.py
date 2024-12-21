@@ -69,39 +69,37 @@ class ClientWaitCertificate(State):
             raise alerts.UnsupportedCertificate(e)
 
     def _process_x509(self, content):
-        self.nconfig.peer_certificate = content.certificate_list[0].certificate
         if self.config.require_peer_authentication:
             fullchain = self._verify_chain(content.certificate_list)
             if self.config.static_revocation_list:
                 self._verify_static_revocation(content.certificate_list)
-            certificate_entries = sorted(
-                content.certificate_list,
-                key=lambda entry: fullchain.index(entry.certificate)
-            )
-            if len(certificate_entries) < len(fullchain):
-                ca_cert = fullchain[len(certificate_entries)]
-                certificate_entries.append(X509(ca_cert, ()))
-            for entry, issuer in pairwise(certificate_entries):
-                entry_cert = entry.certificate
-                issuer_cert = issuer.certificate
+            for entry, issuer in enumerate(pairwise(fullchain), start=1):
                 status = entry.extensions.get(ExtensionType.STATUS_REQUEST)
                 if status and status.status_type == CertificateStatusType.OCSP:
                     self._verify_status_ocsp_stapling(
-                        entry_cert, issuer_cert, status.ocsp_response)
-                # TODO: elif we have the CRL: use it
-                # ideal order stapling > use crl > download ocsp > download crl
-                elif self.config.ocsp_service and (ocsp_url := get_ocsp_url(entry_cert)):
-                    self._verify_status_ocsp(entry_cert, issuer_cert, ocsp_url)
-                elif self.config.crl_service and (crl_urls := get_crl_urls(entry_cert)):
-                    self._verify_status_crl(entry_cert, issuer_cert, crl_urls)
+                        entry.certificate, issuer.certificate, status.ocsp_response)
+                self._verify_status_online(entry.certificate, issuer.certificate)
+
+        self.nconfig.peer_certificate = content.certificate_list[0].certificate
 
     def _verify_chain(self, certificate_entries):
         leaf, *intermediates = (e.certificate for e in certificate_entries)
         try:
-            return self._get_verifier().verify(leaf, intermediates)
+            fullchain = self._get_verifier().verify(leaf, intermediates)
         except x509.verification.VerificationError as exc:
             # TODO: CertificateExpired, but cryptography seems to lack it
             raise alerts.BadCertificate from exc
+        # Sort the entries to ensure each certificate is signed by the
+        # next one in the list. Also include the root certificate if it
+        # was ommited.
+        certificate_entries = sorted(
+            certificate_entries,
+            key=lambda entry: fullchain.index(entry.certificate)
+        )
+        if len(certificate_entries) < len(fullchain):
+            ca_cert = fullchain[len(certificate_entries)]
+            certificate_entries.append(X509(ca_cert, ()))
+        return certificate_entries
 
     def _get_verifier(self):
         if not self.server_hostname:
@@ -129,6 +127,13 @@ class ClientWaitCertificate(State):
             validate_ocsp(issuer, ocsp_req, ocsp_res)
         except ValueError as exc:
             raise alerts.BadCertificateStatusResponse from exc
+
+    def _verify_status_online(self, entry, issuer):
+        self.config.ocsp_service
+        self.config.download_service
+
+        ocsp_urls, cert_urls = get_ocsp_url(entry)
+        crl_urls = get_crl_urls()
 
     def _verify_status_ocsp(self, entry, issuer, ocsp_url):
         ocsp_req = make_ocsp_request(entry, issuer)

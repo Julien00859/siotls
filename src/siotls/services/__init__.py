@@ -20,13 +20,16 @@ class CRLServiceErrorGroup(TLSServiceErrorGroup):
 
 class CRLService(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def request(self, urls: Iterable[str]) -> bytes:
+    def request(self, urls: Iterable[str]) -> tuple[str | None, bytes | None]:
         raise NotImplementedError  # pragma: no cover
 
-    def save(self, url: str, crl: bytes, expiration: datetime):  # noqa: B027
+    def get(self, urls: Iterable[str]) -> tuple[str | None, bytes | None]:  # noqa: ARG002
+        return (None, None)  # pragma: no cover
+
+    def save(self, url: str, crl: bytes, expiration: datetime) -> None:  # noqa: B027
         pass  # pragma: no cover
 
-    def delete(self, url: str):  # noqa: B027
+    def delete(self, url: str) -> None:  # noqa: B027
         pass  # pragma: no cover
 
 

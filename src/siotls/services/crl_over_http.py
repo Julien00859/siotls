@@ -34,11 +34,7 @@ class CrlOverHttp(CRLService):
             filename = urlobj.hostname.replace('.', '-') + '.crl'
         return self.folder.joinpath(filename)
 
-    def request(self, urls):
-        if not urls:
-            e = "missing url"
-            raise ValueError(e)
-
+    def get(self, urls):
         # Try to get the CRL from the cache first
         utcnow = datetime.now(UTC)
         for url in urls:
@@ -60,8 +56,27 @@ class CrlOverHttp(CRLService):
                 logger.info("using revocation list found at %s", crl_path)
                 return url, crl_data
 
+        return None, None
+
+    def save(self, url, crl, expiration):
+        crl_path = self._local_path(url)
+        if not crl_path.is_file():
+            logger.info("saving revocation list at %s", crl_path)
+            crl_path.write_bytes(crl)
+        self._cache[url] = (crl_path, expiration)
+
+    def delete(self, url):
+        crl_path, _ = self._cache.pop(url, (None, None))
+        if crl_path:
+            crl_path.unlink(missing_ok=True)
+
+    def request(self, urls):
+        if not urls:
+            e = "missing url"
+            raise ValueError(e)
+
         if len(urls) == 1:
-            return urls[0], self._request(urls[0])
+            return urls[0], self._request_single(urls[0])
 
         # Trying each URL sequentially isn't very effective... Ideally
         # we should do as many concurrent happy-eyeballs (RFC8305) as
@@ -71,14 +86,14 @@ class CrlOverHttp(CRLService):
         excs = []
         for url in urls:
             try:
-                return url, self._request(url)
+                return url, self._request_single(url)
             except CRLServiceError as exc_:
                 exc = exc_
             excs.append(exc)
         e = "all URLs failed"
         raise CRLServiceErrorGroup(e, excs)
 
-    def _request(self, url):
+    def _request_single(self, url):
         urlobj = urlsplit(url)
         if urlobj.scheme != 'http':
             e = "url scheme must be http"
@@ -116,15 +131,3 @@ class CrlOverHttp(CRLService):
             raise CRLServiceError(e)
 
         return http_res.read(content_length)
-
-    def save(self, url, crl, expiration):
-        crl_path = self._local_path(url)
-        if not crl_path.is_file():
-            logger.info("saving revocation list at %s", crl_path)
-            crl_path.write_bytes(crl)
-        self._cache[url] = (crl_path, expiration)
-
-    def delete(self, url):
-        crl_path, _ = self._cache.pop(url, (None, None))
-        if crl_path:
-            crl_path.unlink(missing_ok=True)

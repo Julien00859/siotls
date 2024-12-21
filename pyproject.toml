@@ -25,8 +25,9 @@ classifiers = [
 ]
 
 dependencies = [
+  "asn1",
   "cryptography>=43",
-  "idna"
+  "idna",
 ]
 
 [project.optional-dependencies]
