@@ -29,14 +29,14 @@ class TLSSignatureSuite(metaclass=RegistryMeta):
     def for_signature(cls, certificate, sign_oid, hash_algo, parameters=None):
         # It is for verifying EXISTING signatures.
         signs = cls.for_certificate(certificate)
-        if isinstance(signs[0], _RSAMixin):
+        if issubclass(signs[0], _RSAMixin):
             signs = [
                 sign for sign in signs
                 if sign.sign_oid == sign_oid
-                if sign.digestmod == hash_algo
-                if parameters and sign.padding == parameters
+                if sign.digestmod.name == hash_algo.name
+                if parameters is None or sign.padding.name == parameters.name
             ]
-        elif isinstance(signs[0], _ECDSAMixin):
+        elif issubclass(signs[0], _ECDSAMixin):
             signs = [
                 sign for sign in signs
                 if sign.sign_oid == sign_oid

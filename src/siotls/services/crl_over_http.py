@@ -27,6 +27,13 @@ class CrlOverHttp(CRLService):
     def __init__(self):
         self._cache = {}  # {url: (crl_path, expiration)}
 
+    def _local_path(self, url):
+        urlobj = urlsplit(url)
+        filename = urlobj.path.rpartition('/')[2]
+        if not filename:
+            filename = urlobj.hostname.replace('.', '-') + '.crl'
+        return self.folder.joinpath(filename)
+
     def request(self, urls):
         if not urls:
             e = "missing url"
@@ -35,27 +42,36 @@ class CrlOverHttp(CRLService):
         # Try to get the CRL from the cache first
         utcnow = datetime.now(UTC)
         for url in urls:
-            crl_path, expiration = self._cache.get(url)
+            crl_path, expiration = self._cache.get(url, (None, None))
             if crl_path:
                 is_fresh = utcnow < expiration - timedelta(seconds=self.state)
                 if is_fresh:
                     with contextlib.suppress(OSError):
-                        return crl_path.read_bytes()
+                        crl_data = crl_path.read_bytes()
+                        logger.info("using revocation list found at %s", crl_path)
+                        return url, crl_data
                 self.delete(url)
 
-        # Download the CRL from the CA
+        # Lookup the disk folder, but the CRL might be outdated...
+        for url in urls:
+            with contextlib.suppress(OSError):
+                crl_path = self._local_path(url)
+                crl_data = crl_path.read_bytes()
+                logger.info("using revocation list found at %s", crl_path)
+                return url, crl_data
+
         if len(urls) == 1:
-            return self._request(urls[0])
+            return urls[0], self._request(urls[0])
 
         # Trying each URL sequentially isn't very effective... Ideally
         # we should do as many concurrent happy-eyeballs (RFC8305) as
-        # there are URLs. So we can stick to using the single best one.
+        # there are URLs. So we can download from the single best one.
         random.shuffle(urls)  # don't always reach for the first one
         exc = None
         excs = []
         for url in urls:
             try:
-                return self._request(url)
+                return url, self._request(url)
             except CRLServiceError as exc_:
                 exc = exc_
             excs.append(exc)
@@ -71,7 +87,7 @@ class CrlOverHttp(CRLService):
             e = "url authority cannot be empty"
             raise ValueError(e)
 
-        logger.info("requesting online certificate status at %s", url)
+        logger.info("downloading revocation list at %s", url)
         http_req = Request(  # noqa: S310
             url,
             headers={
@@ -102,13 +118,11 @@ class CrlOverHttp(CRLService):
         return http_res.read(content_length)
 
     def save(self, url, crl, expiration):
-        urlobj = urlsplit(url)
-        filename = urlobj.path.rpartition('/')[2]
-        if not filename:
-            filename = urlobj.hostname.replace('.', '-') + '.crl'
-        filepath = self.folder.joinpath(filename)
-        filepath.write_bytes(crl)
-        self._cache[url] = (filepath, expiration)
+        crl_path = self._local_path(url)
+        if not crl_path.is_file():
+            logger.info("saving revocation list at %s", crl_path)
+            crl_path.write_bytes(crl)
+        self._cache[url] = (crl_path, expiration)
 
     def delete(self, url):
         crl_path, _ = self._cache.pop(url, (None, None))

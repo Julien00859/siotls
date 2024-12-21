@@ -20,9 +20,9 @@ def get_crl_urls(certificate):
     urls = []
     for dist_points in ext.value:
         for url in dist_points.full_name:
-            urlobj = urlsplit(url)
+            urlobj = urlsplit(url.value)
             if urlobj.scheme == 'http' and urlobj.netloc:
-                urls.append(url)
+                urls.append(url.value)
     return urls
 
 
@@ -33,7 +33,7 @@ def load_crl(issuer, crl_der):
 
 
 def validate_crl(issuer, crl):
-    if crl.this_update_utc > datetime.now(UTC):
+    if crl.last_update_utc > datetime.now(UTC):
         e = "crl is not valid yet"
         raise ValueError(e)
     if crl.next_update_utc < datetime.now(UTC):
@@ -68,4 +68,4 @@ def validate_crl(issuer, crl):
 
 
 def is_revoked(crl, certificate):
-    return bool(crl.get_revoked_certificate_by_serial_number(certificate))
+    return bool(crl.get_revoked_certificate_by_serial_number(certificate.serial_number))

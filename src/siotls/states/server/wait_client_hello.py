@@ -45,7 +45,7 @@ CERTIFICATE_VERIFY_SERVER = b"".join([
     b"\x00",
 ])
 
-logger = logging.getLogger('siotls.connection')
+logger = logging.getLogger(__name__)
 
 
 class ServerWaitClientHello(State):
@@ -120,7 +120,7 @@ class ServerWaitClientHello(State):
         )
 
         clear_extensions, _ = server_extensions
-        self._transcript.do_hrr_dance(self.config.side, self._transcript.digest())
+        self._transcript.do_hrr_dance()
         self._send_content(HelloRetryRequest(
             HelloRetryRequest.random,
             session_id,

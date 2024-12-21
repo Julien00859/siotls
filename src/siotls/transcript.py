@@ -49,10 +49,11 @@ otherwise the transcript wouldn't be right.
 import hashlib
 
 from siotls.contents import alerts
-from siotls.iana import HandshakeType
+from siotls.iana import HandshakeType, HandshakeType_
 
 ORDER = [
-    ('server', HandshakeType.SERVER_HELLO, False),
+    ('client', HandshakeType.MESSAGE_HASH, False),
+    ('server', HandshakeType_.HELLO_RETRY_REQUEST, False),
     ('client', HandshakeType.CLIENT_HELLO, False),
     ('server', HandshakeType.SERVER_HELLO, False),
     ('server', HandshakeType.ENCRYPTED_EXTENSIONS, False),
@@ -72,19 +73,20 @@ class Transcript:
         if not digestmods:
             e = "empty digestmods"
             raise ValueError(e)
-        self._hashes = [dm() for dm in digestmods]
-        self._order_i = 1
+        self._digestmod = None
+        self._digestmods = [dm() for dm in digestmods]
+        self._order_i = 2
+        self._client_hello_transcripts = {}
 
     def post_init(self, digestmod):
         name = digestmod().name
-        hash_ = next((h for h in self._hashes if h.name == name), None)
-        if not hash_:
-            e = f"{digestmod} not found inside {self._hashes}"
+        self._digestmod = next((h for h in self._digestmods if h.name == name), None)
+        if not self._digestmod:
+            e = f"{digestmod} not found inside {self._digestmods}"
             raise ValueError(e)
-        self._hashes.clear()
-        self._hashes.append(hash_)
+        self._digestmods.clear()
 
-    def do_hrr_dance(self, side, client_hello_transcript_hash):
+    def do_hrr_dance(self):
         """
         Transcript-Hash(ClientHello1, HelloRetryRequest, ... Mn) =
             Hash(message_hash ||        /* Handshake type */
@@ -92,15 +94,19 @@ class Transcript:
                  Hash(ClientHello1) ||  /* Hash of ClientHello1 */
                  HelloRetryRequest  || ... || Mn)
         """
-        self._hashes[0] = hashlib.new(self._hashes[0].name, b''.join([
+        self._order_i = 0
+        self._digestmod = hashlib.new(self._digestmod.name, b'')
+
+        message_hash = b''.join((
             HandshakeType.MESSAGE_HASH.to_bytes(1, 'big'),
             b'\x00\x00',
-            self._hashes[0].digest_size.to_bytes(1, 'big'),
-            client_hello_transcript_hash,
-        ]))
-        self._order_i = (side == 'client')
+            self._digestmod.digest_size.to_bytes(1, 'big'),
+            self._client_hello_transcripts[self._digestmod.name],
+        ))
+        self.update(message_hash, 'client', HandshakeType.MESSAGE_HASH)
 
     def update(self, handshake_data, side, handshake_type):
+        # the transcript should only be updated during the initial handshake
         if self._order_i == len(ORDER):
             return
 
@@ -115,22 +121,38 @@ class Transcript:
                 f"but found {(side, handshake_type)} instead")
             raise alerts.UnexpectedMessage(e)
 
-        for hash_ in self._hashes:
-            hash_.update(handshake_data)
+        # update the transcript
+        if self._digestmod:
+            self._digestmod.update(handshake_data)
+        for dm in self._digestmods:
+            dm.update(handshake_data)
+
+        # save the transcript after the first client hello, for the
+        # hello retry request (hrr) dance
+        if handshake_type == HandshakeType.CLIENT_HELLO:
+            for dm in self._digestmods:
+                self._client_hello_transcripts[dm.name] = dm.digest()
+        elif handshake_type == HandshakeType.ENCRYPTED_EXTENSIONS:
+            self._client_hello_transcripts.clear()
+
         self._order_i += 1
 
     def digest(self):
-        return self._hashes[0].digest()
+        return self._digestmod.digest()
 
     def hexdigest(self):
-        return self._hashes[0].hexdigest()
+        return self._digestmod.hexdigest()
 
     def copy(self):
         dummy = bool
         copy = type(self)([dummy])
-        copy._hashes = [  # noqa: SLF001
-            h.copy() for h in self._hashes
-        ]
+        if self._digestmods:
+            copy._digestmods = [  # noqa: SLF001
+                h.copy() for h in self._digestmods
+            ]
+            copy._digestmod = None  # noqa: SLF001
+        else:
+            copy._digestmod = []  # noqa: SLF001
+            copy._digestmod = self._digestmod.copy()  # noqa: SLF001
         copy._order_i = self._order_i  # noqa: SLF001
         return copy
-

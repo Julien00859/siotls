@@ -5,6 +5,7 @@ from itertools import pairwise
 from cryptography import x509
 
 from siotls.contents import alerts
+from siotls.contents.handshakes.certificate import X509
 from siotls.crypto.crl import get_crl_urls, is_revoked, load_crl
 from siotls.crypto.ocsp import get_ocsp_url, make_ocsp_request, validate_ocsp
 from siotls.iana import (
@@ -70,22 +71,32 @@ class ClientWaitCertificate(State):
     def _process_x509(self, content):
         self.nconfig.peer_certificate = content.certificate_list[0].certificate
         if self.config.require_peer_authentication:
-            self._verify_chain(content.certificate_list)
+            fullchain = self._verify_chain(content.certificate_list)
             if self.config.static_revocation_list:
                 self._verify_static_revocation(content.certificate_list)
-            for entry, issuer in pairwise(content.certificate_list):
+            certificate_entries = sorted(
+                content.certificate_list,
+                key=lambda entry: fullchain.index(entry.certificate)
+            )
+            if len(certificate_entries) < len(fullchain):
+                ca_cert = fullchain[len(certificate_entries)]
+                certificate_entries.append(X509(ca_cert, ()))
+            for entry, issuer in pairwise(certificate_entries):
+                entry_cert = entry.certificate
+                issuer_cert = issuer.certificate
                 status = entry.extensions.get(ExtensionType.STATUS_REQUEST)
                 if status and status.status_type == CertificateStatusType.OCSP:
-                    self._verify_status_ocsp_stapling(entry, issuer, status.ocsp_response)
-                elif self.config.ocsp_service and (ocsp_url := get_ocsp_url(entry.certificate)):
-                    self._verify_status_ocsp(entry, issuer, ocsp_url)
-                elif self.config.crl_service and (crl_urls := get_crl_urls(entry.certificate)):
-                    self._verify_status_crl(entry, issuer, crl_urls)
+                    self._verify_status_ocsp_stapling(
+                        entry_cert, issuer_cert, status.ocsp_response)
+                if self.config.ocsp_service and (ocsp_url := get_ocsp_url(entry_cert)):
+                    self._verify_status_ocsp(entry_cert, issuer_cert, ocsp_url)
+                if self.config.crl_service and (crl_urls := get_crl_urls(entry_cert)):
+                    self._verify_status_crl(entry_cert, issuer_cert, crl_urls)
 
     def _verify_chain(self, certificate_entries):
         leaf, *intermediates = (e.certificate for e in certificate_entries)
         try:
-            self._get_verifier().verify(leaf, intermediates)
+            return self._get_verifier().verify(leaf, intermediates)
         except x509.verification.VerificationError as exc:
             # TODO: CertificateExpired, but cryptography seems to lack it
             raise alerts.BadCertificate from exc
@@ -111,20 +122,20 @@ class ClientWaitCertificate(State):
                 raise alerts.CertificateRevoked(e)
 
     def _verify_status_ocsp_stapling(self, entry, issuer, ocsp_res):
-        ocsp_req = make_ocsp_request(entry.certificate, issuer.certificate)
+        ocsp_req = make_ocsp_request(entry, issuer)
         try:
-            validate_ocsp(issuer.certificate, ocsp_req, ocsp_res)
+            validate_ocsp(issuer, ocsp_req, ocsp_res)
         except ValueError as exc:
             raise alerts.BadCertificateStatusResponse from exc
 
     def _verify_status_ocsp(self, entry, issuer, ocsp_url):
-        ocsp_req = make_ocsp_request(entry.certificate, issuer.certificate)
+        ocsp_req = make_ocsp_request(entry, issuer)
         try:
             ocsp_res = self.config.ocsp_service.request(ocsp_url, ocsp_req)
         except TLSServiceError as exc:
             raise alerts.BadCertificateStatusResponse from exc
         try:
-            valid_until = validate_ocsp(issuer.certificate, ocsp_req, ocsp_res)
+            valid_until = validate_ocsp(issuer, ocsp_req, ocsp_res)
         except ValueError as exc:
             self.config.ocsp_service.delete(ocsp_req)
             raise alerts.BadCertificateStatusResponse from exc
@@ -141,9 +152,9 @@ class ClientWaitCertificate(State):
             self.config.crl_service.delete(crl_url)
             raise alerts.CertificateUnknown from exc
         else:
-            self.config.crl_service.save(crl_url, crl_der)
-        if is_revoked(crl, entry.certificate):
-            e = f"{entry.certificate} found in online revocation list"
+            self.config.crl_service.save(crl_url, crl_der, crl.next_update_utc)
+        if is_revoked(crl, entry):
+            e = f"{entry} found in online revocation list"
             raise alerts.CertificateRevoked(e)
 
     def _process_raw_public_key(self, content):

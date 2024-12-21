@@ -73,11 +73,8 @@ class ClientStart(State):
         self._send_content(ClientHello(
             self._client_unique, self.config.cipher_suites, extensions,
         ))
-        self._move_to_state(
-            ClientWaitServerHello,
-            key_shares=self._key_shares,
-            client_hello_transcript_hash=self._transcript.digest(),
-        )
+
+        self._move_to_state(ClientWaitServerHello, key_shares=self._key_shares)
 
     def process(self, message):
         super().process(message)

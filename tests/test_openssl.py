@@ -9,9 +9,7 @@ from unittest.mock import patch
 from parameterized import parameterized
 
 from siotls import TLSConnection
-from siotls.contents import alerts
 from siotls.iana import CipherSuites, NamedGroup
-from siotls.states import ClientWaitServerHello
 
 from . import TAG_INTEGRATION, TestCase, test_temp_dir
 from .config import client_config, server_config
@@ -138,59 +136,40 @@ class TestOpenSSL(TestCase):
         cipher = CipherSuites.TLS_CHACHA20_POLY1305_SHA256
         self._test_openssl_server(cipher, group)
 
+
     @patch.dict(environ, {'SSLKEYLOGFILE': fspath(Path.home()/'.sslkeylogfile')})
-    def test_openssl_server_hello_retry_request(self):
+    def test_openssl_client_hello_retry_request(self):
         context = ssl.create_default_context(
-            purpose=ssl.Purpose.CLIENT_AUTH,
             cafile=fspath(test_temp_dir.joinpath('ca-cert.pem'))
-        )
-        context.set_ecdh_curve('prime256v1')
-        context.load_cert_chain(
-            fspath(test_temp_dir.joinpath('server-cert.pem')),
-            fspath(test_temp_dir.joinpath('server-privkey.pem')),
         )
         openssl_in = siotls_out = ssl.MemoryBIO()
         openssl_out = siotls_in = ssl.MemoryBIO()
-        openssl_sock = context.wrap_bio(openssl_in, openssl_out, server_side=True)
+        openssl_sock = context.wrap_bio(openssl_in, openssl_out)
 
-        keys = self.capture_keys()
         config = dataclasses.replace(
-            client_config,
-            key_exchanges=[
-                NamedGroup.x25519,
-                NamedGroup.secp256r1,
-            ],
+            server_config,
+            key_exchanges=[NamedGroup.secp384r1],
             log_keys=True,
         )
-        conn = TLSConnection(config, server_hostname='server.siotls.localhost')
-
-        # send ClientHello
+        conn = TLSConnection(config)
         conn.initiate_connection()
-        siotls_out.write(conn.data_to_send())
-        first_state = conn._state
-        self.assertIsInstance(conn._state, ClientWaitServerHello,
-            "must be waiting for a first server hello (actually hrr)")
+
+        # ClientHello
         with contextlib.suppress(ssl.SSLWantReadError):
             openssl_sock.do_handshake()
-
-        # receive HelloRetryRequest, send Second ClientHello
         conn.receive_data(siotls_in.read())
         siotls_out.write(conn.data_to_send())
-        self.assertIsInstance(conn._state, ClientWaitServerHello,
-            "must be waiting for a second server hello")
-        self.assertIsNot(conn._state, first_state,
-            "must be waiting for a second server hello")
+
+        # ClientHello again after HelloRetryRequest
         with contextlib.suppress(ssl.SSLWantReadError):
             openssl_sock.do_handshake()
-
-        # receive ServerHello/Cert/CertVerify/Finished, send Finished
-        try:
-            conn.receive_data(siotls_in.read())
-        except alerts.DecryptError:
-            e = "bad transcript hash\n" + '\n'.join(keys)
-            self.fail(e)
+        conn.receive_data(siotls_in.read())
         siotls_out.write(conn.data_to_send())
+
+        # Finished after ServerHello/Cert/CertVerify/Finished
         openssl_sock.do_handshake()
+        conn.receive_data(siotls_in.read())
+        siotls_out.write(conn.data_to_send())
 
         # Connection established, exchange a ping pong
         self.assertTrue(conn.is_post_handshake())

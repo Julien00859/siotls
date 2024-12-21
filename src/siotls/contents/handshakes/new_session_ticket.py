@@ -1,7 +1,7 @@
 import dataclasses
 import logging
 import textwrap
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from siotls.contents import alerts
 from siotls.contents.handshakes.extensions import Extension
@@ -41,9 +41,9 @@ class NewSessionTicket(Handshake, SerializableBody):
         ticket,
         extensions: list[Extension]
     ):
-        if ticket_expires.tzinfo != timezone.utc:
+        if ticket_expires.tzinfo != UTC:
             e =(f"{ticket_expires=} must be aware and localized in utc")
-        if ticket_expires > datetime.now(timezone.utc) + timedelta(days=7):
+        if ticket_expires > datetime.now(UTC) + timedelta(days=7):
             e =(f"the ticket would expire on {ticket_expires} which is "
                 "over the limit of 7 days by now")
             raise ValueError(e)
@@ -59,7 +59,7 @@ class NewSessionTicket(Handshake, SerializableBody):
         if not (0 <= ticket_lifetime <= SEVEN_DAYS):
             e = f"{ticket_lifetime=} must be between 0 and {SEVEN_DAYS=}"
             raise alerts.IllegalParameter(e)
-        ticket_expires = datetime.now(timezone.utc) + timedelta(seconds=ticket_lifetime)
+        ticket_expires = datetime.now(UTC) + timedelta(seconds=ticket_lifetime)
 
         ticket_age_add = stream.read_int(4)
         ticket_nonce = stream.read_var(1)
@@ -75,7 +75,7 @@ class NewSessionTicket(Handshake, SerializableBody):
 
     def serialize_body(self):
         ticket_lifetime = int((
-            self.ticket_expires - datetime.now(timezone.utc)
+            self.ticket_expires - datetime.now(UTC)
         ).total_seconds())
         extensions = b''.join(ext.serialize() for ext in self.extensions.values())
 

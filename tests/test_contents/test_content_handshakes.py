@@ -1,6 +1,6 @@
 import contextlib
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from freezegun import freeze_time
 
@@ -291,7 +291,7 @@ class TestContentHandshakeNewSessionTicket(TestContentHandshake):
         self.assertTrue(stream.is_eof())
 
         new_session_ticket = NewSessionTicket(
-            ticket_expires=datetime.now(timezone.utc) + timedelta(minutes=5),
+            ticket_expires=datetime.now(UTC) + timedelta(minutes=5),
             ticket_age_add=1642134120,
             ticket_nonce=(1).to_bytes(8, 'big'),
             ticket=payload[23:23+240],

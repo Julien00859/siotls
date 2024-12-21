@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 
 from siotls.configuration import TLSNegotiatedConfiguration
 from siotls.contents import ChangeCipherSpec, alerts
@@ -8,17 +9,18 @@ from siotls.iana import ContentType, ExtensionType, HandshakeType, HandshakeType
 from .. import State
 from . import ClientWaitEncryptedExtensions
 
+logger = logging.getLogger(__name__)
+
 
 class ClientWaitServerHello(State):
     can_receive = True
     can_send = True
     can_send_application_data = False
 
-    def __init__(self, connection, key_shares, client_hello_transcript_hash):
+    def __init__(self, connection, key_shares):
         super().__init__(connection)
         self._is_first_server_hello = self.nconfig is None
         self._key_shares = key_shares
-        self._client_hello_transcript_hash = client_hello_transcript_hash
 
     def process(self, content):
         if (content.content_type != ContentType.HANDSHAKE
@@ -41,10 +43,11 @@ class ClientWaitServerHello(State):
             self._transcript.post_init(self._cipher.digestmod)
             self._send_content(ChangeCipherSpec())
 
-        if content.msg_type is HandshakeType_.HELLO_RETRY_REQUEST:
-            self._process_hello_retry_request(content)
-        else:
-            self._process_server_hello(content)
+            if content.msg_type is HandshakeType_.HELLO_RETRY_REQUEST:
+                self._process_hello_retry_request(content)
+                return
+
+        self._process_server_hello(content)
 
     def _process_hello_retry_request(self, hello_retry_request):
         from . import ClientStart
@@ -64,7 +67,9 @@ class ClientWaitServerHello(State):
             key_exchanges=[key_share.selected_group],
         )
 
-        self._transcript.do_hrr_dance(self.config.side, self._client_hello_transcript_hash)
+        self._transcript.do_hrr_dance()
+        self._transcript.update(
+            hello_retry_request.serialize(), 'server', hello_retry_request.msg_type)
 
         cookie_ext = hello_retry_request.extensions.get(ExtensionType.COOKIE)
         self._move_to_state(ClientStart, cookie=cookie_ext and cookie_ext.cookie)
