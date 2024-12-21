@@ -88,9 +88,11 @@ class ClientWaitCertificate(State):
                 if status and status.status_type == CertificateStatusType.OCSP:
                     self._verify_status_ocsp_stapling(
                         entry_cert, issuer_cert, status.ocsp_response)
-                if self.config.ocsp_service and (ocsp_url := get_ocsp_url(entry_cert)):
+                # TODO: elif we have the CRL: use it
+                # ideal order stapling > use crl > download ocsp > download crl
+                elif self.config.ocsp_service and (ocsp_url := get_ocsp_url(entry_cert)):
                     self._verify_status_ocsp(entry_cert, issuer_cert, ocsp_url)
-                if self.config.crl_service and (crl_urls := get_crl_urls(entry_cert)):
+                elif self.config.crl_service and (crl_urls := get_crl_urls(entry_cert)):
                     self._verify_status_crl(entry_cert, issuer_cert, crl_urls)
 
     def _verify_chain(self, certificate_entries):
