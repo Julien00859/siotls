@@ -15,6 +15,15 @@ from . import CRLService, CRLServiceError, CRLServiceErrorGroup
 logger = logging.getLogger(__name__)
 
 CRL_MIMETYPE = 'application/pkix-crl'
+OCSP_REQUEST_MIMETYPE = 'application/ocsp-request'
+OCSP_RESPONSE_MIMETYPE = 'application/ocsp-response'
+
+SOCKET_TIMEOUT = 1
+HTTP_TIMEOUT = 5
+
+
+def download(url, data=None, content_type=None, socket_timeout=SOCKET_TIMEOUT, http_timeout=HTTP_TIMEOUT):
+
 
 
 class CrlOverHttp(CRLService):
@@ -33,42 +42,6 @@ class CrlOverHttp(CRLService):
         if not filename:
             filename = urlobj.hostname.replace('.', '-') + '.crl'
         return self.folder.joinpath(filename)
-
-    def get(self, urls):
-        # Try to get the CRL from the cache first
-        utcnow = datetime.now(UTC)
-        for url in urls:
-            crl_path, expiration = self._cache.get(url, (None, None))
-            if crl_path:
-                is_fresh = utcnow < expiration - timedelta(seconds=self.state)
-                if is_fresh:
-                    with contextlib.suppress(OSError):
-                        crl_data = crl_path.read_bytes()
-                        logger.info("using revocation list found at %s", crl_path)
-                        return url, crl_data
-                self.delete(url)
-
-        # Lookup the disk folder, but the CRL might be outdated...
-        for url in urls:
-            with contextlib.suppress(OSError):
-                crl_path = self._local_path(url)
-                crl_data = crl_path.read_bytes()
-                logger.info("using revocation list found at %s", crl_path)
-                return url, crl_data
-
-        return None, None
-
-    def save(self, url, crl, expiration):
-        crl_path = self._local_path(url)
-        if not crl_path.is_file():
-            logger.info("saving revocation list at %s", crl_path)
-            crl_path.write_bytes(crl)
-        self._cache[url] = (crl_path, expiration)
-
-    def delete(self, url):
-        crl_path, _ = self._cache.pop(url, (None, None))
-        if crl_path:
-            crl_path.unlink(missing_ok=True)
 
     def request(self, urls):
         if not urls:
