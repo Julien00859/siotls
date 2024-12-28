@@ -1,6 +1,7 @@
 import dataclasses
 import textwrap
 
+from siotls.contents import alerts
 from siotls.iana import ExtensionType, HandshakeType, NamedGroup
 from siotls.serial import SerializableBody
 from siotls.utils import try_cast
@@ -25,6 +26,9 @@ class SupportedGroups(Extension, SerializableBody):
     named_group_list: list[NamedGroup | int]
 
     def __init__(self, named_group_list):
+        if len(named_group_list) != len(set(named_group_list)):
+            e = "the list cannot have duplicates"
+            raise ValueError(e)
         self.named_group_list = named_group_list
 
     @classmethod
@@ -33,7 +37,10 @@ class SupportedGroups(Extension, SerializableBody):
             try_cast(NamedGroup, named_group)
             for named_group in stream.read_listint(2, 2)
         ]
-        return cls(named_group_list)
+        try:
+            return cls(named_group_list)
+        except ValueError as exc:
+            raise alerts.IllegalParameter(*exc.args) from exc
 
     def serialize_body(self):
         return b''.join([
