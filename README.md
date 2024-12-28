@@ -21,12 +21,15 @@ that are left open. Questions such as "how many messages can we encrypt using
 AES-CCM-8."
 
 To help us navigate the rich world of secure communication, in addition to
-RFC-8446 and the documents it references, we also studied:
+[RFC8446 (TLS 1.3)](https://datatracker.ietf.org/doc/html/rfc8446) and the
+documents it references, we also studied:
 
 * https://safecurves.cr.yp.to/
 * https://www.enisa.europa.eu/publications/algorithms-key-size-and-parameters-report-2014
 * https://latacora.micro.blog/2018/04/03/cryptographic-right-answers.html
 * https://cabforum.org/working-groups/server/baseline-requirements/documents/
+* https://author-tools.ietf.org/api/iddiff?doc_1=rfc8446&url_2=https://tlswg.github.io/tls13-spec/draft-ietf-tls-rfc8446bis.txt
+* https://letsencrypt.org/certificates/
 
 Installation
 ------------
