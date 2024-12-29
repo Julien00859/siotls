@@ -1,17 +1,9 @@
 import abc
 import binascii
-import collections
-import inspect
 import itertools
 import math
 
 _sentinel = object()
-
-
-# Get the pure python implementation of collections.OrderedDict
-_collections_globals = {k: getattr(collections, k) for k in dir(collections)}
-exec(inspect.getsource(collections.OrderedDict), _collections_globals)  # noqa: S102
-PyOrderedDict = _collections_globals.pop("OrderedDict")
 
 
 class RegistryMeta(abc.ABCMeta):

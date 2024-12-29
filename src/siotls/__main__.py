@@ -2,10 +2,13 @@ import argparse
 import logging
 import os
 import pathlib
+import pkgutil
 import sys
 import warnings
 
 import siotls
+import siotls.crypto.providers
+import siotls.services.providers
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,14 @@ def setup_logging(verbosity):
         warnings.filterwarnings("default")
 
 
+def list_providers(namespace):
+    return [
+        module.name.rpartition('.')[2]
+        for module
+        in pkgutil.iter_modules(namespace.__path__, namespace.__name__ + '.')
+    ]
+
+
 def main():
     logging.basicConfig()
 
@@ -59,6 +70,14 @@ def main():
              "tools such as wireshark, use - to log on stderr")
     parser.add_argument('--insecure', action='store_true',
         help="skip verifying the remote certificate")
+    parser.add_argument('--crypto-provider', action='store',
+        choices=list_providers(siotls.crypto.providers), default='cryptography',
+        help="the cryptography library that will be used to encrypt the "
+             "data on the wire and sign/validate the digital signatures")
+    parser.add_argument('--service-provider', action='store',
+        choices=list_providers(siotls.services.providers), default='simple',
+        help="the http/caching service library that will be used to "
+             "download remote CRLs and request OCSP statuses")
 
     options = parser.parse_args()
 
@@ -83,6 +102,9 @@ def main():
     if options.tlskey and not os.access(options.tlskey, os.R_OK):
         logging.critical("Cannot access TLS private key file at %s", options.tlskey)
         return 1
+
+    # Load the cryptography provider
+    siotls.crypto.install(options.crypto_provider)
 
     # Run
     try:

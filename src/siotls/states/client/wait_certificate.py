@@ -7,7 +7,7 @@ from cryptography import x509
 from siotls.contents import alerts
 from siotls.contents.handshakes.certificate import X509
 from siotls.crypto.crl import get_crl_urls, is_revoked, load_crl
-from siotls.crypto.ocsp import get_ocsp_url, make_ocsp_request, validate_ocsp
+from siotls.crypto.ocsp import get_ocsp_urls, make_ocsp_request, validate_ocsp
 from siotls.iana import (
     CertificateStatusType,
     CertificateType,

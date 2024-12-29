@@ -3,6 +3,7 @@ import atexit
 import contextlib
 import dataclasses
 import logging
+import pkgutil
 import re
 import selectors
 import shutil
@@ -12,6 +13,7 @@ import unittest
 from os import fspath, getenv
 from pathlib import Path
 
+import siotls.crypto
 from siotls.__main__ import setup_logging
 from siotls.contents import Content
 from siotls.serial import SerialIO
@@ -25,6 +27,10 @@ setup_logging(logging.ERROR - 10 * options.verbosity)
 
 test_temp_dir = Path(tempfile.mkdtemp(prefix='siotls-test-'))
 atexit.register(shutil.rmtree, fspath(test_temp_dir), ignore_errors=True)
+
+siotls.crypto.install(
+    getenv('SIOTLS_CRYPTO_PROVIDER', 'cryptography')
+)
 
 TAG_EXTERNAL = getenv('SIOTLS_EXTERNAL') == '1'
 TAG_INTEGRATION = getenv('SIOTLS_INTEGRATION') == '1'

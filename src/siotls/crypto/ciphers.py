@@ -1,15 +1,11 @@
 # class names, assert
 # ruff: noqa: N801, S101
+import abc
 import enum
-import functools
 import hashlib
 import hmac
 from typing import ClassVar
 
-from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.ciphers import aead
-
-import siotls
 from siotls import key_logger
 from siotls.crypto.hkdf import derive_secret, hkdf_expand_label, hkdf_extract
 from siotls.iana import CipherSuites
@@ -26,6 +22,20 @@ class CipherState(enum.IntEnum):
     EARLY = 0
     HANDSHAKE = 1
     APPLICATION = 2
+
+
+class ICipher(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def _ciphermod(self, key: bytes):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _encrypt(self, nonce: bytes, data: bytes, associated_data: bytes):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _decrypt(self, nonce: bytes, data: bytes, associated_data: bytes):
+        raise NotImplementedError
 
 
 class _TLSSecrets:
@@ -100,7 +110,7 @@ class _TLSSecrets:
         )
 
 
-class TLSCipherSuite(metaclass=RegistryMeta):
+class TLSCipherSuite(ICipher, metaclass=RegistryMeta):
     _registry_key = '_cipher_registry'
     _cipher_registry: ClassVar = {}
 
@@ -148,17 +158,14 @@ class TLSCipherSuite(metaclass=RegistryMeta):
             self._write_seq.peek() >= self.usage_limit - REKEY_THRESHOLD)
 
     def decrypt(self, data, associated_data):
-        try:
-            return self._read_cipher.decrypt(self._next_read_nonce(), data, associated_data)
-        except InvalidTag as exc:
-            raise siotls.contents.alerts.DecryptError from exc
+        return self._decrypt(self._next_read_nonce(), data, associated_data)
 
     def _next_read_nonce(self):
         nonce = self._read_iv ^ next(self._read_seq)
         return nonce.to_bytes(self.nonce_length, 'big')
 
     def encrypt(self, data, associated_data):
-        return self._write_cipher.encrypt(self._next_write_nonce(), data, associated_data)
+        return self._encrypt(self._next_write_nonce(), data, associated_data)
 
     def _next_write_nonce(self):
         nonce = self._write_iv ^ next(self._write_seq)
@@ -306,9 +313,8 @@ class TLSCipherSuite(metaclass=RegistryMeta):
         return exporter_master, resumption_master
 
 
-class TLS_AES_128_GCM_SHA256(TLSCipherSuite):
+class Aes128GcmMixin:
     iana_id = CipherSuites.TLS_AES_128_GCM_SHA256
-    _ciphermod = aead.AESGCM
     digestmod = hashlib.sha256
     block_size = 16
     key_length = 16
@@ -318,9 +324,8 @@ class TLS_AES_128_GCM_SHA256(TLSCipherSuite):
     hashempty = SHA256_EMPTY
     hashzeros = SHA256_ZEROS
 
-class TLS_AES_256_GCM_SHA384(TLSCipherSuite):
+class Aes256GcmMixin:
     iana_id = CipherSuites.TLS_AES_256_GCM_SHA384
-    _ciphermod = aead.AESGCM
     digestmod = hashlib.sha384
     block_size = 16
     key_length = 32
@@ -330,9 +335,8 @@ class TLS_AES_256_GCM_SHA384(TLSCipherSuite):
     hashempty = SHA384_EMPTY
     hashzeros = SHA384_ZEROS
 
-class TLS_CHACHA20_POLY1305_SHA256(TLSCipherSuite):
+class ChaPolyMixin:
     iana_id = CipherSuites.TLS_CHACHA20_POLY1305_SHA256
-    _ciphermod = aead.ChaCha20Poly1305
     digestmod = hashlib.sha256
     block_size = 16
     key_length = 32
@@ -342,9 +346,8 @@ class TLS_CHACHA20_POLY1305_SHA256(TLSCipherSuite):
     hashempty = SHA256_EMPTY
     hashzeros = SHA256_ZEROS
 
-class TLS_AES_128_CCM_SHA256(TLSCipherSuite):
+class Aes128CcmMixin:
     iana_id = CipherSuites.TLS_AES_128_CCM_SHA256
-    _ciphermod = aead.AESCCM
     digestmod = hashlib.sha256
     block_size = 16
     key_length = 16
@@ -354,9 +357,8 @@ class TLS_AES_128_CCM_SHA256(TLSCipherSuite):
     hashempty = SHA256_EMPTY
     hashzeros = SHA256_ZEROS
 
-class TLS_AES_128_CCM_8_SHA256(TLSCipherSuite):
+class Aes128Ccm8Mixin:
     iana_id = CipherSuites.TLS_AES_128_CCM_8_SHA256
-    _ciphermod = functools.partial(aead.AESCCM, tag_length=8)
     digestmod = hashlib.sha256
     block_size = 16
     key_length = 16
