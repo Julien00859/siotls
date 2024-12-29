@@ -25,7 +25,7 @@ from siotls.contents.handshakes.extensions import (
     SupportedVersionsResponse,
 )
 from siotls.crypto import TLSCipherSuite, TLSKeyExchange, TLSSignatureSuite
-from siotls.crypto.ocsp import get_ocsp_urls, make_ocsp_request, validate_ocsp
+from siotls.crypto.ocsp import make_ocsp_request, validate_ocsp
 from siotls.iana import (
     CertificateStatusType,
     CertificateType,

@@ -24,7 +24,8 @@ class TLSSignatureSuite(ISign, metaclass=RegistryMeta):
 
     iana_id: SignatureScheme
     sign_oid: SignatureAlgorithmOID
-    pubkey_id: PublicKeyAlgorithmOID | Literal['']
+    pubkey_id: PublicKeyAlgorithmOID
+    curve_oid: EllipticCurveOID | None
     digest_name: Literal['sha256', 'sha384', 'sha512'] | None
     padding_name: Literal['pkcs1', 'pss'] | None
     _key: Any
@@ -45,14 +46,14 @@ class TLSSignatureSuite(ISign, metaclass=RegistryMeta):
             signs = [
                 sign for sign in signs
                 if sign.sign_oid == sign_oid
-                if sign.digestmod.name == hash_algo.name
+                if sign.digest_name == digest_name
                 if parameters is None or sign.padding.name == parameters.name
             ]
         elif issubclass(signs[0], _ECDSAMixin):
             signs = [
                 sign for sign in signs
                 if sign.sign_oid == sign_oid
-                if sign.digestmod.name == hash_algo.name
+                if sign.digest_name == digest_name
             ]
 
         if len(signs) == 0:
@@ -91,9 +92,9 @@ class TLSSignatureSuite(ISign, metaclass=RegistryMeta):
                     e = f"unknown ECDSA curve: {key.curve.name}"
                     raise ValueError(e) from exc
             case ed25519.Ed25519PublicKey() | ed25519.Ed25519PrivateKey():
-                return (TLS_ED25519,)
+                return (cls[SignatureScheme.ed25519],)
             case ed448.Ed448PublicKey() | ed448.Ed448PrivateKey():
-                return (TLS_ED448,)
+                return (cls[SignatureScheme.ed448],)
 
         e = f"unknown key: {key!r}"
         raise ValueError(e)
@@ -103,55 +104,72 @@ class RsaPkcs1Sha256Mixin:
     iana_id = SignatureScheme.rsa_pkcs1_sha256
     sign_oid = SignatureAlgorithmOID.RSA_WITH_SHA256
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
+    curve_oid = None
     digest_name = 'sha256'
+    padding_name = 'pkcs1'
 
 class RsaPkcs1Sha384Mixin:
     iana_id = SignatureScheme.rsa_pkcs1_sha384
     sign_oid = SignatureAlgorithmOID.RSA_WITH_SHA384
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
+    curve_oid = None
     digest_name = 'sha384'
+    padding_name = 'pkcs1'
 
 class RsaPkcs1Sha512Mixin:
     iana_id = SignatureScheme.rsa_pkcs1_sha512
     sign_oid = SignatureAlgorithmOID.RSA_WITH_SHA512
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
+    curve_oid = None
     digest_name = 'sha512'
+    padding_name = 'pkcs1'
 
 class RsaPssRsaeSha256Mixin:
     iana_id = SignatureScheme.rsa_pss_rsae_sha256
     sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
+    curve_oid = None
     digest_name = 'sha256'
+    padding_name = 'pss'
 
 class RsaPssRsaeSha384Mixin:
     iana_id = SignatureScheme.rsa_pss_rsae_sha384
     sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
+    curve_oid = None
     digest_name = 'sha384'
+    padding_name = 'pss'
 
 class RsaPssRsaeSha512Mixin:
     iana_id = SignatureScheme.rsa_pss_rsae_sha512
     sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
+    curve_oid = None
     digest_name = 'sha512'
+    padding_name = 'pss'
 
 class RsaPssPssSha256Mixin:
     iana_id = SignatureScheme.rsa_pss_pss_sha256
     sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSASSA_PSS
+    curve_oid = None
     digest_name = 'sha256'
+    padding_name = 'pss'
 
 class RsaPssPssSha384Mixin:
     iana_id = SignatureScheme.rsa_pss_pss_sha384
     sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSASSA_PSS
+    curve_oid = None
     digest_name = 'sha384'
+    padding_name = 'pss'
 
 class RsaPssPssSha512Mixin:
     iana_id = SignatureScheme.rsa_pss_pss_sha512
     sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSASSA_PSS
     digest_name = 'sha512'
+    padding_name = 'pss'
 
 class EcdsaSecp256r1Sha256Mixin:
     iana_id = SignatureScheme.ecdsa_secp256r1_sha256
@@ -159,6 +177,8 @@ class EcdsaSecp256r1Sha256Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.EC_PUBLIC_KEY
     curve_oid = EllipticCurveOID.SECP256R1
     digest_name = 'sha256'
+    padding_name = None
+
 
 class EcdsaSecp384r1Sha384Mixin:
     iana_id = SignatureScheme.ecdsa_secp384r1_sha384
@@ -166,6 +186,7 @@ class EcdsaSecp384r1Sha384Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.EC_PUBLIC_KEY
     curve_oid = EllipticCurveOID.SECP384R1
     digest_name = 'sha384'
+    padding_name = None
 
 class EcdsaSecp521r1Sha512Mixin:
     iana_id = SignatureScheme.ecdsa_secp521r1_sha512
@@ -173,16 +194,21 @@ class EcdsaSecp521r1Sha512Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.EC_PUBLIC_KEY
     curve_oid = EllipticCurveOID.SECP521R1
     digest_name = 'sha512'
+    padding_name = None
 
 
 class Ed25519Mixin:
     iana_id = SignatureScheme.ed25519
     sign_oid = SignatureAlgorithmOID.ED25519
     pubkey_oid = PublicKeyAlgorithmOID.ED25519
+    curve_oid = None
     digest_name = None
+    padding_name = None
 
 class Ed448Mixin:
     iana_id = SignatureScheme.ed448
     sign_oid = SignatureAlgorithmOID.ED448
     pubkey_oid = PublicKeyAlgorithmOID.ED448
+    curve_oid = None
     digest_name = None
+    padding_name = None

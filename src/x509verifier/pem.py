@@ -31,7 +31,7 @@ class _PemState(IntEnum):
     WAIT_END = 2
 
 
-def pem_decode(substrate, asn1Spec=None, *, multi=False):  # noqa: C901, N803, PLR0912
+def pem_decode(substrate, asn1Spec=None, *, multi=False):  # noqa: C901, N803
     asn1_objects = []
     state = _PemState.WAIT_BEGIN
     for lineno, line in enumerate(substrate.splitlines()):
