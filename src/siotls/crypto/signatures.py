@@ -8,7 +8,7 @@ from siotls.utils import RegistryMeta
 from x509oid import EllipticCurveOID, PublicKeyAlgorithmOID, SignatureAlgorithmOID
 
 DIGEST_NAME = Literal['sha256', 'sha384', 'sha512']
-PARAMETERS_NAME = Literal['pkcs1', 'pss']
+PARAMETERS_NAME = Literal['EMSA-PKCS1-v1_5', 'EMSA-PSS']
 
 
 class ISign(metaclass=abc.ABCMeta):
@@ -63,6 +63,9 @@ class TLSSignatureSuite(ISign, metaclass=RegistryMeta):
     def for_certificate(cls, certificate):
         # It is for signing NEW messages. DO NOT use this one with
         # ExtensionType.SIGNATURE_ALGORITHMS_CERT
+        # This is a more selective version of for_key because RSA-PSS
+        # means the key MUST be used with PSS padding. So even if
+        # technically the key could be used with pkc1
         return cls.for_key(
             certificate.public_key(),
             certificate.public_key_algorithm_oid,
@@ -98,7 +101,7 @@ class RsaPkcs1Sha256Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     curve_oid = None
     digest_name = 'sha256'
-    parameters_name = 'pkcs1'
+    parameters_name = 'EMSA-PKCS1-v1_5'
 
 class RsaPkcs1Sha384Mixin:
     iana_id = SignatureScheme.rsa_pkcs1_sha384
@@ -106,7 +109,7 @@ class RsaPkcs1Sha384Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     curve_oid = None
     digest_name = 'sha384'
-    parameters_name = 'pkcs1'
+    parameters_name = 'EMSA-PKCS1-v1_5'
 
 class RsaPkcs1Sha512Mixin:
     iana_id = SignatureScheme.rsa_pkcs1_sha512
@@ -114,7 +117,7 @@ class RsaPkcs1Sha512Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     curve_oid = None
     digest_name = 'sha512'
-    parameters_name = 'pkcs1'
+    parameters_name = 'EMSA-PKCS1-v1_5'
 
 class RsaPssRsaeSha256Mixin:
     iana_id = SignatureScheme.rsa_pss_rsae_sha256
@@ -122,7 +125,7 @@ class RsaPssRsaeSha256Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     curve_oid = None
     digest_name = 'sha256'
-    parameters_name = 'pss'
+    parameters_name = 'EMSA-PSS'
 
 class RsaPssRsaeSha384Mixin:
     iana_id = SignatureScheme.rsa_pss_rsae_sha384
@@ -130,7 +133,7 @@ class RsaPssRsaeSha384Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     curve_oid = None
     digest_name = 'sha384'
-    parameters_name = 'pss'
+    parameters_name = 'EMSA-PSS'
 
 class RsaPssRsaeSha512Mixin:
     iana_id = SignatureScheme.rsa_pss_rsae_sha512
@@ -138,7 +141,7 @@ class RsaPssRsaeSha512Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.RSAES_PKCS1_v1_5
     curve_oid = None
     digest_name = 'sha512'
-    parameters_name = 'pss'
+    parameters_name = 'EMSA-PSS'
 
 class RsaPssPssSha256Mixin:
     iana_id = SignatureScheme.rsa_pss_pss_sha256
@@ -146,7 +149,7 @@ class RsaPssPssSha256Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.RSASSA_PSS
     curve_oid = None
     digest_name = 'sha256'
-    parameters_name = 'pss'
+    parameters_name = 'EMSA-PSS'
 
 class RsaPssPssSha384Mixin:
     iana_id = SignatureScheme.rsa_pss_pss_sha384
@@ -154,14 +157,24 @@ class RsaPssPssSha384Mixin:
     pubkey_oid = PublicKeyAlgorithmOID.RSASSA_PSS
     curve_oid = None
     digest_name = 'sha384'
-    parameters_name = 'pss'
+    parameters_name = 'EMSA-PSS'
 
 class RsaPssPssSha512Mixin:
     iana_id = SignatureScheme.rsa_pss_pss_sha512
     sign_oid = SignatureAlgorithmOID.RSASSA_PSS
     pubkey_oid = PublicKeyAlgorithmOID.RSASSA_PSS
     digest_name = 'sha512'
-    parameters_name = 'pss'
+    parameters_name = 'EMSA-PSS'
+
+
+# >>> obj = der_decode(data, Certificate)[0]
+# >>> params = obj['tbsCertificate']['subjectPublicKeyInfo']['algorithm']['parameters']
+# >>> x509oid.EllipticCurveOID('.'.join(map(str, der_decode(params)[0])))
+# <EllipticCurveOID.secp384r1: '1.3.132.0.34'>
+# >>> cert = load_pem_x509_certificate(data)
+# >>> x509oid.EllipticCurveOID[cert.public_key().curve.name]
+# <EllipticCurveOID.secp384r1: '1.3.132.0.34'>
+
 
 class EcdsaSecp256r1Sha256Mixin:
     iana_id = SignatureScheme.ecdsa_secp256r1_sha256
@@ -170,7 +183,6 @@ class EcdsaSecp256r1Sha256Mixin:
     curve_oid = EllipticCurveOID.SECP256R1
     digest_name = 'sha256'
     parameters_name = None
-
 
 class EcdsaSecp384r1Sha384Mixin:
     iana_id = SignatureScheme.ecdsa_secp384r1_sha384

@@ -11,7 +11,9 @@
 # - Removed _SIG_OIDS_TO_HASH
 # - Changed cryptography.hazmat.bindings._rust.ObjectIdentifier for enum.StrEnum
 # - Added EllipticCurveOID
+# - Added oid()
 
+import contextlib
 from enum import StrEnum
 
 
@@ -135,9 +137,10 @@ class PublicKeyAlgorithmOID(StrEnum):
 
 
 class EllipticCurveOID(StrEnum):
-    SECP256R1 = "1.2.840.10045.3.1.7"
-    SECP384R1 = "1.3.132.0.34"
-    SECP521R1 = "1.3.132.0.35"
+    # cryptography's cert.public_key().curve.name is lowercase
+    secp256r1 = "1.2.840.10045.3.1.7"
+    secp384r1 = "1.3.132.0.34"
+    secp521r1 = "1.3.132.0.35"
 
 
 class ExtendedKeyUsageOID(StrEnum):
@@ -172,6 +175,26 @@ class CertificatePoliciesOID(StrEnum):
 class AttributeOID(StrEnum):
     CHALLENGE_PASSWORD = "1.2.840.113549.1.9.7"  # noqa: S105
     UNSTRUCTURED_NAME = "1.2.840.113549.1.9.2"
+
+
+def oid(value):
+    for Enum in (  # noqa: N806
+        ExtensionOID,
+        OCSPExtensionOID,
+        CRLEntryExtensionOID,
+        NameOID,
+        SignatureAlgorithmOID,
+        PublicKeyAlgorithmOID,
+        EllipticCurveOID,
+        ExtendedKeyUsageOID,
+        AuthorityInformationAccessOID,
+        SubjectInformationAccessOID,
+        CertificatePoliciesOID,
+        AttributeOID,
+    ):
+        with contextlib.suppress(ValueError):
+            return Enum(value)
+    return value
 
 
 _OID_NAMES = {
