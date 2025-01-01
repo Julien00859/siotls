@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Literal
 
 from siotls.iana import SignatureScheme
 from siotls.utils import RegistryMeta
-from x509oid import EllipticCurveOID, PublicKeyAlgorithmOID, SignatureAlgorithmOID
+from siotls.x509.oid import EllipticCurveOID, PublicKeyAlgorithmOID, SignatureAlgorithmOID
 
 DIGEST_NAME = Literal['sha256', 'sha384', 'sha512']
 PARAMETERS_NAME = Literal['EMSA-PKCS1-v1_5', 'EMSA-PSS']
@@ -180,7 +180,7 @@ class EcdsaSecp256r1Sha256Mixin:
     iana_id = SignatureScheme.ecdsa_secp256r1_sha256
     sign_oid = SignatureAlgorithmOID.ECDSA_WITH_SHA256
     pubkey_oid = PublicKeyAlgorithmOID.EC_PUBLIC_KEY
-    curve_oid = EllipticCurveOID.SECP256R1
+    curve_oid = EllipticCurveOID.secp256r1
     digest_name = 'sha256'
     parameters_name = None
 
@@ -188,7 +188,7 @@ class EcdsaSecp384r1Sha384Mixin:
     iana_id = SignatureScheme.ecdsa_secp384r1_sha384
     sign_oid = SignatureAlgorithmOID.ECDSA_WITH_SHA384
     pubkey_oid = PublicKeyAlgorithmOID.EC_PUBLIC_KEY
-    curve_oid = EllipticCurveOID.SECP384R1
+    curve_oid = EllipticCurveOID.secp384r1
     digest_name = 'sha384'
     parameters_name = None
 
@@ -196,7 +196,7 @@ class EcdsaSecp521r1Sha512Mixin:
     iana_id = SignatureScheme.ecdsa_secp521r1_sha512
     sign_oid = SignatureAlgorithmOID.ECDSA_WITH_SHA512
     pubkey_oid = PublicKeyAlgorithmOID.EC_PUBLIC_KEY
-    curve_oid = EllipticCurveOID.SECP521R1
+    curve_oid = EllipticCurveOID.secp521r1
     digest_name = 'sha512'
     parameters_name = None
 

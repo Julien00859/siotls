@@ -17,6 +17,13 @@ import contextlib
 from enum import StrEnum
 
 
+def from_tuple(oid_tpl):
+    return '.'.join(map(str, oid_tpl))
+
+def to_tuple(oid_str):
+    return tuple(map(int, oid_str.split('.')))
+
+
 class ExtensionOID(StrEnum):
     SUBJECT_DIRECTORY_ATTRIBUTES = "2.5.29.9"
     SUBJECT_KEY_IDENTIFIER = "2.5.29.14"
@@ -44,6 +51,11 @@ class ExtensionOID(StrEnum):
     PRECERT_POISON = "1.3.6.1.4.1.11129.2.4.3"
     SIGNED_CERTIFICATE_TIMESTAMPS = "1.3.6.1.4.1.11129.2.4.5"
     MS_CERTIFICATE_TEMPLATE = "1.3.6.1.4.1.311.21.7"
+
+
+class OCSPResponseType(StrEnum):
+    OCSP = "1.3.6.1.5.5.7.48.1"
+    OCSP_BASIC = "1.3.6.1.5.5.7.48.1.1"
 
 
 class OCSPExtensionOID(StrEnum):

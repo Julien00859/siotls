@@ -1,21 +1,38 @@
 import base64
-import io
 import re
 from enum import IntEnum
-
-from pyasn1.codec.der.decoder import decode as der_decode
-from pyasn1_modules.rfc5280 import Certificate, CertificateList
 
 KNOWN_PEM_LABELS = (
     'CERTIFICATE', 'X509 CRL', 'CERTIFICATE REQUEST', 'PKCS7', 'CMS',
     'PRIVATE KEY', 'ENCRYPTED PRIVATE KEY', 'ATTRIBUTE CERTIFICATE',
     'PUBLIC KEY',
 )
-LABEL_TO_CLASS = {
-    'CERTIFICATE': Certificate,
-    'X509 CRL': CertificateList,
-}
 PEM_LABEL_RE = re.compile(r'[!-,.-~]+(?:[\s-][!-,.-~]+)')
+
+# Headers found in the cryptography-vectors PEM files
+# Ones known to rfc7468:
+"""\
+108 -----BEGIN CERTIFICATE-----
+ 27 -----BEGIN PRIVATE KEY-----
+ 21 -----BEGIN X509 CRL-----
+ 18 -----BEGIN ENCRYPTED PRIVATE KEY-----
+ 16 -----BEGIN CERTIFICATE REQUEST-----
+ 15 -----BEGIN PUBLIC KEY-----
+  2 -----BEGIN PKCS7-----
+"""
+# Ones unknown to rfc7468:
+"""\
+  7 -----BEGIN RSA PRIVATE KEY-----
+  5 -----BEGIN EC PRIVATE KEY-----
+  5 -----BEGIN DSA PRIVATE KEY-----
+  3 -----BEGIN RSA PUBLIC KEY-----
+  2 -----BEGIN X509 CERTIFICATE-----
+  1 -----BEGIN X9.42 DH PARAMETERS-----
+  1 -----BEGIN NEW CERTIFICATE REQUEST-----
+  1 -----BEGIN DSA PUBLIC KEY-----
+  1 -----BEGIN DSA PARAMETERS-----
+  1 -----BEGIN DH PARAMETERS-----
+"""
 
 def is_valid_pem_label(label):
     """ Is :param:`label` a valid label according to RFC 7468 """
@@ -31,15 +48,18 @@ class _PemState(IntEnum):
     WAIT_END = 2
 
 
-def pem_decode(substrate, asn1Spec=None, *, multi=False):  # noqa: C901, N803
-    asn1_objects = []
+def pem_decode(substrate: str, expect_label='', *, multi=False):  # noqa: C901, PLR0912
+    multi_der_data = []
     state = _PemState.WAIT_BEGIN
     for lineno, line in enumerate(substrate.splitlines()):
         match state:
             case _PemState.WAIT_BEGIN:
                 if line.startswith('-----BEGIN ') and line.endswith('-----'):
                     label = line[11:-5]
-                    if not is_valid_pem_label(label):
+                    if expect_label:
+                        if label != expect_label:
+                            continue
+                    elif not is_valid_pem_label(label):
                         e = f"invalid label at line {lineno}: {label!r}"
                         raise ValueError(e)
                     der_data = bytearray()
@@ -47,18 +67,9 @@ def pem_decode(substrate, asn1Spec=None, *, multi=False):  # noqa: C901, N803
 
             case _PemState.WAIT_END:
                 if line == f'-----END {label}-----':
-                    asn1_obj, rest = der_decode(
-                        io.BytesIO(der_data),
-                        asn1Spec or LABEL_TO_CLASS.get(label, type(None))()
-                    )
-                    if rest:
-                        e =(f"only {len(der_data) - len(rest)} bytes "
-                            f"out of {len(der_data)} could be decoded "
-                            f"for {label} at line {lineno}")
-                        raise ValueError(e)
                     if not multi:
-                        return asn1_obj
-                    asn1_objects.append(asn1_obj)
+                        return der_data
+                    multi_der_data.append(der_data)
                     state = _PemState.WAIT_BEGIN
                 elif line.startswith('-----'):
                     e = f"invalid boundary at line {lineno}"
@@ -71,10 +82,11 @@ def pem_decode(substrate, asn1Spec=None, *, multi=False):  # noqa: C901, N803
                         raise ValueError(e) from None
 
     if state == _PemState.WAIT_END:
-        e = f"end boundary {'-----END {label}-----'!r} not found"
+        e = f"end boundary {f'-----END {label}-----'!r} not found"
         raise ValueError(e)
     elif not multi:
-        e = f"begin boundary {'-----BEGIN [type]----'!r} not found"
+        boundary = f'-----BEGIN {expect_label or "[label]"}----'
+        e = f"begin boundary {boundary!r} not found"
         raise ValueError(e)
 
-    return asn1_objects
+    return multi_der_data

@@ -3,8 +3,6 @@ import functools
 import logging
 import typing
 
-from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes, PublicKeyTypes
-from cryptography.x509 import Certificate, CertificateRevocationList
 from cryptography.x509.verification import PolicyBuilder, Store
 
 from siotls.crypto import TLSSignatureSuite
@@ -17,6 +15,12 @@ from siotls.iana import (
     SignatureScheme,
 )
 from siotls.services import CRLService, OCSPService
+from siotls.x509.loader import (
+    DerCertificate,
+    DerCRL,
+    DerPrivateKey,
+    DerPublicKey,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,15 +58,15 @@ class TLSConfiguration:
         ].copy)
 
     trust_store: Store | None = None
-    static_revocation_list: CertificateRevocationList | None = None
+    static_revocation_list: DerCRL | None = None
     ocsp_service: OCSPService | None = None
     crl_service: CRLService | None = None
     max_chain_depth: int = 5
-    trusted_public_keys: list[PublicKeyTypes] = dataclasses.field(default_factory=list)
+    trusted_public_keys: list[DerPublicKey] = dataclasses.field(default_factory=list)
 
-    private_key: PrivateKeyTypes | None = None
-    public_key: PublicKeyTypes | None = None
-    certificate_chain: list[Certificate] | None = None
+    private_key: DerPrivateKey | None = None
+    public_key: DerPublicKey | None = None
+    certificate_chain: list[DerCertificate] | None = None
 
     # extensions
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384
@@ -213,8 +217,8 @@ class TLSNegotiatedConfiguration:
     client_certificate_type: CertificateType | None
     server_certificate_type: CertificateType | None
     peer_want_ocsp_stapling: bool | None
-    peer_certificate: Certificate | None
-    peer_public_key: PublicKeyTypes | None
+    peer_certificate: DerCertificate | None
+    peer_public_key: DerPublicKey | None
 
     def __init__(self):
         object.__setattr__(self, '_frozen', False)
