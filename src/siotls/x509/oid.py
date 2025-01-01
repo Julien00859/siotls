@@ -12,16 +12,10 @@
 # - Changed cryptography.hazmat.bindings._rust.ObjectIdentifier for enum.StrEnum
 # - Added EllipticCurveOID
 # - Added oid()
+# - Added HashOID
 
 import contextlib
 from enum import StrEnum
-
-
-def from_tuple(oid_tpl):
-    return '.'.join(map(str, oid_tpl))
-
-def to_tuple(oid_str):
-    return tuple(map(int, oid_str.split('.')))
 
 
 class ExtensionOID(StrEnum):
@@ -148,6 +142,16 @@ class PublicKeyAlgorithmOID(StrEnum):
     ED448 = "1.3.101.113"
 
 
+class HashOID(StrEnum):
+    sha256 = "2.16.840.1.101.3.4.2.1"
+    sha384 = "2.16.840.1.101.3.4.2.2"
+    sha512 = "2.16.840.1.101.3.4.2.3"
+
+
+class PaddingOID(StrEnum):
+    MGF1 = "1.2.840.113549.1.1.8"
+
+
 class EllipticCurveOID(StrEnum):
     # cryptography's cert.public_key().curve.name is lowercase
     secp256r1 = "1.2.840.10045.3.1.7"
@@ -190,23 +194,33 @@ class AttributeOID(StrEnum):
 
 
 def oid(value):
-    for Enum in (  # noqa: N806
-        ExtensionOID,
-        OCSPExtensionOID,
+    for Enum in (
+        AttributeOID,
+        AuthorityInformationAccessOID,
+        CertificatePoliciesOID,
         CRLEntryExtensionOID,
-        NameOID,
-        SignatureAlgorithmOID,
-        PublicKeyAlgorithmOID,
         EllipticCurveOID,
         ExtendedKeyUsageOID,
-        AuthorityInformationAccessOID,
+        ExtensionOID,
+        HashOID,
+        NameOID,
+        OCSPExtensionOID,
+        PaddingOID,
+        PublicKeyAlgorithmOID,
+        SignatureAlgorithmOID,
         SubjectInformationAccessOID,
-        CertificatePoliciesOID,
-        AttributeOID,
     ):
         with contextlib.suppress(ValueError):
             return Enum(value)
     return value
+
+
+def from_tuple(oid_cls, tuple_oid):
+    return oid_cls('.'.join(map(str, tuple_oid)))
+
+
+def from_pyasn1(oid_cls, pyasn1_oid):
+    return from_tuple(oid_cls, pyasn1_oid.asTuple())
 
 
 _OID_NAMES = {

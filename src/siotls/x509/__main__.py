@@ -3,13 +3,14 @@
 import argparse
 import re
 
+from pyasn1_modules.rfc5280 import Certificate
 from pyasn1_modules.rfc6960 import OCSPResponse
 
 from . import loader, oid
 
 
 def pformat(obj):
-    return re.sub(r'\b(?:\d+\.)+\d+\b', lambda m: repr(oid(m[0])), str(obj))
+    return re.sub(r'\b(?:\d+\.)+\d+\b', lambda m: repr(oid.oid(m[0])), str(obj))
 
 
 def main():
@@ -25,11 +26,11 @@ def main():
             options.format = 'pem' if file.read(11) == b'-----BEGIN ' else 'der'
 
     x509_loader = {
-        ('pem', 'cert'): loader.load_pem_x509_certificate,
-        ('pem', 'certs'): loader.load_pem_x509_certificates,
-        ('der', 'cert'): loader.load_der_x509_certificate,
-        ('pem', 'crl'): loader.load_pem_x509_crl,
-        ('der', 'crl'): loader.load_der_x509_crl,
+        ('pem', 'cert'): loader.load_pem_certificate,
+        ('pem', 'certs'): loader.load_pem_certificates,
+        ('der', 'cert'): loader.load_der_certificate,
+        ('pem', 'crl'): loader.load_pem_crl,
+        ('der', 'crl'): loader.load_der_crl,
         ('der', 'ocsp-req'): loader.load_der_ocsp_request,
         ('der', 'ocsp-res'): loader.load_der_ocsp_response,
         ('pem', 'priv_key'): loader.load_pem_private_key,
@@ -51,7 +52,13 @@ if __name__ == '__main__':
     if (
         isinstance(obj, OCSPResponse)
         and (res_type_oid := obj['responseBytes']['responseType'].asTuple())
-        and oid.from_tuple(res_type_oid) == oid.OCSPResponseType.OCSP_BASIC
+        and oid.from_pyasn1(res_type_oid) == oid.OCSPResponseType.OCSP_BASIC
     ):
         ocsp = loader.load_der_ocsp_basic_response(obj['responseBytes']['response'].asOctets())
         print(pformat(ocsp))
+
+    if isinstance(obj, Certificate):
+        pubkey_oid, params = loader.load_subject_key_info_algorithm(
+            obj['tbsCertificate']['subjectPublicKeyInfo']['algorithm'])
+        print(repr(pubkey_oid))
+        print(pformat(params))

@@ -5,6 +5,7 @@ import typing
 
 from cryptography.x509.verification import PolicyBuilder, Store
 
+import siotls.x509.loader as x509loader
 from siotls.crypto import TLSSignatureSuite
 from siotls.iana import (
     ALPNProtocol,
@@ -15,12 +16,6 @@ from siotls.iana import (
     SignatureScheme,
 )
 from siotls.services import CRLService, OCSPService
-from siotls.x509.loader import (
-    DerCertificate,
-    DerCRL,
-    DerPrivateKey,
-    DerPublicKey,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -58,15 +53,15 @@ class TLSConfiguration:
         ].copy)
 
     trust_store: Store | None = None
-    static_revocation_list: DerCRL | None = None
+    static_revocation_list: x509loader.DerCRL | None = None
     ocsp_service: OCSPService | None = None
     crl_service: CRLService | None = None
     max_chain_depth: int = 5
-    trusted_public_keys: list[DerPublicKey] = dataclasses.field(default_factory=list)
+    trusted_public_keys: list[x509loader.DerPublicKey] = dataclasses.field(default_factory=list)
 
-    private_key: DerPrivateKey | None = None
-    public_key: DerPublicKey | None = None
-    certificate_chain: list[DerCertificate] | None = None
+    private_key: x509loader.DerPrivateKey | None = None
+    public_key: x509loader.DerPublicKey | None = None
+    certificate_chain: list[x509loader.DerCertificate] | None = None
 
     # extensions
     max_fragment_length: MLFOctets = MLFOctets.MAX_16384
@@ -76,6 +71,35 @@ class TLSConfiguration:
 
     # extra
     log_keys: bool = False
+
+    @functools.cached_property
+    def asn1_public_key(self):
+        if self.public_key is None:
+            return None
+        return x509loader.load_der_public_key(self.public_key)
+
+    @functools.cached_property
+    def asn1_private_key(self):
+        if self.public_key is None:
+            return None
+        return x509loader.load_der_private_key(self.private_key)
+
+    @functools.cached_property
+    def asn1_static_revocation_list(self):
+        if self.static_revocation_list is None:
+            return None
+        return x509loader.load_der_crl(self.static_revocation_list)
+
+    @functools.cached_property
+    def asn1_certificate_chain(self):
+        return x509loader.load_der_certificates(self.certificate_chain)
+
+    @functools.cached_property
+    def asn1_trusted_public_keys(self):
+        return [
+            x509loader.load_der_public_key(public_key)
+            for public_key in self.trusted_public_keys
+        ]
 
     @property
     def require_peer_authentication(self):
@@ -118,6 +142,7 @@ class TLSConfiguration:
         else:
             self._check_client_settings()
 
+        self._load_asn1_objects()
         if self.certificate_chain:
             self._check_certificate_chain()
         if self.public_key:
@@ -125,11 +150,11 @@ class TLSConfiguration:
 
         if (self.require_peer_authentication
             and self.static_revocation_list is None
-            and not self.ocsp_service
-            and not self.crl_service
+            and self.ocsp_service is None
+            and self.crl_service is None
         ):
             w =("missing static revocation list, ocsp service, or crl "
-                "service: certificate revocation check disabled")
+                "service: online certificate revocation check disabled")
             logger.warning(w)
 
     def _check_mandatory_settings(self):
@@ -204,6 +229,13 @@ class TLSConfiguration:
                 "of them is found in the configured signature "
                 f"algorithms: {sorted(self.signature_algorithms)}")
 
+    def _load_asn1_objects(self):
+        # ruff: noqa: B018
+        self.asn1_certificate_chain
+        self.asn1_private_key
+        self.asn1_public_key
+        self.asn1_trusted_public_keys
+
 
 @dataclasses.dataclass(init=False)
 class TLSNegotiatedConfiguration:
@@ -217,8 +249,8 @@ class TLSNegotiatedConfiguration:
     client_certificate_type: CertificateType | None
     server_certificate_type: CertificateType | None
     peer_want_ocsp_stapling: bool | None
-    peer_certificate: DerCertificate | None
-    peer_public_key: DerPublicKey | None
+    peer_certificate: x509loader.DerCertificate | None
+    peer_public_key: x509loader.DerPublicKey | None
 
     def __init__(self):
         object.__setattr__(self, '_frozen', False)
@@ -234,6 +266,18 @@ class TLSNegotiatedConfiguration:
         self.peer_want_ocsp_stapling = None
         self.peer_certificate = None
         self.peer_public_key = None
+
+    @functools.cached_property
+    def asn1_peer_certificate(self):
+        if self.peer_certificate is None:
+            return None
+        return x509loader.load_der_certificate(self.peer_certificate)
+
+    @functools.cached_property
+    def asn1_peer_public_key(self):
+        if self.peer_public_key is None:
+            return None
+        return x509loader.load_der_public_key(self.peer_public_key)
 
     def freeze(self):
         self._frozen = True

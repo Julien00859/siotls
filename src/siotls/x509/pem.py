@@ -68,8 +68,8 @@ def pem_decode(substrate: str, expect_label='', *, multi=False):  # noqa: C901, 
             case _PemState.WAIT_END:
                 if line == f'-----END {label}-----':
                     if not multi:
-                        return der_data
-                    multi_der_data.append(der_data)
+                        return bytes(der_data)
+                    multi_der_data.append(bytes(der_data))
                     state = _PemState.WAIT_BEGIN
                 elif line.startswith('-----'):
                     e = f"invalid boundary at line {lineno}"

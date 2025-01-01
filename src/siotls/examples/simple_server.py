@@ -4,12 +4,10 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from wsgiref.handlers import format_date_time
 
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
-from cryptography.x509 import load_pem_x509_certificates
-
 from siotls import USER_AGENT, TLSConfiguration, TLSConnection
 from siotls.services.ocsp_over_http import OcspOverHttp
 from siotls.utils import socket_pformat
+from siotls.x509 import decode_pem_private_key, decode_pem_x509_certificates
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +17,8 @@ def serve(host, port, certificate_chain_path, private_key_path, *, log_keys: boo
           open(private_key_path, 'rb') as private_key_file):
         tls_config = TLSConfiguration(
             'server',
-            private_key=load_pem_private_key(private_key_file.read(), None),
-            certificate_chain=load_pem_x509_certificates(certificate_chain_file.read()),
+            private_key=decode_pem_private_key(private_key_file.read(), None),
+            certificate_chain=decode_pem_x509_certificates(certificate_chain_file.read()),
             alpn=['http/1.1', 'http/1.0'],
             ocsp_service=OcspOverHttp(),  # ocsp stapling
             log_keys=log_keys,

@@ -69,6 +69,7 @@ lint.ignore = [
   "Q",  # quote, I like ' for technical strings and " for human text
   "D212",  # docstrings
   "ERA001",  # commented code
+  "N806",  # non-lowercase-variable-in-function
   "PYI013",  # ellipsis
   "PYI024",  # collections.namedtuple
   "SIM102", "PLR5501", "RET505", "RET506",  # if/elif
