@@ -94,7 +94,7 @@ ca_aki = x509.AuthorityKeyIdentifier(
 server_domain = 'server.siotls.localhost'
 server_privkey = ec.generate_private_key(ec.SECP256R1())
 server_privkey_der = server_privkey.private_bytes(
-    Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+    Encoding.DER, PrivateFormat.PKCS8, NoEncryption())
 server_pubkey = server_privkey.public_key()
 server_pubkey_der = server_pubkey.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
 server_cert = (
@@ -137,7 +137,7 @@ server_cert_der = server_cert.public_bytes(Encoding.DER)
 #
 client_privkey = ec.generate_private_key(ec.SECP256R1())
 client_privkey_der = client_privkey.private_bytes(
-    Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+    Encoding.DER, PrivateFormat.PKCS8, NoEncryption())
 client_pubkey = client_privkey.public_key()
 client_pubkey_der = client_pubkey.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
 client_cert = (

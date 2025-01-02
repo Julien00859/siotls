@@ -33,10 +33,10 @@ def main():
         ('der', 'crl'): loader.load_der_crl,
         ('der', 'ocsp-req'): loader.load_der_ocsp_request,
         ('der', 'ocsp-res'): loader.load_der_ocsp_response,
-        ('pem', 'priv_key'): loader.load_pem_private_key,
-        ('der', 'priv_key'): loader.load_der_private_key,
-        ('pem', 'pub_key'): loader.load_pem_public_key,
-        ('der', 'pub_key'): loader.load_der_public_key,
+        ('pem', 'priv-key'): loader.load_pem_private_key,
+        ('der', 'priv-key'): loader.load_der_private_key,
+        ('pem', 'pub-key'): loader.load_pem_public_key,
+        ('der', 'pub-key'): loader.load_der_public_key,
     }[options.format, options.asn1class]
 
     with open(options.file, 'rb') as file:
@@ -58,7 +58,13 @@ if __name__ == '__main__':
         print(pformat(ocsp))
 
     if isinstance(obj, Certificate):
-        pubkey_oid, params = loader.load_subject_key_info_algorithm(
+        pubkey_oid, pubkey_params = loader.load_algorithm(
+            oid.PublicKeyAlgorithmOID,
             obj['tbsCertificate']['subjectPublicKeyInfo']['algorithm'])
         print(repr(pubkey_oid))
-        print(pformat(params))
+        print(pformat(pubkey_params))
+
+        sign_oid, sign_params = loader.load_algorithm(
+            oid.SignatureAlgorithmOID, obj['signatureAlgorithm'])
+        print(repr(sign_oid))
+        print(pformat(sign_params))

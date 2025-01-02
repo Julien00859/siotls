@@ -125,9 +125,9 @@ def main():
                 check_certificate=not options.insecure,
                 log_keys=bool(options.keylogfile),
             )
-    except Exception as exc:  # noqa: BLE001
-        logger.critical("Fatal exception", exc_info=exc)
-        return 1
+    except Exception:
+        logger.critical("Fatal exception")
+        raise
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received, exiting.")
 

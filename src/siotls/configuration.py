@@ -92,6 +92,8 @@ class TLSConfiguration:
 
     @functools.cached_property
     def asn1_certificate_chain(self):
+        if self.certificate_chain is None:
+            return None
         return x509loader.load_der_certificates(self.certificate_chain)
 
     @functools.cached_property
@@ -198,36 +200,35 @@ class TLSConfiguration:
         if not self.private_key:
             e = "certificate chain provided but private key missing"
             raise ValueError(e)
-        if self.private_key.public_key() != self.certificate_chain[0].public_key():
-            e =("the public key extracted from the certificate "
-                "doesn't match the private key")
-            raise ValueError(e)
 
-        suites = {
-            suite.iana_id: suite for suite in
-            TLSSignatureSuite.for_certificate(self.certificate_chain[0])
-        }
-        if set(suites).isdisjoint(self.signature_algorithms):
+        pubkey_info = self.asn1_certificate_chain[0]['tbsCertificate']['subjectPublicKeyInfo']
+        # TODO: verify that the public key found inside the certificate
+        #       corresponds to the private key.
+
+        suites = TLSSignatureSuite.for_key_algo(pubkey_info['algorithm'])
+        suites_iana_id = {suite.iana_id for suite in suites}
+        if suites_iana_id.isdisjoint(self.signature_algorithms):
             e =("the public key extracted from the certificate can "
                 "be used with the following signature algorithms: "
-                f"{sorted(suites)} but none of them is found in "
-                "the configured signature algorithms: "
+                f"{sorted(suites_iana_id)} but none of them is found "
+                "in the configured signature algorithms: "
                 f"{sorted(self.signature_algorithms)}")
+            raise ValueError(e)
 
     def _check_public_key(self):
         if not self.private_key:
             e = "public key provided but private key missing"
             raise ValueError(e)
-        if self.private_key.public_key() != self.public_key:
-            e = "the public key doesn't match the private key"
-            raise ValueError(e)
+        # TODO: verify that the public key corresponds to the private key.
 
-        suites = TLSSignatureSuite.for_key(self.public_key)
-        if set(suites).isdisjoint(self.signature_algorithms):
+        suites = TLSSignatureSuite.for_key_algo(self.asn1_public_key['algorithm'])
+        suites_iana_id = {suite.iana_id for suite in suites}
+        if suites_iana_id.isdisjoint(self.signature_algorithms):
             e =("the public key can be used with the following "
-                f"signature algorithms: {sorted(suites)} but none "
-                "of them is found in the configured signature "
+                f"signature algorithms: {sorted(suites_iana_id)} but "
+                "none of them is found in the configured signature "
                 f"algorithms: {sorted(self.signature_algorithms)}")
+            raise ValueError(e)
 
     def _load_asn1_objects(self):
         # ruff: noqa: B018

@@ -5,9 +5,8 @@ from http import HTTPStatus
 from wsgiref.handlers import format_date_time
 
 from siotls import USER_AGENT, TLSConfiguration, TLSConnection
-from siotls.services.ocsp_over_http import OcspOverHttp
 from siotls.utils import socket_pformat
-from siotls.x509 import decode_pem_private_key, decode_pem_x509_certificates
+from siotls.x509 import decode_pem_certificates, decode_pem_private_key
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +16,9 @@ def serve(host, port, certificate_chain_path, private_key_path, *, log_keys: boo
           open(private_key_path, 'rb') as private_key_file):
         tls_config = TLSConfiguration(
             'server',
-            private_key=decode_pem_private_key(private_key_file.read(), None),
-            certificate_chain=decode_pem_x509_certificates(certificate_chain_file.read()),
+            private_key=decode_pem_private_key(private_key_file.read()),
+            certificate_chain=decode_pem_certificates(certificate_chain_file.read()),
             alpn=['http/1.1', 'http/1.0'],
-            ocsp_service=OcspOverHttp(),  # ocsp stapling
             log_keys=log_keys,
         )
 

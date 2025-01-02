@@ -1,6 +1,3 @@
-from collections import defaultdict
-from typing import Any, ClassVar
-
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, padding
 from siotls.crypto.signatures import (
@@ -23,7 +20,7 @@ from siotls.crypto.signatures import (
 )
 
 
-class _RSAMixin:
+class _RSAMixin(ISign):
     digestmod: hashes.Hash
     padding: padding.PKCS1v15 | padding.PSS
 

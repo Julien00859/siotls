@@ -3,6 +3,7 @@ import typing
 import pyasn1_modules.rfc4055
 import pyasn1_modules.rfc5480  # noqa: F401
 from pyasn1.codec.der.decoder import decode as der_decode
+from pyasn1.codec.native.decoder import decode as py_decode
 from pyasn1_modules.rfc5280 import (
     AlgorithmIdentifier,
     Certificate,
@@ -44,7 +45,7 @@ def load_der_certificates(data_list: list[DerCertificate]) -> list[Certificate]:
     return [load_der(data, Certificate()) for data in data_list]
 
 def decode_pem_certificates(data: bytes) -> list[DerCertificate]:
-    return list(pem_decode(data.encode(), 'CERTIFICATE', multi=True))
+    return list(pem_decode(data.decode(), 'CERTIFICATE', multi=True))
 
 def load_pem_certificates(data: bytes) -> list[Certificate]:
     return load_der_certificates(decode_pem_certificates(data))
@@ -104,12 +105,12 @@ def load_pem_public_key(data: bytes):
     return load_der(decode_pem_public_key(data), SubjectPublicKeyInfo())
 
 
-def load_subject_key_info_algorithm(algo: AlgorithmIdentifier):
-    return (
-        oid.from_pyasn1(oid.PublicKeyAlgorithmOID, algo['algorithm']),
-        load_der(
-            algo['parameters'],
-            algorithmIdentifierMap[algo['algorithm']]
-        ),
-    )
-
+def load_algorithm(
+    algo_oid: oid.PublicKeyAlgorithmOID | oid.SignatureAlgorithmOID,
+    algo: AlgorithmIdentifier,
+):
+    algo_oid_ = oid.from_pyasn1(algo_oid, algo['algorithm'])
+    spec = algorithmIdentifierMap[algo['algorithm']]
+    if not algo['parameters'].hasValue():
+        return algo_oid_, py_decode({}, spec)  # missing parameters
+    return algo_oid_, load_der(algo['parameters'], spec)

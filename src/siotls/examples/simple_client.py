@@ -2,9 +2,7 @@ import logging
 import socket
 
 from siotls import USER_AGENT, TLSConfiguration, TLSConnection
-from siotls.services.crl_over_http import CrlOverHttp
-from siotls.services.ocsp_over_http import OcspOverHttp
-from siotls.trust_store import get_system_store
+from siotls.services.providers.simple.trust_store import get_system_store
 from siotls.utils import socket_pformat
 
 logger = logging.getLogger(__name__)
@@ -14,8 +12,6 @@ def connect(host, port, *, check_certificate: bool, log_keys: bool):
     options = {}
     if check_certificate:
         options['trust_store'] = get_system_store()
-        options['crl_service'] = CrlOverHttp()
-        options['ocsp_service'] = OcspOverHttp()
     config = TLSConfiguration(
         'client',
         alpn=['http/1.1', 'http/1.0'],
