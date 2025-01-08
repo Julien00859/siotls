@@ -9,7 +9,7 @@ from cryptography.x509 import (
     load_der_x509_crl,
 )
 
-from . import TLSSignatureSuite
+from . import TLSSignatureScheme
 
 
 def get_crl_urls(certificate):
@@ -52,7 +52,7 @@ def validate_crl(issuer, crl):
         e = "issuer forbidden from signing crl"
         raise ValueError(e)
 
-    Signature = TLSSignatureSuite.for_signature(  # noqa: N806
+    Signature = TLSSignatureScheme.for_signature(
         issuer,
         crl.signature_algorithm_oid,
         crl.signature_hash_algorithm,

@@ -71,7 +71,7 @@ def main():
     parser.add_argument('--insecure', action='store_true',
         help="skip verifying the remote certificate")
     parser.add_argument('--crypto-provider', action='store',
-        choices=list_providers(siotls.crypto.providers), default='cryptography',
+        choices=list_providers(siotls.crypto.providers), default='openssl',
         help="the cryptography library that will be used to encrypt the "
              "data on the wire and sign/validate the digital signatures")
     parser.add_argument('--service-provider', action='store',

@@ -4,7 +4,7 @@ import struct
 import types
 
 from siotls import TLSError, key_logger
-from siotls.crypto.ciphers import TLSCipherSuite
+from siotls.crypto import TLSCipherSuite
 from siotls.iana import AlertLevel, ContentType, TLSVersion
 from siotls.serial import SerialIO, TLSBufferError, TooMuchDataError
 from siotls.wrapper import WrappedSocket
@@ -301,7 +301,7 @@ class TLSConnection:
             raise TLSError(e)
         if (content.content_type == ContentType.HEARTBEAT
             and (not self.config.can_send_heartbeat
-                 or self.nconfig and not self.nconfig.can_send_heartbeat)):
+                 or (self.nconfig and not self.nconfig.can_send_heartbeat))):
             e = "cannot send heartbeat on this connection"
             raise ValueError(e)
 

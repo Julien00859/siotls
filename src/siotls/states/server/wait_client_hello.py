@@ -24,7 +24,7 @@ from siotls.contents.handshakes.extensions import (
     SignatureAlgorithms,
     SupportedVersionsResponse,
 )
-from siotls.crypto import TLSCipherSuite, TLSKeyExchange, TLSSignatureSuite
+from siotls.crypto import TLSCipherSuite, TLSKeyExchange, TLSSignatureScheme
 from siotls.crypto.ocsp import make_ocsp_request, validate_ocsp
 from siotls.iana import (
     CertificateStatusType,
@@ -279,9 +279,9 @@ class ServerWaitClientHello(State):
         if not sa_ext:
             raise alerts.MissingExtension(ExtensionType.SIGNATURE_ALGORITHMS)
         suites = {sa.iana_id: sa for sa in (
-            TLSSignatureSuite.for_certificate(self.config.certificate_chain[0])
+            TLSSignatureScheme.for_certificate(self.config.certificate_chain[0])
             if self.nconfig.server_certificate_type == CertificateType.X509 else
-            TLSSignatureSuite.for_key(self.config.public_key)
+            TLSSignatureScheme.for_key(self.config.public_key)
         )}
         for server_suite in self.config.signature_algorithms:
             if server_suite in suites and server_suite in sa_ext.supported_signature_algorithms:
@@ -296,7 +296,7 @@ class ServerWaitClientHello(State):
         if key_share_ext and key_exchange in key_share_ext.client_shares:
             # possible to resume key share => ServerHello
             client_exchange = key_share_ext.client_shares[key_exchange]
-            KeyExchange = TLSKeyExchange[key_exchange]  # noqa: N806
+            KeyExchange = TLSKeyExchange[key_exchange]
             try:
                 private_key, server_exchange = KeyExchange.init()
                 shared_key = KeyExchange.resume(private_key, client_exchange)

@@ -1,8 +1,8 @@
 import pkgutil
 
-from .ciphers import TLSCipherSuite
+from .cipher_suites import TLSCipherSuite
 from .key_exchanges import TLSKeyExchange
-from .signatures import TLSSignatureSuite
+from .signature_schemes import TLSSignatureScheme
 
 
 def install(provider):

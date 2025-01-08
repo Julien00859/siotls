@@ -20,7 +20,7 @@ from cryptography.x509.oid import (
     ExtensionOID,
 )
 
-from . import TLSSignatureSuite
+from . import TLSSignatureScheme
 
 AIA = ExtensionOID.AUTHORITY_INFORMATION_ACCESS
 OCSP = AuthorityInformationAccessOID.OCSP
@@ -91,7 +91,7 @@ def validate_ocsp(issuer, ocsp_request: bytes, ocsp_response: bytes):  # noqa: C
         e = "issuer forbidden from signing OCSP"
         raise ValueError(e)
 
-    Signature = TLSSignatureSuite.for_signature(  # noqa: N806
+    Signature = TLSSignatureScheme.for_signature(
         issuer,
         res.signature_algorithm_oid,
         res.signature_hash_algorithm,

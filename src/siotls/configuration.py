@@ -6,7 +6,7 @@ import typing
 from cryptography.x509.verification import PolicyBuilder, Store
 
 import siotls.x509.loader as x509loader
-from siotls.crypto import TLSSignatureSuite
+from siotls.crypto import TLSSignatureScheme
 from siotls.iana import (
     ALPNProtocol,
     CertificateType,
@@ -37,7 +37,7 @@ class TLSConfiguration:
             NamedGroup.x25519,
             NamedGroup.secp256r1,
         ].copy)
-    signature_algorithms: list[NamedGroup] = \
+    signature_algorithms: list[SignatureScheme] = \
         dataclasses.field(default_factory=[
             SignatureScheme.ed25519,
             SignatureScheme.ed448,
@@ -205,7 +205,7 @@ class TLSConfiguration:
         # TODO: verify that the public key found inside the certificate
         #       corresponds to the private key.
 
-        suites = TLSSignatureSuite.for_key_algo(pubkey_info['algorithm'])
+        suites = TLSSignatureScheme.for_key_algo(pubkey_info['algorithm'])
         suites_iana_id = {suite.iana_id for suite in suites}
         if suites_iana_id.isdisjoint(self.signature_algorithms):
             e =("the public key extracted from the certificate can "
@@ -221,7 +221,7 @@ class TLSConfiguration:
             raise ValueError(e)
         # TODO: verify that the public key corresponds to the private key.
 
-        suites = TLSSignatureSuite.for_key_algo(self.asn1_public_key['algorithm'])
+        suites = TLSSignatureScheme.for_key_algo(self.asn1_public_key['algorithm'])
         suites_iana_id = {suite.iana_id for suite in suites}
         if suites_iana_id.isdisjoint(self.signature_algorithms):
             e =("the public key can be used with the following "

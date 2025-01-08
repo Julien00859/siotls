@@ -37,7 +37,7 @@ dev = [
   "freezegun",
   "parameterized",
   "pre-commit",
-  "ruff==0.4.5",  # keep me sync with .pre-commit-config.yaml
+  "ruff==0.8.5",  # keep me sync with .pre-commit-config.yaml
 ]
 
 [project.urls]
@@ -89,6 +89,9 @@ lint.exclude = ["src/siotls/_vendor.py"]
 ]
 "src/siotls/states/**/*.py" = [
   "TID252",  # from .. import State
+]
+"src/siotls/*/providers/**/*.py" = [
+  "I001",  # ruff consideres siotls as third party, isort does not
 ]
 "tests/**/*.py" = [
   "D",  # docstrings

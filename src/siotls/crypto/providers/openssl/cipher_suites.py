@@ -4,7 +4,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers import aead
 
 from siotls.contents import alerts
-from siotls.crypto.ciphers import (
+from siotls.crypto.cipher_suites import (
     Aes128Ccm8Mixin,
     Aes128CcmMixin,
     Aes128GcmMixin,

@@ -1,9 +1,5 @@
 from typing import ClassVar
 
-from cryptography.hazmat.primitives.asymmetric import dh, ec, x448, x25519
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-
-import siotls
 from siotls.iana import NamedGroup
 from siotls.utils import RegistryMeta
 
@@ -17,7 +13,11 @@ class TLSKeyExchange(metaclass=RegistryMeta):
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and TLSKeyExchange in cls.__bases__:
-            cls._key_exchange_registry[cls.iana_id] = cls
+            other_cls = cls._key_exchange_registry.setdefault(cls.iana_id, cls)
+            if cls is not other_cls:
+                e =(f"cannot install {cls} as {other_cls} is installed "
+                    f"for {cls.iana_id!r} already")
+                raise KeyError(e)
 
     @classmethod
     def init(cls):
@@ -28,88 +28,24 @@ class TLSKeyExchange(metaclass=RegistryMeta):
         raise NotImplementedError("abstract method")  # noqa: EM101
 
 
-class _XMixin:
-    @classmethod
-    def init(cls):
-        private_key = cls.PrivateKey.generate()
-        my_key_share = private_key.public_key().public_bytes_raw()
-        return private_key, my_key_share
-
-    @classmethod
-    def resume(cls, private_key, peer_key_share):
-        peer_public_key = cls.PublicKey.from_public_bytes(peer_key_share)
-        shared_key = private_key.exchange(peer_public_key)
-        return shared_key
-
-class X25519(_XMixin, TLSKeyExchange):
+class X25519Mixin:
     iana_id = NamedGroup.x25519
-    PrivateKey = x25519.X25519PrivateKey
-    PublicKey = x25519.X25519PublicKey
 
-class X448(_XMixin, TLSKeyExchange):
+class X448Mixin:
     iana_id = NamedGroup.x448
-    PrivateKey = x448.X448PrivateKey
-    PublicKey = x448.X448PublicKey
 
 
-class _SECMixin:
-    @classmethod
-    def init(cls):
-        private_key = ec.generate_private_key(cls.curve())
-        my_key_share = private_key.public_key().public_bytes(
-            Encoding.X962, PublicFormat.UncompressedPoint
-        )
-        return private_key, my_key_share
-
-    @classmethod
-    def resume(cls, private_key, peer_key_share):
-        peer_public_key = ec.EllipticCurvePublicKey.from_encoded_point(
-            cls.curve(), peer_key_share
-        )
-        shared_key = private_key.exchange(ec.ECDH(), peer_public_key)
-        return shared_key
-
-class SECP256R1(_SECMixin, TLSKeyExchange):
+class Secp256R1Mixin:
     iana_id = NamedGroup.secp256r1
-    curve = ec.SECP256R1
 
-class SECP384R1(_SECMixin, TLSKeyExchange):
+class Secp384R1Mixin:
     iana_id = NamedGroup.secp384r1
-    curve = ec.SECP384R1
 
-class SECP521R1(_SECMixin, TLSKeyExchange):
+class Secp521R1Mixin:
     iana_id = NamedGroup.secp521r1
-    curve = ec.SECP521R1
 
 
-class _FFDHEMixin:
-    @classmethod
-    def init(cls):
-        params = dh.DHParameterNumbers(cls.p, cls.g, cls.q).parameters()
-        private_key = params.generate_private_key()
-
-        y = private_key.public_key().public_numbers().y
-        my_key_share = y.to_bytes(cls.p_length, 'big')
-
-        return private_key, my_key_share
-
-    @classmethod
-    def resume(cls, private_key, peer_key_share):
-        if len(peer_key_share.lstrip(b'\x00')) < cls.min_key_length:
-            e = "the peer's key is too short"
-            raise siotls.contents.alerts.InsufficientSecurity(e)
-
-        y = int.from_bytes(peer_key_share, 'big')
-        if not (1 < y < cls.p - 1):
-            e = "invalid peer ffdhe Y"
-            raise ValueError(e)
-
-        pn = dh.DHParameterNumbers(cls.p, cls.g, cls.q)
-        pubkey = dh.DHPublicNumbers(y, pn).public_key()
-        shared_key = private_key.exchange(pubkey)
-        return shared_key
-
-class FFDHE2048(_FFDHEMixin, TLSKeyExchange):
+class Ffdhe2048Mixin:
     iana_id = NamedGroup.ffdhe2048
     p = int.from_bytes(bytes.fromhex("""
         FFFFFFFF FFFFFFFF ADF85458 A2BB4A9A AFDC5620 273D3CF1
@@ -141,7 +77,7 @@ class FFDHE2048(_FFDHEMixin, TLSKeyExchange):
     p_length = 256
     min_key_length = 225
 
-class FFDHE3072(_FFDHEMixin, TLSKeyExchange):
+class Ffdhe3072Mixin:
     iana_id = NamedGroup.ffdhe3072
     p = int.from_bytes(bytes.fromhex("""
         FFFFFFFF FFFFFFFF ADF85458 A2BB4A9A AFDC5620 273D3CF1
@@ -183,7 +119,7 @@ class FFDHE3072(_FFDHEMixin, TLSKeyExchange):
     p_length = 384
     min_key_length = 275
 
-class FFDHE4096(_FFDHEMixin, TLSKeyExchange):
+class Ffdhe4096Mixin:
     iana_id = NamedGroup.ffdhe4096
     p = int.from_bytes(bytes.fromhex("""
         FFFFFFFF FFFFFFFF ADF85458 A2BB4A9A AFDC5620 273D3CF1
@@ -237,7 +173,7 @@ class FFDHE4096(_FFDHEMixin, TLSKeyExchange):
     p_length = 512
     min_key_length = 325
 
-class FFDHE6144(_FFDHEMixin, TLSKeyExchange):
+class Ffdhe6144Mixin:
     iana_id = NamedGroup.ffdhe6144
     p = int.from_bytes(bytes.fromhex("""
         FFFFFFFF FFFFFFFF ADF85458 A2BB4A9A AFDC5620 273D3CF1
@@ -311,7 +247,7 @@ class FFDHE6144(_FFDHEMixin, TLSKeyExchange):
     p_length = 768
     min_key_length = 375
 
-class FFDHE8192(_FFDHEMixin, TLSKeyExchange):
+class Ffdhe8192Mixin:
     iana_id = NamedGroup.ffdhe8192
     p = int.from_bytes(bytes.fromhex("""
         FFFFFFFF FFFFFFFF ADF85458 A2BB4A9A AFDC5620 273D3CF1

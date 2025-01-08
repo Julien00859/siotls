@@ -1,5 +1,5 @@
 from siotls.contents import alerts
-from siotls.crypto import TLSSignatureSuite
+from siotls.crypto import TLSSignatureScheme
 from siotls.iana import ContentType, HandshakeType
 
 from .. import State
@@ -38,7 +38,7 @@ class ClientWaitCertificateVerify(State):
             self.nconfig.peer_public_key
             or self.nconfig.peer_certificate.public_key()
         )
-        TLSSignatureSuite[content.algorithm](public_key).verify(
+        TLSSignatureScheme[content.algorithm](public_key).verify(
             content.signature,
             CERTIFICATE_VERIFY_SERVER + self._certificate_transcript_hash,
         )

@@ -117,7 +117,11 @@ class TLSCipherSuite(ICipher, metaclass=RegistryMeta):
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
         if register and TLSCipherSuite in cls.__bases__:
-            cls._cipher_registry[cls.iana_id] = cls
+            other_cls = cls._cipher_registry.setdefault(cls.iana_id, cls)
+            if cls is not other_cls:
+                e =(f"cannot install {cls} as {other_cls} is installed "
+                    f"for {cls.iana_id!r} already")
+                raise KeyError(e)
 
     iana_id: CipherSuites
     # digestmod: hashlib._Hash

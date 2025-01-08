@@ -2,8 +2,9 @@
 # ruff: noqa: N801
 import abc
 from collections import defaultdict
-from typing import Any, ClassVar
+from typing import ClassVar
 
+from siotls.contents import alerts
 from siotls.iana import SignatureScheme
 from siotls.utils import RegistryMeta
 from siotls.x509.loader import load_algorithm
@@ -18,15 +19,19 @@ from siotls.x509.oid import (
 
 class ISign(metaclass=abc.ABCMeta):
     @abc.abstractmethod
+    def __init__(self, *, public_key=None, private_key=None):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def sign(self, message):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def verify(self, signature, message):
+    def verify(self, signature, message, *, alert=alerts.BadCertificate):
         raise NotImplementedError
 
 
-class TLSSignatureSuite(ISign, metaclass=RegistryMeta):
+class TLSSignatureScheme(ISign, metaclass=RegistryMeta):
     _registry_key = '_signature_iana_registry'
     _signature_iana_registry: ClassVar = {}
     _signature_sign_oid_registry: ClassVar = defaultdict(list)
@@ -35,17 +40,17 @@ class TLSSignatureSuite(ISign, metaclass=RegistryMeta):
     iana_id: SignatureScheme
     sign_oid: SignatureAlgorithmOID
     pubkey_id: PublicKeyAlgorithmOID
-    _key: Any
 
     def __init_subclass__(cls, *, register=True, **kwargs):
         super().__init_subclass__(**kwargs)
-        if register and TLSSignatureSuite in cls.__bases__:
-            cls._signature_iana_registry[cls.iana_id] = cls
+        if register and TLSSignatureScheme in cls.__bases__:
+            other_cls = cls._signature_iana_registry.setdefault(cls.iana_id, cls)
+            if cls is not other_cls:
+                e =(f"cannot install {cls} as {other_cls} is installed "
+                    f"for {cls.iana_id!r} already")
+                raise KeyError(e)
             cls._signature_sign_oid_registry[cls.sign_oid].append(cls)
             cls._signature_pubkey_oid_registry[cls.pubkey_oid].append(cls)
-
-    def __init__(self, key):
-        self._key = key
 
     @classmethod
     def for_signature_algo(cls, asn1_signature_algo):
