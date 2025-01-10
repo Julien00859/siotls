@@ -25,7 +25,6 @@ classifiers = [
 ]
 
 dependencies = [
-  "cryptography>=43",
   "idna",
   "pyasn1-modules",
 ]
@@ -38,6 +37,17 @@ dev = [
   "parameterized",
   "pre-commit",
   "ruff==0.8.5",  # keep me sync with .pre-commit-config.yaml
+]
+
+# crypto providers
+openssl = [
+  "cryptography>=43",
+]
+
+# services providers
+simple = [
+  "rfc6555 @ git+https://github.com/Julien00859/rfc6555@has-ipv6-unclosed-fd",
+  "h11 @ git+https://github.com/Julien00859/h11@Julien00859/headers-get",
 ]
 
 [project.urls]
