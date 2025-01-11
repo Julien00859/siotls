@@ -41,11 +41,11 @@ class OCSPService(TLSService, CacheMixin, RequestMixin):
             e = "error while loading OCSP response"
             raise TLSServiceError(e) from exc
 
+        # TODO: verify the OCSP response signature before using its data
         logger.warning("TODO: verify the OCSP response signature before using its data")
-
-        expire = ocsp_basic  # lol
-        if expire:
-            self._cache_set(ocsp_req, ocsp_res, expire)
+        nextUpdate = ocsp_basic['tbsResponseData']['responses'][0]['nextUpdate']
+        if nextUpdate:
+            self._cache_set(ocsp_req, ocsp_res, nextUpdate)
 
         return ocsp_res
 
@@ -53,14 +53,14 @@ class CRTService(TLSService, RequestMixin):
     request_content_type = ''
     request_max_length = 0
 
-    response_content_type = 'application/pkix-cert'
-    response_max_length = 1 << 15  # 32kiB, longest cert chain I have is 16kiB
+    response_content_type = b'application/pkix-cert'
+    response_max_length = intbyte('64kiB')  # longest cert chain I have is 16kiB
 
 
 class CRLService(TLSService, RequestMixin):
     request_content_type = ''
     request_max_length = 0
 
-    response_content_type = 'application/pkix-crl'
+    response_content_type = b'application/pkix-crl'
     response_max_length = 1 << 24  # 16MiB, longest crl I have (DigitCert) is 7MiB
 

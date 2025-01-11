@@ -211,8 +211,8 @@ class RequestMixin:
                     f"{self.response_max_length}, got {content_length}")
                 raise TLSServiceError(e)
 
-            content_type = http_res.headers.get(b'content-type', b'')
-            if content_type and content_type != self.response_content_type:
+            content_type = http_res.headers.get(b'content-type')
+            if content_type != self.response_content_type:
                 e =(f"{err}: bad response Content-Type, expected "
                     f"{self.response_content_type}, got {content_type}")
                 raise TLSServiceError(e)

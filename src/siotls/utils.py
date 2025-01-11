@@ -3,8 +3,7 @@ import binascii
 import itertools
 import math
 import re
-
-from number import Number
+from numbers import Number
 
 _sentinel = object()
 
