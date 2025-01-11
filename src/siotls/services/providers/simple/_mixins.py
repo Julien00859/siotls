@@ -9,6 +9,7 @@ import rfc6555 as happy_eyesball
 
 from siotls import USER_AGENT
 from siotls.services.sievecache import SieveCache
+from siotls.utils import intbyte
 
 from . import TLSServiceError
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__package__)
 
 
 class CacheMixin:
-    stale: timedelta
+    stale = timedelta(seconds=60)
     cache_cls = SieveCache
 
     def __init__(self, *args, **kwargs):
@@ -41,16 +42,20 @@ class CacheMixin:
 
 
 class RequestMixin:
+    # Arbitrary
     conn_timeout: float = 2.0
     """ Time available to establishm the connection (DNS + TCP handshake). """
 
+    # Arbitrary
     sock_timeout: float = 1.0
     """ Time available per socket.recv and socket.send. """
 
-    http_timeout: float = 10.0  # CA/B Forum 2.1.2 - 4.10.2 "Service Availability"
+    # Recommandation of CA/B Forum 2.1.2 - 4.10.2 "Service Availability"
+    http_timeout: float = 10.0
     """ Time available to complete the HTTP exchange. """
 
-    chunk_length: int = 1 << 14  # 16kiB
+    # Same size as the record layer in TLS, a bit cargo culting
+    chunk_length: int = intbyte('16kiB')
     """ How many bytes shall be received at once. """
 
     request_content_type: bytes
@@ -62,7 +67,10 @@ class RequestMixin:
     response_content_type: bytes
     """ The Content-Type to expect in the http response. """
 
-    response_head_max_length: int = 4096  # HEAD example.com is 322 bytes
+    # With no Content-Security-Policy header, responses head usually fit
+    # under 1kiB. 4kiB is very tolerent, doesn't consume that much RAM,
+    # and protects against forged Content-Length headers (CVE-2020-10735).
+    response_head_max_length: int = intbyte(4096)
     """ The maximum length of the response head (status line + headers). """
 
     response_body_max_length: int
@@ -71,10 +79,15 @@ class RequestMixin:
     Content-Length response header and the data received on the wire.
     """
 
-    def _request(self, url, data=b'') -> tuple[h11.Response, bytes]:  # noqa: C901, PLR0912, PLR0915
+    def _request(self, url, data=b'') -> bytes:  # noqa: C901, PLR0912, PLR0915
         """
-        Perform a HTTP/1.1 GET (empty data) or POST (data present) on
-        the given URL. Return a pair (response, body).
+        Perform a untrusted HTTP/1.1 GET (empty data) or POST (data
+        present) on the given URL. Return the response body.
+
+        It is NOT RECOMMENDED to use this tool as a general purpose http
+        client. This tool SHOULD only be used to download documents that
+        are digitaly signed. Users MUST verify the signature before
+        using the document.
         """
         # This function looks long and complicated but really isn't that
         # much. It really is only about sending a single HTTP request
@@ -91,10 +104,9 @@ class RequestMixin:
         # set a global per-request (instead of per-connect/recv/send)
         # timeout, and it'll happily read up headers up to 6MiB before
         # you get a chance to get control back. Not a problem as most of
-        # the time you do HTTPS and verified via TLS that the connection
-        # was genuine, so the remote http server is gonna behave well.
-        # But it's a deal breaker for us, as we are only ever gonna talk
-        # in raw HTTP.
+        # the time you rely on TLS (HTTPS) to make sure that the server
+        # is genuine and will behave well. But it's a deal breaker for
+        # us, as we are only ever gonna talk in raw HTTP.
         #
         # We could have split this huge function into many smaller ones,
         # but the complexity would essentially have remained the same,
@@ -144,8 +156,8 @@ class RequestMixin:
                 if time.monotonic() > alarm:
                     raise TimeoutError  # noqa: TRY301
 
-            def sockrecv():
-                data = sock.recv(self.chunk_length)
+            def sockrecv(size=self.chunk_length):
+                data = sock.recv(size)
                 if time.monotonic() > alarm:
                     raise TimeoutError  # noqa: TRY301
                 return data
@@ -158,18 +170,19 @@ class RequestMixin:
             socksend(conn.send(h11.EndOfMessage()))
 
             # Read the HTTP response head (status line + head)
-            bytes_recv = 0
+            bytes_recv = intbyte(0)
             while True:
                 event = conn.next_event()
                 match event:
                     case h11.NEED_DATA:
-                        data = sockrecv()
-                        bytes_recv += len(data)
                         if bytes_recv > self.response_head_max_length:
                             e =(f"{err}: bad response headers, expected "
-                                f"at most {self.response_head_max_length} "
-                                f"bytes, but read {bytes_recv} so far")
+                                f"at most {self.response_head_max_length}, "
+                                f"but read {bytes_recv} so far")
                             raise TLSServiceError(e)
+                        data = sockrecv(min(
+                            self.chunk_length, self.response_head_max_length))
+                        bytes_recv += len(data)
                         conn.receive_data(data)
                     case h11.Response():
                         break
@@ -232,7 +245,7 @@ class RequestMixin:
             raise TLSServiceError(e) from exc
 
         else:
-            return http_res, body
+            return body
 
         finally:
             if sock is not None:

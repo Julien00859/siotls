@@ -2,6 +2,9 @@ import abc
 import binascii
 import itertools
 import math
+import re
+
+from number import Number
 
 _sentinel = object()
 
@@ -9,6 +12,78 @@ _sentinel = object()
 class RegistryMeta(abc.ABCMeta):
     def __getitem__(cls, entry):
         return getattr(cls, cls._registry_key)[entry]
+
+
+class intbyte(int):  # noqa: N801
+    """
+    Integer with a Byte SI representation
+
+    >>> Byte(0)
+    0
+    >>> Byte(2)
+    2
+    >>> Byte('65')
+    65
+    >>> Byte('89B')
+    89
+    >>> Byte('1k')
+    1000
+    >>> Byte('1ki')
+    1024
+    >>> Byte('1.5k')
+    1500
+    >>> Byte('1.5ki')
+    1536
+    >>> Byte('1ki') + Byte('-1k')
+    24
+    >>> str(Byte(0))
+    '0'
+    >>> str(Byte('70M'))
+    '70MB'
+    >>> str(Byte('43Mi'))
+    '43MiB'
+    >>> str(Byte('1.5M'))
+    '1500kB'
+    """
+
+    __sizes = {  # noqa: RUF012
+        'Ti': 1 << 40,
+        'T': 1000 ** 4,
+        'Gi': 1 << 30,
+        'G': 1000 ** 3,
+        'Mi': 1 << 20,
+        'M': 1000 ** 2,
+        'ki': 1 << 10,
+        'k': 1000 ** 1,
+        '':  1,
+    }
+
+    __re = re.compile(r"""^
+        (?P<float>[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?)  # The number as float
+        (?P<unit>k|M|G|T|ki|Mi|Gi|Ti)?[Bo]?                 # The unit
+    $""", re.VERBOSE)
+
+    def __new__(cls, x=0):
+        if isinstance(x, Number):
+            return super().__new__(cls, x)
+
+        match = cls.__re.search(x)
+        if not match:
+            e = f"not a valid {cls.__name__} representation: {x}"
+            raise ValueError(e)
+        base = float(match.group('float'))
+        unit = cls.__sizes[match.group('unit') or '']
+        return super().__new__(cls, base * unit)
+
+    def __str__(self):
+        if not self:
+            return "0"
+        for unit, size in type(self).__sizes.items():  # noqa: SLF001
+            d, m = divmod(self, size)
+            if not m:
+                return f"{d}{unit}B"
+        return super().__str__()
+
 
 
 def hexdump(bytes_):
