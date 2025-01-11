@@ -123,13 +123,14 @@ class RequestMixin:
                 ('Host', urlobj.netloc),
                 ('User-Agent', USER_AGENT),
                 ('Content-Length', str(len(data))),
-            ] + ([
-                ('Content-Type', self.request_content_type)] if data else [])
+            ] + (
+                [('Content-Type', self.request_content_type)] if data else []
+            )
         )
 
-        # Connect to the remote host and set the various timeouts
         sock = None
         try:
+            # Connect to the remote host and set the various timeouts
             alarm = time.monotonic() + self.http_timeout
 
             sock = happy_eyesball.create_connection(
@@ -186,35 +187,30 @@ class RequestMixin:
                     f"{HTTPStatus(http_res.status_code)!r}")
                 raise TLSServiceError(e)
 
+            content_length = http_res.headers.get(b'content-length')
+            if content_length is None:
+                e = f"{err}: missing mandatory response Content-Length"
+                raise TLSServiceError(e)
+
+            content_length = int(content_length)  # h11 validated it
+            if content_length > self.response_body_max_length:
+                e =(f"{err}: bad response Content-Length, expected at most "
+                    f"{self.response_max_length}, got {content_length}")
+                raise TLSServiceError(e)
+
             content_type = http_res.headers.get(b'content-type', b'')
             if content_type and content_type != self.response_content_type:
                 e =(f"{err}: bad response Content-Type, expected "
                     f"{self.response_content_type}, got {content_type}")
                 raise TLSServiceError(e)
 
-            # CT-Length can be missing with Connection: close and
-            # Transfer-Encoding: chunked. Here we accept to read up to ..... TODO
-            content_length = int(http_res.headers.get(
-                b'content-length', self.response_body_max_length))
-            if content_length > self.response_body_max_length:
-                e =(f"{err}: bad response Content-Length, expected at most "
-                    f"{self.response_max_length}, got {content_length}")
-                raise TLSServiceError(e)
-
             body = bytearray()
-            bytes_recv = 0
             while True:
                 event = conn.next_event()
                 match event:
                     case h11.NEED_DATA:
-                        data = sockrecv()
-                        bytes_recv += len(data)
-                        if bytes_recv > content_length:
-                            e =(f"{err}: bad response body, expected at "
-                                f"most {self.response_body_max_length} "
-                                f"bytes, but read {bytes_recv} so far")
-                            raise TLSServiceError(e)
-                        conn.receive_data(data)
+                        # h11 verifies the length of the body
+                        conn.receive_data(sockrecv())
                     case h11.Data():
                         body += event.data
                     case h11.EndOfMessage():
@@ -222,7 +218,6 @@ class RequestMixin:
                     case _:
                         e = f"{err}: unexpected event: {event}"
                         raise TLSServiceError(e)
-
 
         except OSError as exc:
             e = f"{err}: connection failure"
