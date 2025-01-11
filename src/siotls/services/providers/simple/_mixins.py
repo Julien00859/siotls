@@ -1,3 +1,4 @@
+import collections.abc
 import logging
 import time
 from datetime import UTC, datetime, timedelta
@@ -8,7 +9,6 @@ import h11
 import rfc6555 as happy_eyesball
 
 from siotls import USER_AGENT
-from siotls.services.sievecache import SieveCache
 from siotls.utils import intbyte
 
 from . import TLSServiceError
@@ -17,12 +17,12 @@ logger = logging.getLogger(__package__)
 
 
 class CacheMixin:
+    _cache: collections.abc.MutableMapping
     stale = timedelta(seconds=60)
-    cache_cls = SieveCache
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, cache, **kwargs):
         super().__init__(*args, **kwargs)
-        self._cache = self.cache_cls()
+        self._cache = cache
 
     def _cache_get(self, key, default=None):
         data, expire = self._cache.get(key, (None, None))

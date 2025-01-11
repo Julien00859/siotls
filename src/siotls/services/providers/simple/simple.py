@@ -56,11 +56,13 @@ class CRTService(TLSService, RequestMixin):
     response_content_type = b'application/pkix-cert'
     response_max_length = intbyte('64kiB')  # longest cert chain I have is 16kiB
 
+    def request(self, url):
+
 
 class CRLService(TLSService, RequestMixin):
     request_content_type = ''
     request_max_length = 0
 
     response_content_type = b'application/pkix-crl'
-    response_max_length = 1 << 24  # 16MiB, longest crl I have (DigitCert) is 7MiB
+    response_max_length = intbyte('16MiB')< 1 << 24  # 16MiB, longest crl I have (DigitCert) is 7MiB
 
