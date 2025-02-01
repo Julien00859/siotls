@@ -32,11 +32,14 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "coverage",
+  "furo",
   "isort==5.13.2",  # keep me sync with .pre-commit-config.yaml
   "freezegun",
   "parameterized",
   "pre-commit",
   "ruff==0.8.5",  # keep me sync with .pre-commit-config.yaml
+  "sphinx",
+  "sphinx-design"
 ]
 
 # crypto providers
@@ -86,7 +89,7 @@ lint.ignore = [
   "TD", "FIX002",  # todo
   "RET504",  # x = ...; return x
 ]
-lint.exclude = ["src/siotls/_vendor.py"]
+lint.exclude = ["docs/**/*.py", "src/siotls/_vendor.py"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = [
