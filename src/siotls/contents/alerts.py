@@ -12,6 +12,9 @@ from . import Content
 
 @dataclasses.dataclass(init=False)
 class Alert(Content, Serializable, metaclass=RegistryMeta):
+    """
+    :meta private:
+    """
     _registry_key = '_alert_registry'
     _alert_registry: typing.ClassVar = {}
 
@@ -92,7 +95,11 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
 
 
 class TLSFatalAlert(TLSError):  # noqa: N818
-    pass
+    """
+    Base class for all TLS Fatal Alerts
+
+    :meta private:
+    """
 
 
 
