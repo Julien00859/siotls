@@ -1,122 +1,41 @@
-# noqa: INP001
-
-import logging
 import time
-from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
 from urllib.parse import urlsplit
 
 import h11
-from pyasn1_modules.rfc5280 import Certificate
 
 from siotls import USER_AGENT
-from siotls.services import TLSService
-from siotls.services.ocsp import load_verify_ocsp
-from siotls.services.filestore import FileStore
-from siotls.services.sievecache import SieveCache
+from siotls.service import TLSServiceError
 from siotls.utils import intbyte
 
-from . import TLSServiceError, TLSServiceErrorGroup, happy_eyeballs
-
-logger = logging.getLogger(__package__)
+from . import happy_eyeballs
 
 
 class WallClockTimeoutError(TimeoutError):
     pass
 
 
-class CacheHelper:
-    def __init__(self, cache, stale=timedelta(seconds=60)):
-        self._cache = cache
-        self.state = stale
+# This function looks long and complicated but really isn't that much.
+#
+# It really is only about sending a single HTTP request and getting the
+# response. What makes it complicated are all the safeguards we added
+# due to the high profile of siotls, safeguards that typically are not
+# found in other (synchronous) http libraries. They include: wall-clock
+# timeout, strict http/1.1, head and body length limits, happy eyesball.
+# As this function is called *while establishing a TLS connection* we
+# can only use insecure raw HTTP/1. This means that we are prone to a
+# very wide range of attacks: we could very well be connecting to a
+# rogue HTTP server pretending to be digicert, and who will send a huge
+# response at a very slow rate.
+#
+# We could have split this huge function into many smaller ones, but the
+# complexity would essentially have remained the same, just you would
+# be scrolling up and down much more. Just bear with it and remember
+# that it is only 200ish lines long. That http.client + urllib are much
+# longer. Because you did read http.client and urllib(3) before using
+# the infamous requests library, right? right?!
 
-    def get(self, key, default=None):
-        data, expire = self._cache.get(key, (None, None))
-        if not data:
-            return default
-        now = datetime.now(UTC)
-        if now > expire - self.stale:
-            self.rem(key)
-            return default
-        return data
-
-    def set(self, key, data, expire):
-        self._cache[key] = (data, expire)
-
-    def rem(self, key):
-        self._cache.pop(key)
-
-
-
-class SimpleService(TLSService):
-    def __init__(self):
-        self._ocsp_cache = CacheHelper(SieveCache())
-        self._file_cache = CacheHelper(FileStore())
-
-    def request_ocsp(self, url: str, ocsp_req_data: bytes, signer_cert: Certificate):
-        if ocsp_res_data := self._ocsp_cache.get(ocsp_req_data):
-            return ocsp_res_data
-
-        ocsp_res_data = saferequest(
-            url,
-            ocsp_req_data,
-            request_content_type = b'application/ocsp-request',
-            request_body_max_length = intbyte(1024),
-            response_content_type = b'application/ocsp-response',
-            response_body_max_length = intbyte('32kiB')  # longest ocsp res I have is 12kiB
-        )
-        ocsp_basic_res = load_verify_ocsp(ocsp_req_data, ocsp_res_data, signer_cert)
-
-        next_update = ocsp_basic_res['tbsResponseData']['responses'][0]['nextUpdate']
-        if next_update:
-            self._ocsp_cache.set(ocsp_req_data, ocsp_res_data, next_update)
-
-        return ocsp_res_data, ocsp_basic_res
-
-    def download_crl(self, *a, **kw):
-        raise NotImplementedError("todo")  # noqa: EM101
-        saferequest(
-            ...,
-            response_content_type=b'application/pkix-crl',
-            response_body_max_length=intbyte('16MiB')  # longest crl I have (DigitCert) is 7MiB,
-        )
-
-    def download_cert(self, urls):
-        if not urls:
-            e = "missing url"
-            raise ValueError(e)
-
-        for url in urls:
-            if cert := self._cache_get(url):
-                # TODO: verify that is hasn't been revoked since then
-                return cert
-
-        excs = []
-        for url in urls:
-            try:
-                cert_res = saferequest(
-                    url,
-                    response_content_type=b'application/pkix-cert',
-                    response_max_length=intbyte('64kiB'),  # longest cert chain I have is 16kiB
-                )
-                break
-            except TLSServiceError as exc:
-                excs.append(exc)
-                continue
-        else:
-            e = "all URLs failed"
-            raise TLSServiceErrorGroup(e, excs)
-
-        try:
-            cert = load_der_certificate(cert_res)
-        except ValueError as exc:
-            e = "error while loading certificate"
-            raise TLSServiceError(e) from exc
-
-        return cert_res, cert
-
-
-def saferequest(  # noqa: C901, PLR0912, PLR0913, PLR0915
+def safe_request(  # noqa: C901, PLR0912, PLR0913, PLR0915
     url: str,
     data: bytes = b'',
     *,
@@ -179,24 +98,6 @@ def saferequest(  # noqa: C901, PLR0912, PLR0913, PLR0915
         body, checked against both Content-Length response header and
         the data received on the wire.
     """
-    # This function looks long and complicated but isn't that much.
-    #
-    # It really is only about sending a single HTTP request and getting
-    # the response. What makes it complicated are all the safeguards we
-    # added due to the high profile of siotls, safeguards that typically
-    # are not found in other (synchronous) http libraries include. They
-    # include: wall-clock timeout, strict http/1.1, head and body length
-    # limits, happy eyesball.
-    #
-    # We could have split this huge function into many smaller ones, but
-    # the complexity would essentially have remained the same, just you
-    # would be scrolling up and down much more.
-    #
-    # Bear with it and remember that you are only reading a 200ish line
-    # long function. That http.client + urllib are much longer. Because
-    # you did read http.client and urllib(3) before using the infamous
-    # requests library, right? right?!
-
     # Prefix for all errors, so we don't have to type it everytime
     err = f'POST {url} [{len(data)} bytes]' if data else f'GET {url}'
 

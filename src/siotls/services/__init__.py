@@ -11,15 +11,3 @@ class TLSServiceErrorGroup(ExceptionGroup, TLSServiceError):  # noqa: N818
 
 class TLSService:
     pass
-
-
-class CRLService(TLSService):
-    ...
-
-
-class CRTService(TLSService):
-    ...
-
-
-class OCSPService(TLSService):
-    ...
