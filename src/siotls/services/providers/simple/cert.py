@@ -3,8 +3,8 @@ import random
 
 from siotls.services import TLSService, TLSServiceError, TLSServiceErrorGroup
 from siotls.services.filestore import FileStore
-from siotls.x509 import load_der_certificate
 from siotls.utils import intbyte
+from siotls.x509 import load_der_certificate
 
 from ._mixins import CacheMixin, RequestMixin
 

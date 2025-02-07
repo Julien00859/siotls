@@ -10,8 +10,7 @@ import h11
 from siotls import USER_AGENT
 from siotls.utils import intbyte
 
-from . import TLSServiceError
-from . import happy_eyeballs
+from . import TLSServiceError, happy_eyeballs
 
 logger = logging.getLogger(__package__)
 
