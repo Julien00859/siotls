@@ -21,11 +21,11 @@ class TLSKeyExchange(metaclass=RegistryMeta):
 
     @classmethod
     def init(cls):
-        raise NotImplementedError("abstract method")  # noqa: EM101
+        raise NotImplementedError
 
     @classmethod
     def resume(cls, private_key, peer_key_share):
-        raise NotImplementedError("abstract method")  # noqa: EM101
+        raise NotImplementedError
 
 
 class X25519Mixin:
