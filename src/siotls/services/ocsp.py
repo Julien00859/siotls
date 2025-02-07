@@ -21,7 +21,7 @@ def load_verify_ocsp(der_ocsp_req, der_ocsp_res, signer_cert) -> OCSPBasicRespon
     except ValueError as exc:
         e = "malformed OCSP response"
         raise TLSServiceError(e) from exc
-    if ocsp_res['responseStatus'] != 0:  # successful
+    if ocsp_res['responseStatus'] != 0:  # 0 is successful
         e = f"OCSP response status is not successful: {ocsp_res['responseStatus']}"
         raise TLSServiceError(e)
     ocsp_res_type = oid_from_pyasn1(OCSPResponseType, ocsp_res['responseBytes']['responseType'])
