@@ -1,7 +1,7 @@
 import typing
 
-import pyasn1_modules.rfc4055
-import pyasn1_modules.rfc5480  # noqa: F401
+import pyasn1_modules.rfc4055  # RSA algorithms
+import pyasn1_modules.rfc5480  # ECDSA algorithms # noqa: F401
 from pyasn1.codec.der.decoder import decode as der_decode
 from pyasn1.codec.native.decoder import decode as py_decode
 from pyasn1_modules.rfc5280 import (
@@ -106,11 +106,14 @@ def load_pem_public_key(data: bytes):
 
 
 def load_algorithm(
-    algo_oid: oid.PublicKeyAlgorithmOID | oid.SignatureAlgorithmOID,
+    AlgoOID: oid.PublicKeyAlgorithmOID | oid.SignatureAlgorithmOID,  # noqa: N803
     algo: AlgorithmIdentifier,
 ):
-    algo_oid_ = oid.from_pyasn1(algo_oid, algo['algorithm'])
-    spec = algorithmIdentifierMap[algo['algorithm']]
+    algo_oid = oid.from_pyasn1(AlgoOID, algo['algorithm'])
+    try:
+        spec = algorithmIdentifierMap[algo['algorithm']]
+    except KeyError:
+        return algo_oid, None  # no parameters
     if not algo['parameters'].hasValue():
-        return algo_oid_, py_decode({}, spec)  # missing parameters
-    return algo_oid_, load_der(algo['parameters'], spec)
+        return algo_oid, py_decode({}, spec)  # missing parameters
+    return algo_oid, load_der(algo['parameters'], spec)

@@ -51,8 +51,11 @@ if __name__ == '__main__':
     print(pformat(obj))
     if (
         isinstance(obj, OCSPResponse)
-        and (res_type_oid := obj['responseBytes']['responseType'].asTuple())
-        and oid.from_pyasn1(res_type_oid) == oid.OCSPResponseType.OCSP_BASIC
+        and obj['responseStatus'] == 0  # successful
+        and oid.from_pyasn1(
+            oid.OCSPResponseType,
+            obj['responseBytes']['responseType']
+        ) == oid.OCSPResponseType.OCSP_BASIC
     ):
         ocsp = loader.load_der_ocsp_basic_response(obj['responseBytes']['response'].asOctets())
         print(pformat(ocsp))

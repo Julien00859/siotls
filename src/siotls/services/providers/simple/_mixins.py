@@ -6,23 +6,27 @@ from http import HTTPStatus
 from urllib.parse import urlsplit
 
 import h11
-import rfc6555 as happy_eyesball
 
 from siotls import USER_AGENT
 from siotls.utils import intbyte
 
 from . import TLSServiceError
+from . import happy_eyeballs
 
 logger = logging.getLogger(__package__)
 
 
 class CacheMixin:
+    cache_cls: collections.abc.Callable[[], collections.abc.MutableMapping]
     _cache: collections.abc.MutableMapping
     stale = timedelta(seconds=60)
 
-    def __init__(self, *args, cache, **kwargs):
+    def __init__(self, *args, cache=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._cache = cache
+        if cache is not None:
+            self._cache = cache
+        else:
+            self._cache = self.cache_cls()
 
     def _cache_get(self, key, default=None):
         data, expire = self._cache.get(key, (None, None))
@@ -143,9 +147,9 @@ class RequestMixin:
         sock = None
         try:
             # Connect to the remote host and set the various timeouts
-            alarm = time.monotonic() + self.http_timeout
+            alarm = time.perf_counter() + self.http_timeout
 
-            sock = happy_eyesball.create_connection(
+            sock = happy_eyeballs.create_connection(
                 (urlobj.hostname, urlobj.port or 80),
                 timeout=self.conn_timeout,
             )
@@ -153,12 +157,12 @@ class RequestMixin:
 
             def socksend(data):
                 sock.sendall(data)
-                if time.monotonic() > alarm:
+                if time.perf_counter() > alarm:
                     raise TimeoutError  # noqa: TRY301
 
             def sockrecv(size=self.chunk_length):
                 data = sock.recv(size)
-                if time.monotonic() > alarm:
+                if time.perf_counter() > alarm:
                     raise TimeoutError  # noqa: TRY301
                 return data
 
