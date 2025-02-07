@@ -358,7 +358,7 @@ class TLSConfiguration:
         return bool(self.trust_store or self.trusted_public_keys)
 
     @functools.cached_property
-    def certificate_types(self) -> CertificateType:
+    def certificate_types(self) -> Sequence[CertificateType]:
         types = []  # order is important, x509 must be first
         if self.certificate_chain:
             types.append(CertificateType.X509)
@@ -367,7 +367,7 @@ class TLSConfiguration:
         return types
 
     @functools.cached_property
-    def peer_certificate_types(self) -> CertificateType:
+    def peer_certificate_types(self) -> Sequence[CertificateType]:
         types = []  # order is important, x509 must be first
         if self.trust_store:
             types.append(CertificateType.X509)
@@ -385,6 +385,7 @@ class TLSConfiguration:
 
     @property
     def other_side(self) -> typing.Literal['client', 'server']:
+        """ The side of the peer. """
         return 'server' if self.side == 'client' else 'client'
 
     def __post_init__(self):

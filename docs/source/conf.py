@@ -32,8 +32,6 @@ html_static_path = ['static']
 
 # custom
 autodoc_type_aliases = {
-    "PrivateKeyTypes": "cryptography.hazmat.primitives.asymmetric.types.PrivateKeyTypes",
-    "PublicKeyTypes": "cryptography.hazmat.primitives.asymmetric.types.PublicKeyTypes",
 }
 autodoc_class_signature = "separated"
 autodoc_typehints = "description"

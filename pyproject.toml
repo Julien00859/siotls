@@ -49,6 +49,7 @@ openssl = [
 
 # services providers
 simple = [
+  "blake3",
   "rfc6555 @ git+https://github.com/Julien00859/rfc6555@has-ipv6-unclosed-fd",
   "h11 @ git+https://github.com/Julien00859/h11@patches",
 ]
