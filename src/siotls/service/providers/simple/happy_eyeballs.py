@@ -15,7 +15,7 @@
 #
 # Julien's contributions:
 # - solved unclosed socket desciptor in _detect_ipv6
-# - dropped py3.10< compatibility code
+# - dropped <py3.10 compatibility code
 
 """Python implementation of the Happy Eyeballs Algorithm described in RFC 6555"""
 
