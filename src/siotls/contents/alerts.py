@@ -1,3 +1,11 @@
+"""
+Alert Protocol as defined in :rfc:`8446#section-6`.
+
+> TLS provides an Alert content type to indicate closure information
+> and errors.
+>
+"""
+
 import dataclasses
 import textwrap
 import typing
@@ -13,7 +21,7 @@ from . import Content
 @dataclasses.dataclass(init=False)
 class Alert(Content, Serializable, metaclass=RegistryMeta):
     """
-    :meta private:
+    Abstract Alert registry
     """
     _registry_key = '_alert_registry'
     _alert_registry: typing.ClassVar = {}
@@ -74,7 +82,8 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
     @classmethod
     def parse(abc, stream, **kwargs):  # noqa: ARG003
         try:
-            level = AlertLevel(stream.read_int(1))
+            # the level is implicit and SHOULD be ignored
+            _level = AlertLevel(stream.read_int(1))
         except ValueError as exc:
             raise IllegalParameter(*exc.args) from exc
         description = stream.read_int(1)
@@ -83,12 +92,12 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
             cls = abc[AlertDescription(description)]
         except ValueError:
             cls = type(f'UnknownAlert{description}', (Alert,), {
-                'level': level,
+                'level': AlertLevel.FATAL,
                 'description': description,
                 '_struct': '',
             })
 
-        return cls(level=level)
+        return cls()
 
     def serialize(self):
         return ((self.level << 8) + self.description).to_bytes(2, 'big')
@@ -100,7 +109,6 @@ class TLSFatalAlert(TLSError):  # noqa: N818
 
     :meta private:
     """
-
 
 
 class CloseNotify(Alert):

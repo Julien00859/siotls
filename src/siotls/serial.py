@@ -2,6 +2,7 @@ import abc
 import contextlib
 import io
 import logging
+from os import SEEK_CUR
 
 from siotls import TLSError
 
@@ -49,9 +50,16 @@ class SerialIO(io.BytesIO):
         super().__init__(*args, **kwargs)
         self._limits = [float('+inf')]
 
-    def read(self, n=None):
+    def read(self, n: int = -1) -> bytes:
+        """
+        Read at most ``n`` bytes, or all bytes until the limit if ``n``
+        is negative.
+
+        :raise TooMuchDataError: When trying to read more bytes than the
+            current limit allows.
+        """
         max_n = self._limits[-1] - self.tell()
-        if n is None:
+        if n < 0:
             if len(self._limits) > 1:
                 n = max_n
         elif n > max_n:
@@ -59,26 +67,44 @@ class SerialIO(io.BytesIO):
             raise TooMuchDataError(e)
         return super().read(n)
 
-    def read_exactly(self, n):
+    def read_exactly(self, n: int) -> bytes:
+        """
+        Read exactly ``n`` bytes.
+
+        :raise ValueError: When ``n`` is null or negative.
+        :raise MissingDataError: When trying to read more bytes than the
+            they are available on the underlying buffer.
+        """
+        if n <= 0:
+            e = f"can only read a non-null positive amount of bytes: {n}"
+            raise ValueError(e)
         data = b''
         while len(data) != n:
             read = self.read(n - len(data))
             if not read:
+                self.seek(-len(data), SEEK_CUR)
                 e = f"expected {n} bytes but could only read {len(data)}"
                 raise MissingDataError(e)
             data += read
         return data
 
-    def read_int(self, n):
-        if not n:
-            e = "cannot read a integer of 0 bytes"
-            raise ValueError(e)
+    def read_int(self, n: int) -> int:
+        """
+        Read exactly ``n`` bytes, parse those bytes as a big endian
+        representation of a positive integer.
+        """
         return int.from_bytes(self.read_exactly(n), 'big')
 
-    def write_int(self, n, i):
+    def write_int(self, n: int, i: int) -> None:
+        """
+        Write the big endian representation of ``i`` over ``n`` bytes.
+        """
         self.write(i.to_bytes(n, 'big'))
 
     def read_var(self, n):
+        """
+        Read a length-prefixed
+        """
         length = self.read_int(n)
         return self.read_exactly(length)
 

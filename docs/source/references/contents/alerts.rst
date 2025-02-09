@@ -1,5 +1,5 @@
-siotls.contents.alerts
-======================
+Alerts
+======
 
 .. automodule:: siotls.contents.alerts
    :members:

@@ -3,6 +3,9 @@ import secrets
 import struct
 import types
 
+import idna
+
+import siotls
 from siotls import TLSError, key_logger
 from siotls.crypto import TLSCipherSuite
 from siotls.iana import AlertLevel, ContentType, TLSVersion
@@ -26,7 +29,32 @@ def startswith_change_cipher_spec(data):
 
 
 class TLSConnection:
-    def __init__(self, config, server_hostname=None):
+    config: "siotls.configuration.TLSConfiguration"
+    """
+    The TLS configuration used for establishing this secure connection.
+    It includes this side (client / server) of the connection, but also
+    the allowed ciphers, key exchanges and signature schemes and (many)
+    other settings for this connection.
+    """
+
+    nconfig: "siotls.configuration.TLSNegotiatedConfiguration"
+    """
+    The cipher, key exchange, signature scheme and (many) other settings
+    agreed upon by both peers during the handshake.
+    """
+
+    server_hostname: bytes | None
+    """
+    Client-side only. The expected server hostname as IDNA-2008 encoded
+    bytes. Used for :ref:`SNI` and for verifying the CN and SAN fields
+    for the server certificate.
+    """
+
+    def __init__(
+        self,
+        config: "siotls.configuration.TLSConfiguration",
+        server_hostname: str | bytes | None = None
+    ):
         self.config = config
         self.nconfig = None
         self._cipher = cipher_plaintext
@@ -47,6 +75,8 @@ class TLSConnection:
                 w =("missing server_hostname, will not verify the "
                     "peer's certificate CN and SAN entries")
                 logger.warning(w)
+            elif isinstance(server_hostname, str):
+                server_hostname = idna.encode(server_hostname, uts46=True)
             self.server_hostname = server_hostname
             self._client_unique = secrets.token_bytes(32)
             self._server_unique = None

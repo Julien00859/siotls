@@ -65,9 +65,11 @@ class HostName(ServerName, SerializableBody):
     _struct = textwrap.dedent("""
         opaque HostName<1..2^16-1>;
     """).strip('\n')
-    host_name: str
+    host_name: bytes
 
-    def __init__(self, host_name):
+    def __init__(self, host_name: bytes | str):
+        if isinstance(host_name, str):
+            host_name = idna.encode(self.host_name, uts46=True)
         self.host_name = host_name
 
     @classmethod
@@ -82,7 +84,7 @@ class HostName(ServerName, SerializableBody):
     def serialize_body(self):
         return b''.join([
             len(self.host_name).to_bytes(2, 'big'),
-            idna.encode(self.host_name, uts46=True),
+            self.host_name,
         ])
 
 @dataclasses.dataclass(init=False)

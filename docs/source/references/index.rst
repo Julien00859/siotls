@@ -8,5 +8,6 @@ API References
    configuration
    connection
    iana
+   serial
    service
    x509/index

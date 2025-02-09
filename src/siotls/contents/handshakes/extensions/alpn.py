@@ -22,7 +22,7 @@ class ALPN(Extension, SerializableBody):
             ProtocolName protocol_name_list<2..2^16-1>
         } ProtocolNameList;
     """).strip()
-    protocol_name_list: list[ALPNProtocol | str]
+    protocol_name_list: list[ALPNProtocol | bytes]
 
     def __init__(self, protocol_name_list):
         self.protocol_name_list = protocol_name_list
@@ -38,7 +38,7 @@ class ALPN(Extension, SerializableBody):
 
     def serialize_body(self):
         protocol_name_list = b''.join([
-            len(proto_bytes := proto.encode()).to_bytes(1, 'big') + proto_bytes
+            len(proto).to_bytes(1, 'big') + proto
             for proto in self.protocol_name_list
         ])
 

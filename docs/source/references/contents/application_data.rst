@@ -1,5 +1,5 @@
-siotls.contents.application_data
-================================
+Application Data
+================
 
 .. automodule:: siotls.contents.application_data
    :members:

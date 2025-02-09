@@ -1,5 +1,5 @@
-siotls.contents.heartbeat
-=========================
+Heartbeat
+=========
 
 .. automodule:: siotls.contents.heartbeat
    :members:

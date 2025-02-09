@@ -3,10 +3,13 @@ import collections.abc
 import inspect
 
 # Get the pure python implementation of collections.OrderedDict
-_collections_globals = {k: getattr(collections, k) for k in dir(collections)}
-exec(inspect.getsource(collections.OrderedDict), _collections_globals)  # noqa: S102
-PyOrderedDict = _collections_globals.pop("OrderedDict")
-del _collections_globals
+try:
+    _collections_globals = {k: getattr(collections, k) for k in dir(collections)}
+    exec(inspect.getsource(collections.OrderedDict), _collections_globals)  # noqa: S102
+    PyOrderedDict = _collections_globals.pop("OrderedDict")
+    del _collections_globals
+except OSError:
+    PyOrderedDict = dict
 
 
 class _CacheEntry:

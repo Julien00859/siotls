@@ -15,13 +15,13 @@ Sans-IO Philosophy
 
 siotls embraces the `Sans‑IO`_ movement, pioneered by Cory Benfield and
 the `Hyper`_ team. This approach focuses on creating network protocol
-implementations in Python that are independent of direct I/O operations.
-While the Hyper team tackled HTTP, siotls brings this philosophy to TLS.
+implementations that are independent of network communications. While
+the Hyper team tackled HTTP, siotls brings this philosophy to TLS.
 
 siotls operates solely on bytes, leaving all socket operations to the
 user. By controlling the flow of bytes to and from siotls, the users
 retain the freedom to choose the socket library that best fits their
-needs, without being tied to a specific I/O model.
+needs.
 
 In this documentation
 ---------------------
@@ -92,3 +92,4 @@ offer TLS without direct I/O, key differences exist:
 .. _Sans‑IO: https://sans-io.readthedocs.io/
 .. _Hyper: https://github.com/python-hyper
 .. _ssl: https://docs.python.org/3/library/ssl.html#memory-bio-support
+.. _RFC-8446: https://datatracker.ietf.org/doc/html/rfc8446

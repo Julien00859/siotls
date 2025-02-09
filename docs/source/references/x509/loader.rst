@@ -1,4 +1,4 @@
-x509 loader
+x509 Loader
 ===========
 
 .. automodule:: siotls.x509.loader

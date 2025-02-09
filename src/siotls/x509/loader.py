@@ -32,14 +32,16 @@ def load_der(data, asn_object):
 
 # Single certificate
 DerCertificate = typing.NewType('DerCertificate', bytes)  #:
+PemCertificate = typing.NewType('PemCertificate', bytes)  #:
+PemCertificates = typing.NewType('PemCertificates', bytes)  #:
 
 def load_der_certificate(data: DerCertificate) -> Certificate:
     return load_der(data, Certificate())
 
-def decode_pem_certificate(data: bytes) -> DerCertificate:
+def decode_pem_certificate(data: PemCertificate) -> DerCertificate:
     return pem_decode(data.decode(), 'CERTIFICATE')
 
-def load_pem_certificate(data: bytes) -> Certificate:
+def load_pem_certificate(data: PemCertificate) -> Certificate:
     return load_der_certificate(decode_pem_certificate(data))
 
 
@@ -47,23 +49,24 @@ def load_pem_certificate(data: bytes) -> Certificate:
 def load_der_certificates(data_list: list[DerCertificate]) -> list[Certificate]:
     return [load_der(data, Certificate()) for data in data_list]
 
-def decode_pem_certificates(data: bytes) -> list[DerCertificate]:
+def decode_pem_certificates(data: PemCertificates) -> list[DerCertificate]:
     return list(pem_decode(data.decode(), 'CERTIFICATE', multi=True))
 
-def load_pem_certificates(data: bytes) -> list[Certificate]:
+def load_pem_certificates(data: PemCertificates) -> list[Certificate]:
     return load_der_certificates(decode_pem_certificates(data))
 
 
 # Certificate Revocation List (CRL)
 DerCRL = typing.NewType('DerCRL', bytes)  #:
+PemCRL = typing.NewType('PemCRL', bytes)  #:
 
 def load_der_crl(data: DerCRL) -> CertificateList:
     return load_der(data, CertificateList())
 
-def decode_pem_crl(data: bytes) -> DerCRL:
+def decode_pem_crl(data: PemCRL) -> DerCRL:
     return pem_decode(data.decode(), 'X509 CRL')
 
-def load_pem_crl(data: bytes) -> CertificateList:
+def load_pem_crl(data: PemCRL) -> CertificateList:
     return load_der_crl(decode_pem_crl(data))
 
 
@@ -72,7 +75,7 @@ DerOCSPRequest = typing.NewType('DerOCSPRequest', bytes)  #:
 DerOCSPResponse = typing.NewType('DerOCSPResponse', bytes)  #:
 DerOCSPBasicResponse = typing.NewType('DerOCSPBasicResponse', bytes)  #:
 
-def load_der_ocsp_request(data: bytes) -> OCSPRequest:
+def load_der_ocsp_request(data: DerOCSPRequest) -> OCSPRequest:
     return load_der(data, OCSPRequest())
 
 def load_der_ocsp_response(data: DerOCSPResponse) -> OCSPResponse:
@@ -84,27 +87,29 @@ def load_der_ocsp_basic_response(data: DerOCSPBasicResponse) -> BasicOCSPRespons
 
 # Private Key
 DerPrivateKey = typing.NewType('DerPrivateKey', bytes)  #:
+PemPrivateKey = typing.NewType('PemPrivateKey', bytes)  #:
 
 def load_der_private_key(data: DerPrivateKey) -> PrivateKeyInfo:
     return load_der(data, PrivateKeyInfo())
 
-def decode_pem_private_key(data: bytes) -> DerPrivateKey:
+def decode_pem_private_key(data: PemPrivateKey) -> DerPrivateKey:
     return pem_decode(data.decode(), 'PRIVATE KEY')
 
-def load_pem_private_key(data: bytes) -> PrivateKeyInfo:
+def load_pem_private_key(data: PemPrivateKey) -> PrivateKeyInfo:
     return load_der(decode_pem_private_key(data), PrivateKeyInfo())
 
 
 # Public Key
 DerPublicKey = typing.NewType('DerPublicKey', bytes)  #:
+PemPublicKey = typing.NewType('PemPublicKey', bytes)  #:
 
 def load_der_public_key(data: DerPublicKey) -> SubjectPublicKeyInfo:
     return load_der(data, SubjectPublicKeyInfo())
 
-def decode_pem_public_key(data: bytes) -> DerPublicKey:
+def decode_pem_public_key(data: PemPublicKey) -> DerPublicKey:
     return pem_decode(data.decode(), 'PUBLIC KEY')
 
-def load_pem_public_key(data: bytes):
+def load_pem_public_key(data: PemPublicKey) -> SubjectPublicKeyInfo:
     return load_der(decode_pem_public_key(data), SubjectPublicKeyInfo())
 
 

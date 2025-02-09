@@ -48,40 +48,40 @@ class AlertLevel(Hex1Enum):
     FATAL = 2
 
 
-class ALPNProtocol(enum.StrEnum):
-    HTTP_0_9 = "http/0.9"
-    HTTP_1_0 = "http/1.0"
-    HTTP_1_1 = "http/1.1"
-    SPDY_1 = "spdy/1"
-    SPDY_2 = "spdy/2"
-    SPDY_3 = "spdy/3"
-    TURN = "stun.turn"
-    STUN = "stun.nat-discovery"
-    HTTP_2 = "h2"
-    HTTP_2_TCP = "h2c"
-    WebRTC = "webrtc"
-    cWebRTC = "c-webrtc"  # noqa: N815
-    FTP = "ftp"
-    IMAP = "imap"
-    POP3 = "pop3"
-    ManageSieve = "managesieve"
-    CoAP = "coap"
-    XMPP_client = "xmpp-client"
-    XMPP_server = "xmpp-server"
-    acme_tls_1 = "acme-tls/1"
-    MQTT = "mqtt"
-    DNS_over_TLS = "dot"
-    NTSKE_1 = "ntske/1"
-    SunRPC = "sunrpc"
-    HTTP_3 = "h3"
-    SMB2 = "smb"
-    IRC = "irc"
-    NNTP_reading = "nntp"
-    NNTP_transit = "nnsp"
-    DoQ = "doq"
-    SIP = "sip/2"
-    TDS_8_0 = "tds/8.0"
-    DICOM = "dicom"
+class ALPNProtocol(bytes, enum.Enum):
+    HTTP_0_9 = b'http/0.9'
+    HTTP_1_0 = b'http/1.0'
+    HTTP_1_1 = b'http/1.1'
+    SPDY_1 = b'spdy/1'
+    SPDY_2 = b'spdy/2'
+    SPDY_3 = b'spdy/3'
+    TURN = b'stun.turn'
+    STUN = b'stun.nat-discovery'
+    HTTP_2 = b'h2'
+    HTTP_2_TCP = b'h2c'
+    WebRTC = b'webrtc'
+    cWebRTC = b'c-webrtc'  # noqa: N815
+    FTP = b'ftp'
+    IMAP = b'imap'
+    POP3 = b'pop3'
+    ManageSieve = b'managesieve'
+    CoAP = b'coap'
+    XMPP_client = b'xmpp-client'
+    XMPP_server = b'xmpp-server'
+    acme_tls_1 = b'acme-tls/1'
+    MQTT = b'mqtt'
+    DNS_over_TLS = b'dot'
+    NTSKE_1 = b'ntske/1'
+    SunRPC = b'sunrpc'
+    HTTP_3 = b'h3'
+    SMB2 = b'smb'
+    IRC = b'irc'
+    NNTP_reading = b'nntp'
+    NNTP_transit = b'nnsp'
+    DoQ = b'doq'
+    SIP = b'sip/2'
+    TDS_8_0 = b'tds/8.0'
+    DICOM = b'dicom'
 
 
 class CertificateStatusType(Hex1Enum):
