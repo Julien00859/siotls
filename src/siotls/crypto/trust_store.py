@@ -6,12 +6,12 @@ from pyasn1.codec.der.encoder import encode as der_encode
 from pyasn1_modules.rfc5280 import AuthorityKeyIdentifier, Certificate
 
 from siotls.x509.loader import load_der
-from siotls.x509.oid import AKI, ExtensionOID, oid_from_pyasn1
+from siotls.x509.oid import AKI, ExtensionOID, from_pyasn1 as oid_from_pyasn1
 
-from .signatures import TLSSignatureScheme
+from .signature_schemes import TLSSignatureScheme
 
 
-class TrustStore(metaclass=abc.ABCMeta):
+class TLSTrustStore(metaclass=abc.ABCMeta):
     def verify_chain(self, certificate_chain: Sequence[Certificate]):
         find_root_ca = (i for i, cert in enumerate(certificate_chain) if self.is_trusted(cert))
         if ca_index := next(find_root_ca, None):

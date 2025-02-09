@@ -8,7 +8,7 @@ import warnings
 
 import siotls
 import siotls.crypto.providers
-import siotls.services.providers
+import siotls.service.providers
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ def main():
         help="the cryptography library that will be used to encrypt the "
              "data on the wire and sign/validate the digital signatures")
     parser.add_argument('--service-provider', action='store',
-        choices=list_providers(siotls.services.providers), default='simple',
+        choices=list_providers(siotls.service.providers), default='simple',
         help="the http/caching service library that will be used to "
              "download remote CRLs and request OCSP statuses")
 

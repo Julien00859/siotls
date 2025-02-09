@@ -4,8 +4,7 @@ from urllib.parse import urlsplit
 
 import h11
 
-from siotls import USER_AGENT
-from siotls.service import TLSServiceError
+from siotls import TLSError, USER_AGENT
 from siotls.utils import intbyte
 
 from . import happy_eyeballs
@@ -165,7 +164,7 @@ def safe_request(  # noqa: C901, PLR0912, PLR0913, PLR0915
                         e =(f"{err}: bad response headers, expected at "
                             f"most {response_head_max_length}, but "
                             f"read {bytes_recv} so far")
-                        raise TLSServiceError(e)
+                        raise TLSError(e)
                     data = sockrecv(min(
                         chunk_length, response_head_max_length))
                     bytes_recv += len(data)
@@ -174,34 +173,34 @@ def safe_request(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     break
                 case h11.ConnectionClosed():
                     e = f"{err}: connection closed by peer"
-                    raise TLSServiceError(e)
+                    raise TLSError(e)
                 case _:
                     e = f"{err}: unexpected event: {event}"
-                    raise TLSServiceError(e)
+                    raise TLSError(e)
 
         # Make sure we got a 200 with a good CT-Length and CT-Type
         http_res = event
         if http_res.status_code != HTTPStatus.OK:
             e =(f"{err}: bad response status, expected 200, got "
                 f"{HTTPStatus(http_res.status_code)!r}")
-            raise TLSServiceError(e)
+            raise TLSError(e)
 
         content_length = http_res.headers.get(b'content-length')
         if content_length is None:
             e = f"{err}: missing mandatory response Content-Length"
-            raise TLSServiceError(e)
+            raise TLSError(e)
 
         content_length = int(content_length)  # h11 validated it
         if content_length > response_body_max_length:
             e =(f"{err}: bad response Content-Length, expected at most "
                 f"{response_body_max_length}, got {content_length}")
-            raise TLSServiceError(e)
+            raise TLSError(e)
 
         content_type = http_res.headers.get(b'content-type')
         if content_type != response_content_type:
             e =(f"{err}: bad response Content-Type, expected "
                 f"{response_content_type}, got {content_type}")
-            raise TLSServiceError(e)
+            raise TLSError(e)
 
         body = bytearray()
         while True:
@@ -216,22 +215,22 @@ def safe_request(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     break
                 case _:
                     e = f"{err}: unexpected event: {event}"
-                    raise TLSServiceError(e)
+                    raise TLSError(e)
 
     except OSError as exc:
         e = f"{err}: connection failure"
-        raise TLSServiceError(e) from exc
+        raise TLSError(e) from exc
 
     except h11.RemoteProtocolError as exc:
         e = f"{err}: bad http response"
-        raise TLSServiceError(e) from exc
+        raise TLSError(e) from exc
 
     except TimeoutError as exc:
         kind = ( "connection (conn)" if not sock
             else "wall-clock (http)" if isinstance(exc, WallClockTimeoutError)
             else "tcp read/write (sock)")
         e = f"{err}: {kind} timeout"
-        raise TLSServiceError(e) from exc
+        raise TLSError(e) from exc
 
     else:
         return body

@@ -1,11 +1,14 @@
 import collections
 import dbm
+import logging
 import pathlib
 import struct
 import tempfile
 from datetime import UTC, datetime
 
 from blake3 import blake3  # 10x faster than sha512/256, for the same security
+
+logger = logging.getLogger(__name__)
 
 struct_formats = {
     0: f"<B{blake3.digest_size}sf"
@@ -21,6 +24,7 @@ class FileStore(collections.abc.MutableMapping):
         if not self.root_path.isdir():
             self.root_path.mkdir(0o775)
         self._store = dbm.open(self.root_path / 'store.dbm', mode=0o664)  # noqa: SIM115
+        logging.info("Using filestore at %s (%s entries)", self.root_path, len(self._store))
 
     def _parse(self, key, entry):
         version = int.from_bytes(entry[0], 'little')

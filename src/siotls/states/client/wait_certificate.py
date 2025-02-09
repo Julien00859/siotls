@@ -15,7 +15,6 @@ from siotls.iana import (
     ExtensionType,
     HandshakeType,
 )
-from siotls.services import TLSServiceError
 
 from .. import State
 from . import ClientWaitCertificateVerify

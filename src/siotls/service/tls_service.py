@@ -5,6 +5,8 @@ from datetime import UTC, datetime, timedelta
 from pyasn1_modules.rfc5280 import Certificate, CertificateList
 from pyasn1_modules.rfc6960 import BasicOCSPResponse
 
+from siotls import TLSError, TLSErrorGroup
+from siotls.contents import alerts
 from siotls.service.ocsp import load_verify_ocsp
 from siotls.x509.loader import (
     DerCertificate,
@@ -13,7 +15,6 @@ from siotls.x509.loader import (
     DerOCSPResponse,
 )
 
-from . import TLSServiceError, TLSServiceErrorGroup
 from .filestore import FileStore
 from .sievecache import SieveCache
 
@@ -61,7 +62,7 @@ class TLSService(metaclass=abc.ABCMeta):
         if ocsp_res_data := self._mem_cache.get(ocsp_req_data):
             try:
                 return load_verify_ocsp(ocsp_req_data, ocsp_res_data, signer_cert)
-            except TLSServiceError:
+            except TLSError:
                 self._mem_cache.rem(ocsp_req_data)
         return None
 
@@ -78,8 +79,13 @@ class TLSService(metaclass=abc.ABCMeta):
         if cached_ocsp_basic_res := self.get_cached_ocsp(ocsp_req_data, signer_cert):
             return cached_ocsp_basic_res
 
-        ocsp_res_data = self.download_ocsp(url, ocsp_req_data)
-        ocsp_basic_res = load_verify_ocsp(ocsp_req_data, ocsp_res_data, signer_cert)
+        try:
+            ocsp_res_data = self.download_ocsp(url, ocsp_req_data)
+            ocsp_basic_res = load_verify_ocsp(ocsp_req_data, ocsp_res_data, signer_cert)
+        except alerts.Alert:
+            raise
+        except TLSError as exc:
+            raise alerts.BadCertificateStatusResponse from exc
 
         next_update = ocsp_basic_res['tbsResponseData']['responses'][0]['nextUpdate']
         if next_update:
@@ -93,7 +99,7 @@ class TLSService(metaclass=abc.ABCMeta):
             if cert_res := self._file_cache.get(url):
                 try:
                     return load_verify_cert(cert_res)
-                except TLSServiceError:
+                except TLSError:
                     self._file_cache.rem(url)
         return None
 
@@ -105,18 +111,25 @@ class TLSService(metaclass=abc.ABCMeta):
         if cert := self.get_cached_cert(urls):
             return cert
 
+        if not urls:
+            e = "no URLs"
+            raise ValueError(e)
+
         excs = []
         for url in urls:
             try:
                 cert_res = self.download_cert(url)
+                cert = load_verify_cert(cert_res)
                 break
-            except TLSServiceError as exc:
+            except alerts.Alert as exc:
                 excs.append(exc)
+            except TLSError as exc:
+                exc_ = alerts.CertificateUnknown
+                exc_.__cause__ = exc
+                excs.append(exc_)
         else:
             e = "all URLs failed"
-            raise TLSServiceErrorGroup(e, excs)
-
-        cert = load_verify_cert(cert_res)
+            raise TLSErrorGroup(e, excs)
 
         next_update = ...
         if next_update:

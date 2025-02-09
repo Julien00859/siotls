@@ -16,6 +16,9 @@ key_logger.addHandler(logging.NullHandler())
 class TLSError(Exception):
     pass
 
+class TLSErrorGroup(ExceptionGroup, TLSError):  # noqa: N818
+    pass
+
 from .configuration import TLSConfiguration
 from .connection import TLSConnection
 

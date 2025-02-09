@@ -2,7 +2,7 @@ import logging
 import socket
 
 from siotls import USER_AGENT, TLSConfiguration, TLSConnection
-from siotls.services.providers.simple.trust_store import get_system_store
+from siotls.service.providers.simple.trust_store import get_system_store
 from siotls.utils import socket_pformat
 
 logger = logging.getLogger(__name__)

@@ -1,10 +1,10 @@
-from siotls.service import TLSService
+from siotls.service import HTTPService
 from siotls.utils import intbyte
 
 from .safe_request import safe_request
 
 
-class SimpleService(TLSService):
+class SimpleService(HTTPService):
     def _download_cert(self, url):
         return safe_request(
             url,

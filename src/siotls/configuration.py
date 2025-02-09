@@ -4,7 +4,6 @@ import logging
 import typing
 from collections.abc import Sequence
 
-from cryptography.x509.verification import PolicyBuilder, Store
 from pyasn1_modules.rfc5280 import (
     Certificate,
     CertificateList,
@@ -13,7 +12,7 @@ from pyasn1_modules.rfc5280 import (
 from pyasn1_modules.rfc5958 import PrivateKeyInfo
 
 import siotls.x509.loader as x509loader
-from siotls.crypto import TLSSignatureScheme
+from siotls.crypto import TLSSignatureScheme, TLSTrustStore
 from siotls.iana import (
     ALPNProtocol,
     CertificateType,
@@ -22,7 +21,7 @@ from siotls.iana import (
     NamedGroup,
     SignatureScheme,
 )
-from siotls.services import CRLService, CRTService, OCSPService
+from siotls.service import TLSService
 
 logger = logging.getLogger(__name__)
 
@@ -40,22 +39,20 @@ class TLSConfiguration:
     various TLS extensions such as Server Name Indication (SNI),
     Application-Layer Protocol Negotiation (ALPN) and others.
 
-    **Client** On the client-side, the ``trust_store`` and either
-    ``crl_service`` either ``ocsp_service`` and ``cert_service``
-    parameters are recommended. If ``trust_store`` is not set, the
-    server certificates will not be verified. It the services are not
-    set, online certificate revocation check will not be performed.
+    **Client** On the client-side, the :attr:`trust_store` and
+    :attr:`service` parameters are recommended. If :attr:`trust_store`
+    is not set, the server certificates will not be verified. It
+    :attr:`service` is not set, online certificate revocation check will
+    not be performed.
 
     >>> minimal_client_config = TLSConfiguration(
     >>>     'client',
     >>>     trust_store=...,
-    >>>     ocsp_service=...,
-    >>>     cert_service=...,
-    >>>     crl_service=...,
+    >>>     service=...,
     >>> )
 
-    **Server** On the server-side, the ``private_key`` and ``certificate_chain``
-    parameters are mandatory.
+    **Server** On the server-side, the :attr:`private_key` and
+    :attr:`certificate_chain` parameters are mandatory.
 
     >>> minimal_server_config = TLSConfiguration(
     >>>     'server',
@@ -64,24 +61,27 @@ class TLSConfiguration:
     >>> )
 
     **Mutual TLS** Server authentication is mandatory by TLS. Client
-    authentication (mutual TLS) is optional. Set the ``trust_store``
+    authentication (mutual TLS) is optional. Set the :attr:`trust_store`
     parameter server-side to request client authentication. Set the
-    ``private_key`` and ``certificate_chain`` pair client-side to comply.
+    :attr:`private_key` and :attr:`certificate_chain` pair client-side
+    to comply.
 
-    **Raw Public Keys** The ``trust_store`` and ``certificate_chain``
-    parameters are used for certificate authentication. It is possible
-    to use raw public keys in addition to / instead of certificates. Set
-    the ``public_key`` parameter server-side. Set the
-    ``trusted_public_keys`` parameter client-side. Set the other
-    parameter on the other side for mutual TLS using raw public keys.
+    **Raw Public Keys** The :attr:`trust_store` and
+    :attr:`certificate_chain` parameters are used for certificate
+    authentication. It is possible to authenticate using raw public keys
+    in addition to / instead of certificates. Set the :attr:`public_key`
+    parameter server-side. Set the :attr:`trusted_public_keys` parameter
+    client-side. Set the other parameter on the other side for mutual
+    TLS using raw public keys.
 
     **Certificate Revocation** siotls doesn't perform any IO on its own,
     this poses a problem when validating certificates, as it must check
     with the CA that the peer's certificate has not been revoked. siotls
     delegates the communication with the CA to the user, via the
-    ``crl``, ``ocsp`` and ``cert`` services. The user should choose an
-    implementation of those services that integrates with its network
-    stack.
+    :attr:`service`: a user provided class that is used to download
+    certificates, certificate revocation lists and OCSP. An alternative
+    is to make sure that the remote peer provide an OCSP stapling for
+    all the certificates in its chain.
     """
 
     side: typing.Literal['client', 'server']
@@ -158,7 +158,7 @@ class TLSConfiguration:
     :attr:`TLSConnection.nconfig.signature_algorithm`.
     """
 
-    trust_store: Store | None = None
+    trust_store: TLSTrustStore | None = None
     """
     Make peer authentication mandatory. Allow the peer to authenticate
     using x509 certificates.
@@ -167,7 +167,7 @@ class TLSConfiguration:
     requirements for TLS server certificates[^1].
 
     The trust store to use when validating peer x509 certificates, or
-    ``None`` to disable x509 validation (unsafe unless
+    :attr:`None` to disable x509 validation (unsafe unless
     :attr:`trusted_public_keys` is non empty). The module
     :mod:`siotls.trust_store` provides several functions to facilitate
     building such store.
@@ -181,25 +181,9 @@ class TLSConfiguration:
     considered revoked.
     """
 
-    crl_service: CRLService | None = None
+    service: TLSService | None = None
     """
-    The service used to download the certificate revocation list (CRL)
-    at the autority that issued the peer's certificate. Used to verify
-    that the peer's certificate has not been revoked.
-    """
-
-    ocsp_service: OCSPService | None = None
-    """
-    The service used to download the certificate status at the autority
-    that issued the peer's certificate. Need :attr:`cert_service`. Used
-    to verify that the peer's certificate has not been revoked.
-    """
-
-    cert_service: CRTService | None = None
-    """
-    The service used to download the certificate that signed the OCSP
-    response, should that certificate be different than the CA that
-    issued the peer's certificate. Need :attr:`ocsp_service`.
+    The service that is used
     """
 
     max_chain_depth: int = 5
@@ -374,14 +358,6 @@ class TLSConfiguration:
         if self.trusted_public_keys:
             types.append(CertificateType.RAW_PUBLIC_KEY)
         return types
-
-    @functools.cached_property
-    def policy_builder(self):
-        return (
-            PolicyBuilder()
-            .store(self.trust_store)
-            .max_chain_depth(self.max_chain_depth)
-        )
 
     @property
     def other_side(self) -> typing.Literal['client', 'server']:

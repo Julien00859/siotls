@@ -2,12 +2,11 @@ API References
 ==============
 
 .. toctree::
-   :maxdepth: 2
-   :hidden:
+   :maxdepth: 1
 
-   contents/alerts
-   x509/loader
+   contents/index
    configuration
    connection
    iana
-   services
+   service
+   x509/index
