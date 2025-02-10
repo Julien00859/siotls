@@ -1,10 +1,4 @@
-"""
-Alert Protocol as defined in :rfc:`8446#section-6`.
-
-> TLS provides an Alert content type to indicate closure information
-> and errors.
->
-"""
+""" Alert Protocol as defined in :rfc:`8446#section-6`. """
 
 import dataclasses
 import textwrap
@@ -21,13 +15,18 @@ from . import Content
 @dataclasses.dataclass(init=False)
 class Alert(Content, Serializable, metaclass=RegistryMeta):
     """
-    Abstract Alert registry
+    Abstract parent of all :class:`siotls.iana.AlertDescription` classes.
+
+    Acts as a registry too:
+
+        >>> Alert[AlertDescription.DECODE_ERROR]
+        <class 'siotls.contents.alerts.DecodeError'>
     """
     _registry_key = '_alert_registry'
     _alert_registry: typing.ClassVar = {}
 
-    content_type = ContentType.ALERT
-    can_fragment = False
+    content_type = ContentType.ALERT  #:
+    can_fragment = False  #:
 
     _struct = textwrap.dedent("""
         struct {
@@ -65,19 +64,19 @@ class Alert(Content, Serializable, metaclass=RegistryMeta):
             };
         } Alert;
     """).strip('\n')
-    args: tuple[typing.Any]
+
     level: AlertLevel
+    """
+    WARNING to gracefully close the connection (equivalent to a TCP
+    FIN), FATAL to abruptly close it (equivalent to a TCP RST)."""
+
     description: AlertDescription | int
+    """ The unique numeric identifier of the alert. """
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if Alert in cls.__bases__:
             cls._alert_registry[cls.description] = cls
-
-    def __init__(self, *args, level=None):
-        super().__init__(*args)
-        if level is not None:
-            self.level = level
 
     @classmethod
     def parse(abc, stream, **kwargs):  # noqa: ARG003

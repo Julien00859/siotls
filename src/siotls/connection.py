@@ -120,13 +120,13 @@ class TLSConnection:
 
         self._state.initiate_connection()
 
-    def receive_data(self, data):
+    def receive_data(self, data: bytes):
         """
         Enqueue raw / encrypted data received from the peer inside the
-        connection's appropriate buffer. Process the messages when
-        enough data is present. Prepare the messages to be forwarded to
-        the application upon next call to :meth:`data_to_read`, and the
-        data to send to the peer upon next call to :meth:`data_to_send`.
+        connection's buffer. Process the messages when enough data is
+        present. Prepare the messages to be forwarded to this side's
+        application upon next call to :meth:`data_to_read`, and the data
+        to send to the peer upon next call to :meth:`data_to_send`.
         """
         if not data:
             e = f"empty data: {data}"
@@ -179,7 +179,7 @@ class TLSConnection:
         """
         self._send_content(ApplicationData(data))
 
-    def data_to_read(self):
+    def data_to_read(self) -> bytes | bytearray:
         """
         Dequeue the clear data received from the peer that is intended
         for this side's application.
@@ -188,7 +188,7 @@ class TLSConnection:
         self._application_data = bytearray()
         return application_data
 
-    def data_to_send(self):
+    def data_to_send(self) -> bytes | bytearray:
         """
         Dequeue the encrypted data that is intended to the peer.
         """
@@ -212,7 +212,7 @@ class TLSConnection:
             logger.warning("EOF or CloseNotify alert during handshake")
             self._fail()
             return
-        if type(self._state) != states.Closed:
+        if type(self._state) != states.Closed:  # noqa: E721
             self._move_to_state(states.Closed)
         self._state.can_receive = False
 
@@ -236,14 +236,14 @@ class TLSConnection:
             self._send_content(fatal_alert)
         self._move_to_state(states.Failed)
 
-    def is_post_handshake(self):
+    def is_post_handshake(self) -> bool:
         """
         True when the connection state is Connected / Closed (either
         end) / Failed; False otherwise.
         """
         return isinstance(self._state, states.Connected | states.Closed | states.Failed)
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         """
         True when the connection's state is Connected / Half-Closed
         (sending end); False otherwise.
@@ -254,7 +254,7 @@ class TLSConnection:
             return self._state.can_receive
         return isinstance(self._state, states.Connected)
 
-    def wrap(self, tcp_socket):
+    def wrap(self, tcp_socket) -> WrappedSocket:
         return WrappedSocket(self, tcp_socket)
 
     # ------------------------------------------------------------------

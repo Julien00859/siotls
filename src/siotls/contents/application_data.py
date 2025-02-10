@@ -9,15 +9,22 @@ from . import Content
 
 @dataclasses.dataclass(init=False)
 class ApplicationData(Content, Serializable):
-    content_type = ContentType.APPLICATION_DATA
-    can_fragment = True
+    """ The opaque data of/for the protocol that is protected by TLS. """
+
+    content_type = ContentType.APPLICATION_DATA  #:
+    can_fragment = True  #:
 
     _struct = textwrap.dedent("""
         opaque content_data[TLSPlaintext.length];
     """).strip('\n')
-    content_data: bytes
 
-    def __init__(self, data):
+    content_data: bytes
+    """
+    The decrypted data of/for the underlying protocol. See also
+    :meth:`siotls.connection.TLSConnection.data_to_read`.
+    """
+
+    def __init__(self, data: bytes):  #:
         self.content_data = data
 
     @classmethod

@@ -11,17 +11,18 @@ from siotls.utils import RegistryMeta
 
 class Content(metaclass=RegistryMeta):
     """
-    Abstract parent class and class registry for all
-    :class:`siotls.iana.ContentType` classes.
+    Abstract parent of all :class:`siotls.iana.ContentType` classes.
 
-    >>> Content[ContentType.ALERT] is siotls.contents.alerts.Alert
-    True
+    Acts as a registry too:
+
+        >>> Content[ContentType.ALERT]
+        <class siotls.contents.alerts.Alert>
     """
     _registry_key = '_content_registry'
     _content_registry: typing.ClassVar = {}
 
     content_type: ContentType
-    """ The type of the concrete class. """
+    """ The unique numeric identifier of the content. """
 
     can_fragment: bool
     """ Can this content be fragmented over multiple TLS records? """
@@ -34,10 +35,10 @@ class Content(metaclass=RegistryMeta):
     @classmethod
     def get_parser(abc, content_type: ContentType | int) -> type[typing.Self]:
         """
-        Get the concrete Content class for ``content_type``.
+        Get the concrete Content class for ``content_type``, when
+        ``content_type`` comes from an untrusted source.
 
-        :raise alerts.DecodeError: When ``content_type``
-            is not known.
+        :raise alerts.DecodeError: When ``content_type`` is not known.
         """
         try:
             return abc[ContentType(content_type)]

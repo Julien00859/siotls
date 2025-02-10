@@ -50,8 +50,7 @@ openssl = [
 # services providers
 simple = [
   "blake3",
-  "rfc6555 @ git+https://github.com/Julien00859/rfc6555@has-ipv6-unclosed-fd",
-  "h11 @ git+https://github.com/Julien00859/h11@patches",
+  "h11 @ https://pypi.drlazor.be/h11/h11-0.14.1-py3-none-any.whl",
 ]
 
 [project.urls]

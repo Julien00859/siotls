@@ -9,6 +9,14 @@ from . import Content, alerts
 
 @dataclasses.dataclass(init=False)
 class ChangeCipherSpec(Content, Serializable):
+    """
+    A content that has no meaning in TLS 1.3 but that is still
+    transmitted because of `protocol ossification`_, see
+    :rfc:`8446#appendix-D.4` (TLS 1.3 - Middlebox Compatibility Mode).
+
+    .. _protocol ossification: https://en.wikipedia.org/wiki/Protocol_ossification
+    """
+
     content_type = ContentType.CHANGE_CIPHER_SPEC
     can_fragment = False
 
