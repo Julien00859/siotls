@@ -1,42 +1,60 @@
 """
-TLS defines about a hundred hierarchized structures, with many of them
-coming from extensions.
+TLS defines about a hundred structures, with many of them coming from
+extensions.
 
-TLS is an extensible protocole. Many of the structures present here are
+TLS is an extensible protocole, many of the structures present here are
 not defined in :rfc:`8446` (TLS 1.3) but instead defined in other RFCs.
 Often a RFC will define a new structure and IANA will grant it a unique
 identifier in one of its enumerations. TLS implementations (like siotls)
-can then support that RFC by implementing support for that new
-structure, or ignore it if they don't recognize the unique identifier.
+can choose to ignore that extension or to support it.
 
-The :mod:`siotls.iana` module enumerates and groups those
-identifiers. When the enumeration is for a TLS structure, then there's
-an abstract base class named after the enumeration, and as many concrete
+siotls tries to parse all structures, but does not necessarely supports
+them all, i.e. it is possible that it parses a structure but does
+nothing with it. It also stores the structures it doesn't know as opaque
+bytes.
+
+The :mod:`siotls.iana` module contains all the IANA enumerations and
+values. When the enumeration is for a TLS structure, then there's an
+abstract base class named after the enumeration, and as many concrete
 classes as there are values inside the enumeration.
 
 For example, the :class:`siotls.iana.ContentType` is an enumeration with
-5 values: `CHANGE_CIPHER_SPEC`, `ALERT`, `HANDSHAKE`,
-`APPLICATION_DATA`, `HEARTBEAT`. So inside this module, we find
-:class:`Content`: the abstract base class, and :class:`ChangeCipherSpec`,
-:class:`Alert`, :class:`Handshake`, :class:`ApplicationData`, :class:`,
-and :class:`Heartbeat`: its concrete classes.
+5 values: ``CHANGE_CIPHER_SPEC``, ``ALERT``, ``HANDSHAKE``,
+``APPLICATION_DATA``, ``HEARTBEAT``. For those, :class:`Content` is the
+abstract base class, and :class:`~change_cipher_spec.ChangeCipherSpec`,
+:class:`~alerts.Alert`, :class:`~handshakes.Handshake`,
+:class:`~application_data.ApplicationData`, and
+:class:`~heartbeat.Heartbeat` are the concrete classes.
 
 Every concrete class is automatically registered inside the abstract
 base class it implements, using the enueration value as key:
 
-    siotls.contents.Content[siotls.iana.ContentType.ALERT] is siotls.contents.alerts.Alert
+
+    >>> siotls.contents.Content[siotls.iana.ContentType.ALERT]
+    <class siotls.contents.alerts.Alert>
 
 On the wire the structures are generally serialized as follow:
 
-    b"{type}{length}{structure}"
+.. code-block:: python
+
+   b"{type}{length}{structure}"
 
 The way siotls works, it uses the abstract base class to start parsing
 the data, to read the ``type`` and ``length``. The abstract base class
 then specializes itself into the concrete class for ``type`` and
 continues parsing using that concrete class.
 
-    >>> Handshake.parse(SerialIO(b"\x01" + ...))
+    >>> Handshake.parse(SerialIO(b"\\x01" + ...))
     ClientHello(...)  # ClientHello has msg_type=0x01
+
+Pretty much all objects are parsed as above, with the notable exception
+of the top-level :class:`Content` object due to its relation with the
+Record Protocol (:rfc:`8446#section-5`):
+
+    >>> Content.get_parser(0x16)
+    <class siotls.contents.handshakes.Handshake>  # Handshake has content_type=0x16
+    >>> _.parse(SerialIO(b"\\x01" + ...))
+    ClientHello(...)
 """
 
 import typing
@@ -47,12 +65,11 @@ from siotls.utils import RegistryMeta
 
 class Content(metaclass=RegistryMeta):
     """
-    Abstract parent of all :class:`siotls.iana.ContentType` classes.
+    Abstract base class and registry for
+    :class:`siotls.iana.ContentType`.
 
-    Acts as a registry too:
-
-        >>> Content[ContentType.ALERT]
-        <class siotls.contents.alerts.Alert>
+    The *content* is the top-level object of TLS, every message is a
+    *content*.
     """
     _registry_key = '_content_registry'
     _content_registry: typing.ClassVar = {}

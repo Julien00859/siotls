@@ -4,6 +4,8 @@ Contents
 .. automodule:: siotls.contents
    :members:
 
+The concretes classes of the above abstract object:
+
 .. toctree::
    :maxdepth: 1
 
